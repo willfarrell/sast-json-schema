@@ -1,0 +1,220 @@
+[
+  {
+    "description": "type=[number,null]",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass",
+        "data": {
+          "type": ["number", "null"],
+          "enum": [-1e307, 1e307]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail",
+        "data": {
+          "type": ["number", "null"]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=number with enum",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when enum is set",
+        "data": {
+          "type": "number",
+          "enum": [-1e307, 1e307]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when enum is not set",
+        "data": {
+          "type": "number"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=number with minimum",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when minimum is set",
+        "data": {
+          "type": "number",
+          "minimum": -1e308,
+          "maximum": 1e308
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when minimum is not set",
+        "data": {
+          "type": "number",
+          "maximum": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when minimum is < -Number.MAX_VALUE",
+        "data": {
+          "type": "number",
+          "minimum": -1.1e308,
+          "maximum": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when minimum is > Number.MAX_VALUE",
+        "data": {
+          "type": "number",
+          "minimum": 1.1e308,
+          "maximum": 0
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=number with maximum",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when maximum is set",
+        "data": {
+          "type": "number",
+          "minimum": -1e308,
+          "maximum": 1e308
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when maximum is not set",
+        "data": {
+          "type": "number",
+          "minimum": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when maximum is < -Number.MAX_VALUE",
+        "data": {
+          "type": "number",
+          "maximum": -1.1e308,
+          "minimum": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when maximum is > Number.MAX_VALUE",
+        "data": {
+          "type": "number",
+          "maximum": 1.1e308,
+          "minimum": 0
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=number with exclusiveMinimum",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when exclusiveMinimum is set",
+        "data": {
+          "type": "number",
+          "exclusiveMinimum": -1e308,
+          "exclusiveMaximum": 1e308
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when exclusiveMinimum is not set",
+        "data": {
+          "type": "number",
+          "exclusiveMaximum": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when exclusiveMinimum is < -Number.MAX_VALUE",
+        "data": {
+          "type": "number",
+          "exclusiveMinimum": -1.1e308,
+          "exclusiveMaximum": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when exclusiveMinimum is > Number.MAX_VALUE",
+        "data": {
+          "type": "number",
+          "exclusiveMinimum": 1.1e308,
+          "exclusiveMaximum": 0
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=number with exclusiveMaximum",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when exclusiveMaximum is set",
+        "data": {
+          "type": "number",
+          "exclusiveMinimum": -1e308,
+          "exclusiveMaximum": 1e308
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when exclusiveMaximum is not set",
+        "data": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when exclusiveMaximum is < -Number.MAX_VALUE",
+        "data": {
+          "type": "number",
+          "exclusiveMaximum": -1.1e308,
+          "exclusiveMinimum": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when exclusiveMaximum is > Number.MAX_VALUE",
+        "data": {
+          "type": "number",
+          "exclusiveMaximum": 1.1e308,
+          "exclusiveMinimum": 0
+        },
+        "valid": false
+      }
+    ]
+  }
+]

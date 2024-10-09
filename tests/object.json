@@ -1,0 +1,313 @@
+[
+  {
+    "description": "type=[object,null]",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass",
+        "data": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "properties": {},
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail",
+        "data": {
+          "type": ["object", "null"]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with additionalProperties",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when additionalProperties is set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "properties": {},
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when additionalProperties is set to true",
+        "data": {
+          "type": "object",
+          "additionalProperties": true,
+          "unevaluatedProperties": false,
+          "properties": {},
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when additionalProperties is not set",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {},
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with unevaluatedProperties",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when unevaluatedProperties is set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "properties": {},
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when unevaluatedProperties is set to true",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": true,
+          "properties": {},
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when unevaluatedProperties is not set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {},
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with properties",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when properties is set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "properties": {},
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when properties is not set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with required",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when required is set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "properties": {},
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when required is not set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "properties": {}
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with patternProperties",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when patternProperties is set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "patternProperties": {
+            "^00000000-0000-0000-0000-000000000000$": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when patternProperties is not set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when patternProperties key is missing leading ^",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "patternProperties": {
+            "00000000-0000-0000-0000-000000000000$": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when patternProperties key is missing trailing $",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "patternProperties": {
+            "^00000000-0000-0000-0000-000000000000": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with propertyNames",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when propertyNames is set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^00000000-0000-0000-0000-000000000000$",
+            "maxLength": 36
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when propertyNames is not set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with maxProperties",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when maxProperties is set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^00000000-0000-0000-0000-000000000000$",
+            "maxLength": 36
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when maxProperties is not set",
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^00000000-0000-0000-0000-000000000000$",
+            "maxLength": 36
+          },
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  }
+]

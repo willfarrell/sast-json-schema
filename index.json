@@ -1,0 +1,396 @@
+{
+  "$id": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json",
+  "title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
+  "description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
+  "definitions": {
+    "schemaArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#" }
+    },
+    "safeCount": {
+      "description": "[0, Number.MAX_SAFE_INTEGER]",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "safeInteger": {
+      "description": "[Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "safeNumber": {
+      "description": "[-Number.MAX_VALUE, Number.MAX_VALUE], rounded down",
+      "minimum": -1e308,
+      "maximum": 1e308
+    },
+    "safePattern": {
+      "$comment": "TODO? reject use of non-escaped ., charset ranges should be used instead ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$",
+      "pattern": "^\\^.*\\$$"
+    },
+    "typeArray": {
+      "oneOf": [
+        { "const": "array" },
+        { "type": "array", "contains": { "const": "array" } }
+      ]
+    },
+    "typeInteger": {
+      "oneOf": [
+        { "const": "integer" },
+        {
+          "type": "array",
+          "contains": { "const": "integer" }
+        }
+      ]
+    },
+    "typeIntegerOrNumber": {
+      "oneOf": [
+        { "enum": ["integer", "number"] },
+        {
+          "type": "array",
+          "contains": { "enum": ["integer", "number"] }
+        }
+      ]
+    },
+    "typeNumber": {
+      "oneOf": [
+        { "const": "number" },
+        {
+          "type": "array",
+          "contains": { "const": "number" }
+        }
+      ]
+    },
+    "typeString": {
+      "oneOf": [
+        { "const": "string" },
+        { "type": "array", "contains": { "const": "string" } }
+      ]
+    },
+    "typeObject": {
+      "oneOf": [
+        { "const": "object" },
+        { "type": "array", "contains": { "const": "object" } }
+      ]
+    }
+  },
+  "dependencies": {
+    "contains": {
+      "required": ["maxContains", "uniqueItems", "unevaluatedItems"]
+    },
+    "items": {
+      "required": ["maxItems", "uniqueItems", "unevaluatedItems"]
+    },
+    "prefixItems": {
+      "required": ["maxItems", "uniqueItems", "unevaluatedItems"]
+    },
+    "additionalProperties": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeObject" },
+        "additionalProperties": {
+          "const": false
+        }
+      }
+    },
+    "unevaluatedProperties": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeObject" },
+        "unevaluatedProperties": {
+          "const": false
+        }
+      }
+    },
+    "unevaluatedItems": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeArray" },
+        "unevaluatedItems": {
+          "const": false
+        }
+      }
+    },
+    "maximum": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "$ref": "#/definitions/typeInteger" },
+            "maximum": { "$ref": "#/definitions/safeInteger" }
+          }
+        },
+        {
+          "properties": {
+            "type": { "$ref": "#/definitions/typeNumber" },
+            "maximum": { "$ref": "#/definitions/safeNumber" }
+          }
+        }
+      ]
+    },
+    "exclusiveMaximum": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "$ref": "#/definitions/typeInteger" },
+            "exclusiveMaximum": { "$ref": "#/definitions/safeInteger" }
+          }
+        },
+        {
+          "properties": {
+            "type": { "$ref": "#/definitions/typeNumber" },
+            "exclusiveMaximum": { "$ref": "#/definitions/safeNumber" }
+          }
+        }
+      ]
+    },
+    "minimum": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "$ref": "#/definitions/typeInteger" },
+            "minimum": { "$ref": "#/definitions/safeInteger" }
+          }
+        },
+        {
+          "properties": {
+            "type": { "$ref": "#/definitions/typeNumber" },
+            "minimum": { "$ref": "#/definitions/safeNumber" }
+          }
+        }
+      ]
+    },
+    "exclusiveMinimum": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "$ref": "#/definitions/typeInteger" },
+            "exclusiveMinimum": { "$ref": "#/definitions/safeInteger" }
+          }
+        },
+        {
+          "properties": {
+            "type": { "$ref": "#/definitions/typeNumber" },
+            "exclusiveMinimum": {
+              "$ref": "#/definitions/safeNumber"
+            }
+          }
+        }
+      ]
+    },
+    "minContains": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeArray" },
+        "minContains": { "$ref": "#/definitions/safeCount" }
+      }
+    },
+    "maxContains": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeArray" },
+        "maxContains": { "$ref": "#/definitions/safeCount" }
+      }
+    },
+    "minItems": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeArray" },
+        "minItems": { "$ref": "#/definitions/safeCount" }
+      }
+    },
+    "maxItems": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeArray" },
+        "maxItems": { "$ref": "#/definitions/safeCount" }
+      }
+    },
+    "minLength": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeString" },
+        "minLength": { "$ref": "#/definitions/safeCount" }
+      }
+    },
+    "maxLength": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeString" },
+        "maxLength": { "$ref": "#/definitions/safeCount" }
+      }
+    },
+    "minProperties": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeObject" },
+        "minProperties": { "$ref": "#/definitions/safeCount" }
+      }
+    },
+    "maxProperties": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeObject" },
+        "maxProperties": { "$ref": "#/definitions/safeCount" }
+      }
+    },
+    "pattern": {
+      "properties": {
+        "pattern": {
+          "$ref": "#/definitions/safePattern"
+        }
+      },
+      "required": ["maxLength"]
+    },
+    "properties": {
+      "required": ["additionalProperties", "unevaluatedProperties"]
+    },
+    "patternProperties": {
+      "required": [
+        "maxProperties",
+        "additionalProperties",
+        "unevaluatedProperties"
+      ],
+      "properties": {
+        "patternProperties": {
+          "propertyNames": {
+            "$ref": "#/definitions/safePattern"
+          }
+        }
+      }
+    },
+    "propertyNames": {
+      "properties": {
+        "propertyNames": {
+          "required": ["type"]
+        }
+      },
+      "required": ["maxProperties"]
+    },
+    "format": {
+      "required": ["maxLength"]
+    },
+    "type": {
+      "allOf": [
+        {
+          "description": "Ensure `array` has strictness.",
+          "if": {
+            "properties": {
+              "type": {
+                "$ref": "#/definitions/typeArray"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "oneOf": [
+              { "required": ["prefixItems"] },
+              {
+                "required": ["items"]
+              },
+              {
+                "required": ["contains"]
+              }
+            ]
+          }
+        },
+        {
+          "description": "Ensure `integer`/`number` has strictness.",
+          "if": {
+            "properties": {
+              "type": {
+                "$ref": "#/definitions/typeIntegerOrNumber"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "allOf": [
+              {
+                "anyOf": [
+                  { "required": ["enum"] },
+                  { "required": ["minimum"] },
+                  { "required": ["exclusiveMinimum"] }
+                ]
+              },
+              {
+                "anyOf": [
+                  { "required": ["enum"] },
+                  { "required": ["maximum"] },
+                  { "required": ["exclusiveMaximum"] }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "description": "Ensure `string` has strictness.",
+          "if": {
+            "properties": {
+              "type": {
+                "$ref": "#/definitions/typeString"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "oneOf": [
+              {
+                "required": ["enum"]
+              },
+              {
+                "required": ["pattern"]
+              },
+              {
+                "required": ["format"]
+              }
+            ]
+          }
+        },
+        {
+          "description": "Ensure `object` has strictness.",
+          "if": {
+            "properties": {
+              "type": {
+                "$ref": "#/definitions/typeObject"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": ["properties"]
+              },
+              {
+                "required": ["patternProperties"]
+              },
+              {
+                "required": ["propertyNames"]
+              }
+            ],
+            "required": ["required"]
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "additionalItems": { "$ref": "#" },
+    "additionalProperties": { "$ref": "#" },
+    "dependencies": {
+      "additionalProperties": {
+        "anyOf": [{ "type": "array" }, { "$ref": "#" }]
+      }
+    },
+    "items": {
+      "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/schemaArray" }]
+    },
+    "prefetchItems": { "$ref": "#/definitions/schemaArray" },
+    "definitions": {
+      "additionalProperties": { "$ref": "#" }
+    },
+    "patternProperties": {
+      "additionalProperties": { "$ref": "#" }
+    },
+    "properties": {
+      "additionalProperties": { "$ref": "#" }
+    },
+    "if": { "$ref": "#" },
+    "then": { "$ref": "#" },
+    "else": { "$ref": "#" },
+    "allOf": { "$ref": "#/definitions/schemaArray" },
+    "anyOf": { "$ref": "#/definitions/schemaArray" },
+    "oneOf": { "$ref": "#/definitions/schemaArray" },
+    "not": { "$ref": "#" },
+    "contains": { "$ref": "#" },
+    "propertyNames": { "$ref": "#" }
+  }
+}

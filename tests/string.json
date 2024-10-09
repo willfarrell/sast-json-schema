@@ -1,0 +1,162 @@
+[
+  {
+    "description": "type=[string,null]",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass",
+        "data": {
+          "type": ["string", "null"],
+          "enum": ["test"]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail",
+        "data": {
+          "type": ["string", "null"]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with enum",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when enum is set",
+        "data": {
+          "type": "string",
+          "enum": ["test"]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when enum is not set",
+        "data": {
+          "type": "string"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when enum is not set",
+        "data": {
+          "type": ["string", "null"]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with format",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "$todo": [
+      "add in check for certain formats that have supreceeded",
+      "reject use of non-escaped ., charset ranges should be used instead"
+    ],
+    "tests": [
+      {
+        "description": "Should pass when format is set",
+        "data": {
+          "type": "string",
+          "format": "uuid",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when format is not set",
+        "data": {
+          "type": "string"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is set and maxLength is not set",
+        "data": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with pattern",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when pattern is set",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000-0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern is not set",
+        "data": {
+          "type": "string"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern missing leading ^",
+        "data": {
+          "type": "string",
+          "pattern": "00000000-0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern missing trailing $",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000-0000-0000-0000-000000000000",
+          "maxLength": 36
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with maxLength",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "$todo": [
+      "add in check for certain formats that have supreceeded",
+      "reject use of non-escaped ., charset ranges should be used instead"
+    ],
+    "tests": [
+      {
+        "description": "Should pass when maxLength is set",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000-0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when maxLength is not set",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000-0000-0000-0000-000000000000$"
+        },
+        "valid": false
+      }
+    ]
+  }
+]

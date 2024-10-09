@@ -1,0 +1,44 @@
+{
+  "name": "sast-json-schema",
+  "version": "0.0.0-alpha.0",
+  "description": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
+  "type": "module",
+  "main": "index.json",
+  "files": [
+    "index.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": [
+    "JSON",
+    "Schema",
+    "SAST",
+    "Secure",
+    "Safe",
+    "ASVS",
+    "OWASP",
+    "NIST"
+  ],
+  "author": "willfarrell",
+  "repository": {
+    "type": "git",
+    "url": "github:willfarrell/sast-json-schema"
+  },
+  "bugs": {
+    "url": "https://github.com/willfarrell/sast-json-schema/issues"
+  },
+  "homepage": "https://github.com/willfarrell/sast-json-schema/",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/willfarrell"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "json-schema-test-esm": "3.0.0"
+  }
+}

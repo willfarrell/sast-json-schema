@@ -1,0 +1,274 @@
+[
+  {
+    "description": "type=[array,null]",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass",
+        "data": {
+          "type": ["array", "null"],
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail",
+        "data": {
+          "type": ["array", "null"]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with items",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when items is set",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when items is not set",
+        "data": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with uniqueItems",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when uniqueItems is set",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when uniqueItems is set to false",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": false,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when uniqueItems is not set with items",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when uniqueItems is not set with prefixItems",
+        "data": {
+          "type": "array",
+          "prefixItems": [{ "type": "integer", "minimum": 0, "maximum": 1 }],
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when uniqueItems is not set with contains",
+        "data": {
+          "type": "array",
+          "contains": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with maxItems",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when maxItems is set",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when maxItems is not set w/ items",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when maxItems is not set w/ prefixItems",
+        "data": {
+          "type": "array",
+          "prefixItems": [{ "type": "integer", "minimum": 0, "maximum": 1 }],
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with unevaluatedItems",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when unevaluatedItems is set",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when unevaluatedItems is set to true",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": true
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when unevaluatedItems is not set with items",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when unevaluatedItems is not set with contains",
+        "data": {
+          "type": "array",
+          "contains": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when unevaluatedItems is not set with prefixItems",
+        "data": {
+          "type": "array",
+          "prefixItems": [{ "type": "integer", "minimum": 0, "maximum": 1 }],
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with contains",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contains is set",
+        "data": {
+          "type": "array",
+          "contains": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contains is not set",
+        "data": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with maxContains",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when maxContains is set",
+        "data": {
+          "type": "array",
+          "contains": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when maxContains is not set",
+        "data": {
+          "type": "array",
+          "contains": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  }
+]
