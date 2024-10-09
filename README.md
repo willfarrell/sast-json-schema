@@ -20,7 +20,7 @@ isSchemaSecure(schema)
 ```
 
 ### cli
-Using `ajv-cmd`
+Using [`ajv-cmd`](https://github.com/willfarrell/ajv-cmd)
 ```bash
 ajv sast path/to/schema.json
 ```
