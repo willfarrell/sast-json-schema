@@ -9,7 +9,6 @@
         "description": "Should pass",
         "data": {
           "type": ["object", "null"],
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "properties": {},
           "required": []
@@ -35,9 +34,22 @@
         "description": "Should pass when additionalProperties is set",
         "data": {
           "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "unevaluatedProperties": false,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when additionalProperties is set to false",
+        "data": {
+          "type": "object",
           "additionalProperties": false,
           "unevaluatedProperties": false,
-          "properties": {},
           "required": []
         },
         "valid": true
@@ -48,7 +60,6 @@
           "type": "object",
           "additionalProperties": true,
           "unevaluatedProperties": false,
-          "properties": {},
           "required": []
         },
         "valid": false
@@ -58,7 +69,6 @@
         "data": {
           "type": "object",
           "unevaluatedProperties": false,
-          "properties": {},
           "required": []
         },
         "valid": false
@@ -75,7 +85,6 @@
         "description": "Should pass when unevaluatedProperties is set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "properties": {},
           "required": []
@@ -86,7 +95,6 @@
         "description": "Should fail when unevaluatedProperties is set to true",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": true,
           "properties": {},
           "required": []
@@ -97,7 +105,6 @@
         "description": "Should fail when unevaluatedProperties is not set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "properties": {},
           "required": []
         },
@@ -115,7 +122,6 @@
         "description": "Should pass when properties is set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "properties": {},
           "required": []
@@ -126,7 +132,6 @@
         "description": "Should fail when properties is not set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "required": []
         },
@@ -144,7 +149,6 @@
         "description": "Should pass when required is set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "properties": {},
           "required": []
@@ -155,7 +159,6 @@
         "description": "Should fail when required is not set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "properties": {}
         },
@@ -173,7 +176,6 @@
         "description": "Should pass when patternProperties is set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "patternProperties": {
             "^00000000-0000-0000-0000-000000000000$": {
@@ -191,7 +193,6 @@
         "description": "Should fail when patternProperties is not set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "maxProperties": 1,
           "required": []
@@ -202,7 +203,6 @@
         "description": "Should fail when patternProperties key is missing leading ^",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "patternProperties": {
             "00000000-0000-0000-0000-000000000000$": {
@@ -220,7 +220,6 @@
         "description": "Should fail when patternProperties key is missing trailing $",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "patternProperties": {
             "^00000000-0000-0000-0000-000000000000": {
@@ -246,7 +245,6 @@
         "description": "Should pass when propertyNames is set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "propertyNames": {
             "type": "string",
@@ -262,7 +260,6 @@
         "description": "Should fail when propertyNames is not set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "maxProperties": 1,
           "required": []
@@ -281,7 +278,6 @@
         "description": "Should pass when maxProperties is set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "propertyNames": {
             "type": "string",
@@ -297,7 +293,6 @@
         "description": "Should fail when maxProperties is not set",
         "data": {
           "type": "object",
-          "additionalProperties": false,
           "unevaluatedProperties": false,
           "propertyNames": {
             "type": "string",

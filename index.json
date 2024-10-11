@@ -87,7 +87,15 @@
       "properties": {
         "type": { "$ref": "#/definitions/typeObject" },
         "additionalProperties": {
-          "const": false
+          "oneOf": [
+            {
+              "const": false
+            },
+            {
+              "type": "object",
+              "required": ["type"]
+            }
+          ]
         }
       }
     },
@@ -343,24 +351,19 @@
           "then": {
             "anyOf": [
               {
-                "required": [
-                  "properties",
-                  "additionalProperties",
-                  "unevaluatedProperties"
-                ]
+                "required": ["additionalProperties"]
               },
               {
-                "required": [
-                  "patternProperties",
-                  "additionalProperties",
-                  "unevaluatedProperties"
-                ]
+                "required": ["properties"]
+              },
+              {
+                "required": ["patternProperties"]
               },
               {
                 "required": ["propertyNames"]
               }
             ],
-            "required": ["required"]
+            "required": ["required", "unevaluatedProperties"]
           }
         }
       ]

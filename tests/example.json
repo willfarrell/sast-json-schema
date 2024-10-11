@@ -1,0 +1,46 @@
+[
+  {
+    "description": "example meta-schema",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass SAST",
+        "dataFile": "../example.json",
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "example schema",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/example.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when using allowed",
+        "data": {
+          "allowed": 1
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when using disallowed",
+        "data": {
+          "allowed": 1,
+          "disallowed": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when using if",
+        "data": {
+          "allowed": 1,
+          "if": 1
+        },
+        "valid": true
+      }
+    ]
+  }
+]
