@@ -127,6 +127,33 @@
           "maxLength": 36
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains `\\.` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000\\.0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern contains `.` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000.0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains `\\S` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000\\S0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
       }
     ]
   },

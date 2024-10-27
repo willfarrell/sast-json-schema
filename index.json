@@ -24,8 +24,8 @@
       "maximum": 1e308
     },
     "safePattern": {
-      "$comment": "TODO? reject use of non-escaped ., charset ranges should be used instead ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$",
-      "pattern": "^\\^.*\\$$"
+      "$comment": "Must start with ^, end with $, and exclude 'any characters' (., \\S), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$",
+      "pattern": "^\\^(\\\\[.]|[^.(\\\\S)\n\r])*\\$$"
     },
     "typeArray": {
       "oneOf": [
@@ -370,6 +370,9 @@
     }
   },
   "properties": {
+    "$defs": {
+      "additionalProperties": { "$ref": "#" }
+    },
     "additionalItems": { "$ref": "#" },
     "additionalProperties": { "$ref": "#" },
     "dependencies": {

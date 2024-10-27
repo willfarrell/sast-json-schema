@@ -1,7 +1,18 @@
 {
   "$id": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/example.json",
   "definitions": {
-    "allowed": { "type": "integer", "minimum": 0, "maximum": 1 }
+    "allowed": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "allowedProperties": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "properties": {
+        "allowed": true,
+        "if": true,
+        "then": true,
+        "else": true
+      },
+      "required": []
+    }
   },
   "allOf": [
     {
@@ -13,6 +24,12 @@
         },
         "if": {
           "$ref": "#/definitions/allowed"
+        },
+        "then": {
+          "$ref": "#/definitions/allowed"
+        },
+        "else": {
+          "$ref": "#/definitions/allowed"
         }
       },
       "required": []
@@ -21,16 +38,41 @@
       "if": {
         "type": "object",
         "unevaluatedProperties": false,
+        "$ref": "#/definitions/allowedProperties",
         "properties": {
-          "if": true
+          "if": {
+            "enum": [1]
+          }
         },
         "required": ["if"]
       },
       "then": {
         "type": "object",
         "unevaluatedProperties": false,
-        "properties": { "if": true },
-        "required": ["if"]
+        "$ref": "#/definitions/allowedProperties",
+        "properties": {
+          "then": {
+            "enum": [1]
+          },
+          "else": {
+            "enum": [0]
+          }
+        },
+        "required": ["then", "else"]
+      },
+      "else": {
+        "type": "object",
+        "unevaluatedProperties": false,
+        "$ref": "#/definitions/allowedProperties",
+        "properties": {
+          "else": {
+            "enum": [1]
+          },
+          "then": {
+            "enum": [0]
+          }
+        },
+        "required": ["then", "else"]
       }
     }
   ]
