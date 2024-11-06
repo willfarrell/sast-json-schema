@@ -25,7 +25,7 @@
     },
     "safePattern": {
       "$comment": "Must start with ^, end with $, and exclude 'any characters' (., \\S), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$",
-      "pattern": "^\\^(\\\\[.]|[^.(\\\\S)\n\r])*\\$$"
+      "pattern": "^\\^(\\\\[.]|(?!\\\\S)[^.\n\r])*\\$$"
     },
     "typeArray": {
       "oneOf": [

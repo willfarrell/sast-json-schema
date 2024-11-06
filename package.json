@@ -1,6 +1,6 @@
 {
   "name": "sast-json-schema",
-  "version": "0.0.0-alpha.3",
+  "version": "0.0.0-alpha.4",
   "description": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
   "type": "module",
   "main": "index.json",

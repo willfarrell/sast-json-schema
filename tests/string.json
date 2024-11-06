@@ -106,7 +106,8 @@
       {
         "description": "Should fail when pattern is not set",
         "data": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 36
         },
         "valid": false
       },
@@ -154,6 +155,15 @@
           "maxLength": 36
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains unicode character class escape",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{L}]*$",
+          "maxLength": 256
+        },
+        "valid": true
       }
     ]
   },
