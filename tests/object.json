@@ -304,5 +304,240 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "type=object with properties recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when properties inner schemas are secure",
+        "data": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "enum": ["a", "b"] }
+          },
+          "unevaluatedProperties": false,
+          "required": ["name"]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when properties inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" }
+          },
+          "unevaluatedProperties": false,
+          "required": ["name"]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with additionalProperties recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when additionalProperties inner schema is secure",
+        "data": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "unevaluatedProperties": false,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when additionalProperties inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "unevaluatedProperties": false,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with patternProperties recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when patternProperties inner schema is secure",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "patternProperties": {
+            "^[\\p{L}]+$": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when patternProperties inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "patternProperties": {
+            "^[\\p{L}]+$": {
+              "type": "string"
+            }
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with propertyNames recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when propertyNames inner schema is secure",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[\\p{L}]+$",
+            "maxLength": 50
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when propertyNames inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string"
+          },
+          "maxProperties": 1,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with dependencies schema form recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when dependency value is a secure schema",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": { "type": "string", "enum": ["x"] }
+          },
+          "dependencies": {
+            "a": {
+              "type": "object",
+              "properties": {},
+              "unevaluatedProperties": false,
+              "required": []
+            }
+          },
+          "unevaluatedProperties": false,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when dependency value is an array (not recursively validated)",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": { "type": "string", "enum": ["x"] },
+            "b": { "type": "integer", "minimum": 0, "maximum": 1 }
+          },
+          "dependencies": {
+            "a": ["b"]
+          },
+          "unevaluatedProperties": false,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when dependency value is an insecure schema (missing constraints)",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": { "type": "string", "enum": ["x"] }
+          },
+          "dependencies": {
+            "a": { "type": "string" }
+          },
+          "unevaluatedProperties": false,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=object with minProperties",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when minProperties is a valid safeCount",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": { "type": "string", "enum": ["x"] }
+          },
+          "unevaluatedProperties": false,
+          "minProperties": 1,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when minProperties is below 0",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": { "type": "string", "enum": ["x"] }
+          },
+          "unevaluatedProperties": false,
+          "minProperties": -1,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
   }
 ]

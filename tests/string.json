@@ -211,5 +211,33 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "type=string with minLength",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when minLength is a valid safeCount",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{L}]+$",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when minLength is below 0",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{L}]+$",
+          "minLength": -1,
+          "maxLength": 256
+        },
+        "valid": false
+      }
+    ]
   }
 ]
