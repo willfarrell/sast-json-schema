@@ -23,6 +23,22 @@
     ]
   },
   {
+    "description": "type=string with const",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when const is set",
+        "data": {
+          "type": "string",
+          "const": "fixed-value"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
     "description": "type=string with enum",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"

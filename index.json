@@ -2,6 +2,7 @@
   "$id": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json",
   "title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
   "description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
+  "$comment": "Uses `dependencies` (draft-07) instead of `dependentSchemas`/`dependentRequired` (2019-09+) for backward compatibility.",
   "definitions": {
     "schemaArray": {
       "type": "array",
@@ -237,9 +238,7 @@
       },
       "required": ["maxLength"]
     },
-    "properties": {
-      "required": []
-    },
+    "properties": ["required"],
     "patternProperties": {
       "required": ["maxProperties"],
       "properties": {
@@ -296,19 +295,24 @@
             "required": ["type"]
           },
           "then": {
-            "allOf": [
+            "anyOf": [
+              { "required": ["const"] },
               {
-                "anyOf": [
-                  { "required": ["enum"] },
-                  { "required": ["minimum"] },
-                  { "required": ["exclusiveMinimum"] }
-                ]
-              },
-              {
-                "anyOf": [
-                  { "required": ["enum"] },
-                  { "required": ["maximum"] },
-                  { "required": ["exclusiveMaximum"] }
+                "allOf": [
+                  {
+                    "anyOf": [
+                      { "required": ["enum"] },
+                      { "required": ["minimum"] },
+                      { "required": ["exclusiveMinimum"] }
+                    ]
+                  },
+                  {
+                    "anyOf": [
+                      { "required": ["enum"] },
+                      { "required": ["maximum"] },
+                      { "required": ["exclusiveMaximum"] }
+                    ]
+                  }
                 ]
               }
             ]
@@ -326,6 +330,9 @@
           },
           "then": {
             "oneOf": [
+              {
+                "required": ["const"]
+              },
               {
                 "required": ["enum"]
               },
@@ -383,7 +390,7 @@
     "items": {
       "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/schemaArray" }]
     },
-    "prefetchItems": { "$ref": "#/definitions/schemaArray" },
+    "prefixItems": { "$ref": "#/definitions/schemaArray" },
     "definitions": {
       "additionalProperties": { "$ref": "#" }
     },

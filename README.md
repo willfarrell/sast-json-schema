@@ -26,7 +26,7 @@
 
 ## High-level functionality
 
-- Ensure strictness of inperputation.
+- Ensure strictness of interpretation.
 - Ensure `integer` or `number` are within a safe range.
 - Ensure `string` have defined allowed values and length.
 - Ensure `arrays` have defined properties and maxLength.

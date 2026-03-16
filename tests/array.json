@@ -270,5 +270,40 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "type=array with prefixItems recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when prefixItems inner schemas are secure",
+        "data": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "integer", "minimum": 0, "maximum": 100 },
+            { "type": "string", "enum": ["a", "b"] }
+          ],
+          "uniqueItems": true,
+          "maxItems": 2,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when prefixItems inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "string" }
+          ],
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
   }
 ]

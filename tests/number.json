@@ -23,6 +23,22 @@
     ]
   },
   {
+    "description": "type=number with const",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when const is set",
+        "data": {
+          "type": "number",
+          "const": 3.14
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
     "description": "type=number with enum",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
