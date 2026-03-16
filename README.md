@@ -29,8 +29,8 @@
 - Ensure strictness of inperputation.
 - Ensure `integer` or `number` are within a safe range.
 - Ensure `string` have defined allowed values and length.
-- Ensure `arrays` have defined types and lenth.
-- Ensure `object` have defined properties and count.
+- Ensure `arrays` have defined properties and maxLength.
+- Ensure `object` have defined properties and maxProperties when needed.
 
 ## How to run
 
