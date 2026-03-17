@@ -191,6 +191,44 @@
     ]
   },
   {
+    "description": "type=integer with multipleOf",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when multipleOf is positive",
+        "data": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "multipleOf": 5
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when multipleOf is zero",
+        "data": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "multipleOf": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when multipleOf is negative",
+        "data": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "multipleOf": -1
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
     "description": "type=integer with exclusiveMaximum",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"

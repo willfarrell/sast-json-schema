@@ -68,6 +68,14 @@ The following criteria should be considered when writing JSON Schemas used for i
 - **13.6.1:** Verify that the application only responds to HTTP methods in use by the application or by the API (including OPTIONS during preflight requests) and unused methods (e.g. TRACE) are blocked.
 - **13.7.1:** Verify that the value in the Content-Length request header matches the calculated length using the built-in mechanism.
 
+## Known Limitations
+
+- **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function.
+- **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g., AJV does not limit recursion depth by default).
+- **Remote `$ref` safety depends on validator configuration.** Schemas can reference external URLs via `$ref`. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches).
+- **`enum` size is not bounded.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits.
+- **`default` values are not validated.** A schema can declare a `default` that doesn't match its own constraints. JSON Schema spec treats `default` as informational.
+
 ## Sources
 
 - [OWASP ASVS 5.0](https://github.com/OWASP/ASVS/tree/master/5.0/en)

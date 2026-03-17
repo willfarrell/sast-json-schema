@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json",
   "title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
   "description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
@@ -256,6 +257,12 @@
         }
       },
       "required": ["maxProperties"]
+    },
+    "multipleOf": {
+      "properties": {
+        "type": { "$ref": "#/definitions/typeIntegerOrNumber" },
+        "multipleOf": { "exclusiveMinimum": 0 }
+      }
     },
     "format": {
       "required": ["maxLength"]
