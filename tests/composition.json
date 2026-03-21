@@ -1,0 +1,152 @@
+[
+  {
+    "description": "allOf recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when allOf inner schemas are secure",
+        "data": {
+          "allOf": [
+            { "type": "string", "enum": ["a"] },
+            { "type": "string", "const": "a" }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when allOf contains an insecure inner schema",
+        "data": {
+          "allOf": [
+            { "type": "string", "enum": ["a"] },
+            { "type": "string" }
+          ]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "anyOf recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when anyOf inner schemas are secure",
+        "data": {
+          "anyOf": [
+            { "type": "string", "enum": ["a"] },
+            { "type": "integer", "minimum": 0, "maximum": 1 }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when anyOf contains an insecure inner schema",
+        "data": {
+          "anyOf": [
+            { "type": "string", "enum": ["a"] },
+            { "type": "string" }
+          ]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "oneOf recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when oneOf inner schemas are secure",
+        "data": {
+          "oneOf": [
+            { "type": "string", "enum": ["a"] },
+            { "type": "integer", "minimum": 0, "maximum": 1 }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when oneOf contains an insecure inner schema",
+        "data": {
+          "oneOf": [
+            { "type": "string", "enum": ["a"] },
+            { "type": "string" }
+          ]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "not recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when not inner schema is secure",
+        "data": {
+          "not": { "type": "string", "enum": ["a"] }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when not inner schema is insecure",
+        "data": {
+          "not": { "type": "string" }
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "if/then/else recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when if/then/else inner schemas are all secure",
+        "data": {
+          "if": { "type": "string", "enum": ["a"] },
+          "then": { "type": "string", "const": "a" },
+          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when then inner schema is insecure",
+        "data": {
+          "if": { "type": "string", "enum": ["a"] },
+          "then": { "type": "string" },
+          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when else inner schema is insecure",
+        "data": {
+          "if": { "type": "string", "enum": ["a"] },
+          "then": { "type": "string", "const": "a" },
+          "else": { "type": "string" }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when if inner schema is insecure",
+        "data": {
+          "if": { "type": "string" },
+          "then": { "type": "string", "const": "a" },
+          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+        },
+        "valid": false
+      }
+    ]
+  }
+]

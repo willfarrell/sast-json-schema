@@ -270,5 +270,196 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "type=array with prefixItems recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when prefixItems inner schemas are secure",
+        "data": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "integer", "minimum": 0, "maximum": 100 },
+            { "type": "string", "enum": ["a", "b"] }
+          ],
+          "uniqueItems": true,
+          "maxItems": 2,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when prefixItems inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "string" }
+          ],
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with items recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when items inner schema is secure",
+        "data": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["a", "b"] },
+          "uniqueItems": true,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when items inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with contains recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contains inner schema is secure",
+        "data": {
+          "type": "array",
+          "contains": { "type": "string", "enum": ["a"] },
+          "uniqueItems": true,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contains inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "array",
+          "contains": { "type": "string" },
+          "uniqueItems": true,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with additionalItems recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when additionalItems inner schema is secure",
+        "data": {
+          "type": "array",
+          "prefixItems": [{ "type": "integer", "minimum": 0, "maximum": 1 }],
+          "additionalItems": { "type": "string", "enum": ["a"] },
+          "uniqueItems": true,
+          "maxItems": 2,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when additionalItems inner schema is insecure (missing constraints)",
+        "data": {
+          "type": "array",
+          "prefixItems": [{ "type": "integer", "minimum": 0, "maximum": 1 }],
+          "additionalItems": { "type": "string" },
+          "uniqueItems": true,
+          "maxItems": 2,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with minItems",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when minItems is a valid safeCount",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when minItems is below 0",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "minItems": -1,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with minContains",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when minContains is a valid safeCount",
+        "data": {
+          "type": "array",
+          "contains": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "minContains": 1,
+          "maxContains": 5,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when minContains is below 0",
+        "data": {
+          "type": "array",
+          "contains": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "minContains": -1,
+          "maxContains": 5,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
   }
 ]

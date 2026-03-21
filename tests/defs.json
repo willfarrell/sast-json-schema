@@ -1,0 +1,56 @@
+[
+  {
+    "description": "$defs recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $defs inner schemas are secure",
+        "data": {
+          "$defs": {
+            "name": { "type": "string", "enum": ["a", "b"] },
+            "count": { "type": "integer", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $defs contains an insecure inner schema",
+        "data": {
+          "$defs": {
+            "name": { "type": "string" }
+          }
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "definitions recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when definitions inner schemas are secure",
+        "data": {
+          "definitions": {
+            "name": { "type": "string", "enum": ["a", "b"] },
+            "count": { "type": "integer", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when definitions contains an insecure inner schema",
+        "data": {
+          "definitions": {
+            "name": { "type": "string" }
+          }
+        },
+        "valid": false
+      }
+    ]
+  }
+]

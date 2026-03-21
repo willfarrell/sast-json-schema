@@ -1,44 +1,73 @@
 {
-  "name": "sast-json-schema",
-  "version": "0.0.0-alpha.4",
-  "description": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
-  "type": "module",
-  "main": "index.json",
-  "files": [
-    "index.json"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "scripts": {
-    "test": "node test.js"
-  },
-  "keywords": [
-    "JSON",
-    "Schema",
-    "SAST",
-    "Secure",
-    "Safe",
-    "ASVS",
-    "OWASP",
-    "NIST"
-  ],
-  "author": "willfarrell",
-  "repository": {
-    "type": "git",
-    "url": "github:willfarrell/sast-json-schema"
-  },
-  "bugs": {
-    "url": "https://github.com/willfarrell/sast-json-schema/issues"
-  },
-  "homepage": "https://github.com/willfarrell/sast-json-schema/",
-  "funding": {
-    "type": "github",
-    "url": "https://github.com/sponsors/willfarrell"
-  },
-  "license": "MIT",
-  "devDependencies": {
-    "ajv": "^8.17.1",
-    "json-schema-test-esm": "^3.0.0"
-  }
+	"name": "sast-json-schema",
+	"version": "0.0.0-alpha.5",
+	"description": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
+	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
+	"engineStrict": true,
+	"main": "index.json",
+	"files": [
+		"index.json"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"prepare": "husky",
+		"git:pre-commit": "npm run git:lint-staged && npm run git:test-staged",
+		"git:commit-msg": "commitlint --config commitlint.config.cjs --edit",
+		"git:lint-staged": "npm run test:lint",
+		"git:unit-staged": "node --test",
+		"git:test-staged": "npm run git:unit-staged",
+		"lint": "biome check --write --no-errors-on-unmatched",
+		"test": "npm run test:lint && npm run test:unit && npm run test:types && npm run test:sast && npm run test:perf && npm run test:dast",
+		"test:lint": "biome check --staged --no-errors-on-unmatched",
+		"test:unit": "node --test ./*.test.js",
+		"test:types": "which tstyche > /dev/null 2>&1 && tstyche || echo 'tstyche not found, skipping type tests'",
+		"test:perf": "node --test --test-concurrency=1 ./*.perf.js",
+		"test:dast": "npm run test:dast:fuzz",
+		"test:dast:fuzz": "node --test ./*.fuzz.js",
+		"test:sast": "npm run test:sast:license",
+		"test:sast:license": "license-check-and-add check -f license.json"
+	},
+	"keywords": [
+		"JSON",
+		"Schema",
+		"SAST",
+		"Secure",
+		"Safe",
+		"ASVS",
+		"OWASP",
+		"NIST"
+	],
+	"author": "willfarrell",
+	"repository": {
+		"type": "git",
+		"url": "github:willfarrell/sast-json-schema"
+	},
+	"bugs": {
+		"url": "https://github.com/willfarrell/sast-json-schema/issues"
+	},
+	"homepage": "https://github.com/willfarrell/sast-json-schema/",
+	"funding": {
+		"type": "github",
+		"url": "https://github.com/sponsors/willfarrell"
+	},
+	"license": "MIT",
+	"workspaces": [
+		".github"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "^2.0.0",
+		"@commitlint/cli": "^20.0.0",
+		"@commitlint/config-conventional": "^20.0.0",
+		"ajv": "^8.17.1",
+		"fast-check": "^4.0.0",
+		"husky": "^9.0.0",
+		"json-schema-test-esm": "^3.0.0",
+		"license-check-and-add": "4.0.5",
+		"tinybench": "^6.0.0"
+	}
 }

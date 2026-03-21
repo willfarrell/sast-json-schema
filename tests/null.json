@@ -1,0 +1,17 @@
+[
+  {
+    "description": "type=null",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when type is null",
+        "data": {
+          "type": "null"
+        },
+        "valid": true
+      }
+    ]
+  }
+]

@@ -1,9 +1,32 @@
-# sast-json-schema
-Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas
+<div align="center">
+
+<h1>sast-json-schema</h1>
+<p>Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas</p>
+<br />
+<p>
+  <a href="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-unit.yml"><img src="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-unit.yml/badge.svg" alt="GitHub Actions unit test status"></a>
+  <a href="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-dast.yml"><img src="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-dast.yml/badge.svg" alt="GitHub Actions dast test status"></a>
+  <a href="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-perf.yml"><img src="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-perf.yml/badge.svg" alt="GitHub Actions perf test status"></a>
+  <a href="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-sast.yml"><img src="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-sast.yml/badge.svg" alt="GitHub Actions SAST test status"></a>
+  <a href="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-lint.yml"><img src="https://github.com/willfarrell/sast-json-schema/actions/workflows/test-lint.yml/badge.svg" alt="GitHub Actions lint test status"></a>
+  <br/>
+  <a href="https://www.npmjs.com/package/sast-json-schema"><img alt="npm version" src="https://img.shields.io/npm/v/sast-json-schema.svg"></a>
+  <a href="https://packagephobia.com/result?p=sast-json-schema"><img src="https://packagephobia.com/badge?p=sast-json-schema" alt="npm install size"></a>
+  <a href="https://www.npmjs.com/package/sast-json-schema">
+  <img alt="npm weekly downloads" src="https://img.shields.io/npm/dw/sast-json-schema.svg"></a>
+  <a href="https://www.npmjs.com/package/sast-json-schema#provenance">
+  <img alt="npm provenance" src="https://img.shields.io/badge/provenance-Yes-brightgreen"></a>
+  <br/>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/willfarrell/sast-json-schema"><img src="https://api.scorecard.dev/projects/github.com/willfarrell/sast-json-schema/badge" alt="Open Source Security Foundation (OpenSSF) Scorecard"></a>
+  <a href="https://slsa.dev"><img src="https://slsa.dev/images/gh-badge-level3.svg" alt="SLSA 3"></a>
+  <a href="https://biomejs.dev"><img alt="Checked with Biome" src="https://img.shields.io/badge/Checked_with-Biome-60a5fa?style=flat&logo=biome"></a>
+  <a href="https://conventionalcommits.org"><img alt="Conventional Commits" src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white"></a>
+</p>
+</div>
 
 ## High-level functionality
 
-- Ensure strictness of inperputation.
+- Ensure strictness of interpretation.
 - Ensure `integer` or `number` are within a safe range.
 - Ensure `string` have defined allowed values and length.
 - Ensure `arrays` have defined properties and maxLength.
@@ -44,6 +67,14 @@ The following criteria should be considered when writing JSON Schemas used for i
 - **13.2.5:** Verify that REST services explicitly check the incoming Content-Type to be the expected one, such as application/xml or application/json.
 - **13.6.1:** Verify that the application only responds to HTTP methods in use by the application or by the API (including OPTIONS during preflight requests) and unused methods (e.g. TRACE) are blocked.
 - **13.7.1:** Verify that the value in the Content-Length request header matches the calculated length using the built-in mechanism.
+
+## Known Limitations
+
+- **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function.
+- **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g., AJV does not limit recursion depth by default).
+- **Remote `$ref` safety depends on validator configuration.** Schemas can reference external URLs via `$ref`. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches).
+- **`enum` size is not bounded.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits.
+- **`default` values are not validated.** A schema can declare a `default` that doesn't match its own constraints. JSON Schema spec treats `default` as informational.
 
 ## Sources
 
