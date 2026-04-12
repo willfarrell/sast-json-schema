@@ -190,6 +190,22 @@
           "$id": "my schema"
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when $id contains angle brackets",
+        "data": {
+          "$id": "https://evil.com/<script>",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $id has path and query params",
+        "data": {
+          "$id": "https://example.com/schemas/user.json?v=2",
+          "type": "null"
+        },
+        "valid": true
       }
     ]
   },

@@ -43,6 +43,7 @@
         "$ref": "#/definitions/allowedProperties",
         "properties": {
           "if": {
+            "type": "integer",
             "enum": [1]
           }
         },
@@ -55,9 +56,11 @@
         "$ref": "#/definitions/allowedProperties",
         "properties": {
           "then": {
+            "type": "integer",
             "enum": [1]
           },
           "else": {
+            "type": "integer",
             "enum": [0]
           }
         },
@@ -70,9 +73,11 @@
         "$ref": "#/definitions/allowedProperties",
         "properties": {
           "else": {
+            "type": "integer",
             "enum": [1]
           },
           "then": {
+            "type": "integer",
             "enum": [0]
           }
         },

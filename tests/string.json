@@ -336,6 +336,51 @@
           "maxLength": 100
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains positive lookahead (?=...)",
+        "data": {
+          "type": "string",
+          "pattern": "^(?=.*[A-Z])[a-zA-Z]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains positive lookbehind (?<=...)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+(?<=a)$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains non-capturing group (?:...)",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc|def)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains negative lookahead (?!...)",
+        "data": {
+          "type": "string",
+          "pattern": "^(?!admin)[a-z]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains negative lookbehind (?<!...)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+(?<!admin)$",
+          "maxLength": 100
+        },
+        "valid": true
       }
     ]
   },

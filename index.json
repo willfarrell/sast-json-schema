@@ -26,6 +26,7 @@
     "schemaArray": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 1024,
       "items": { "$ref": "#" }
     },
     "safeCount": {
@@ -44,11 +45,11 @@
       "maximum": 1e308
     },
     "safePattern": {
-      "$comment": "Must start with ^, end with $, exclude broad character classes (., \\S, \\W, \\D, \\C, \\P), reject empty negated character class [^] (JS any-char equivalent), reject nested quantifiers (e.g. (a+)+), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Additional runtime ReDoS checking (e.g. safe-regex2, recheck) may be needed for full protection.",
+      "$comment": "Must start with ^, end with $, exclude broad character classes (., \\S, \\W, \\D, \\C, \\P), reject empty negated character class [^] (JS any-char equivalent), reject nested quantifiers (e.g. (a+)+), reject positive lookahead (?=) and positive lookbehind (?<=), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Additional runtime ReDoS checking (e.g. safe-regex2, recheck) may be needed for full protection.",
       "allOf": [
         { "maxLength": 1024 },
         {
-          "pattern": "^\\^(\\\\[.]|(?!\\\\[SWDCP])(?!\\)[+*?{])[^.\n\r])*\\$$"
+          "pattern": "^\\^(\\\\[.]|(?!\\\\[SWDCP])(?!\\)[+*?{])(?!\\(\\?=)(?!\\(\\?<=)[^.\n\r])*\\$$"
         },
         {
           "not": { "pattern": "\\[\\^\\]" }
@@ -200,6 +201,7 @@
       "required": ["maxItems", "uniqueItems", "unevaluatedItems"]
     },
     "additionalProperties": {
+      "required": ["maxProperties"],
       "properties": {
         "type": { "$ref": "#/definitions/typeObject" },
         "additionalProperties": {
@@ -396,7 +398,7 @@
         "$id": {
           "type": "string",
           "maxLength": 1024,
-          "pattern": "^(https://|[a-zA-Z0-9_-]+$)"
+          "pattern": "^(https://[a-zA-Z0-9._/:?&#%=~+@-]+|[a-zA-Z0-9_-]+)$"
         }
       }
     },

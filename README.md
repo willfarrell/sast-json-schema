@@ -75,6 +75,7 @@ The following criteria should be considered when writing JSON Schemas used for i
 - **Remote `$ref` safety depends on validator configuration.** Schemas can reference external URLs via `$ref`. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended.
 - **`default` values are not validated.** A schema can declare a `default` that doesn't match its own constraints. JSON Schema spec treats `default` as informational.
 - **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error.
+- **`not` keyword is not handled.** The `not` keyword is not evaluated by the SAST schema. Schemas using `not` to restrict values will not be checked for security constraints. Prefer allowlist approaches (e.g., `enum`, `pattern`, `const`) over `not` to define acceptable values.
 
 ## Sources
 
