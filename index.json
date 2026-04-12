@@ -26,8 +26,15 @@
       "maximum": 1e308
     },
     "safePattern": {
-      "$comment": "Must start with ^, end with $, and exclude 'any characters' (., \\S), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$",
-      "pattern": "^\\^(\\\\[.]|(?!\\\\S)[^.\n\r])*\\$$"
+      "$comment": "Must start with ^, end with $, exclude broad character classes (., \\S, \\W, \\D, \\C), reject empty negated character class [^] (JS any-char equivalent), reject nested quantifiers (e.g. (a+)+), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Additional runtime ReDoS checking (e.g. safe-regex2, recheck) may be needed for full protection.",
+      "allOf": [
+        {
+          "pattern": "^\\^(\\\\[.]|(?!\\\\[SWDC])(?!\\)[+*?{])[^.\n\r])*\\$$"
+        },
+        {
+          "not": { "pattern": "\\[\\^\\]" }
+        }
+      ]
     },
     "typeArray": {
       "oneOf": [
@@ -73,6 +80,94 @@
         { "const": "object" },
         { "type": "array", "contains": { "const": "object" } }
       ]
+    },
+    "typeOfString": {
+      "properties": { "type": { "const": "string" } },
+      "required": ["type"]
+    },
+    "typeOfInteger": {
+      "properties": { "type": { "const": "integer" } },
+      "required": ["type"]
+    },
+    "typeOfNumber": {
+      "properties": { "type": { "const": "number" } },
+      "required": ["type"]
+    },
+    "typeOfBoolean": {
+      "properties": { "type": { "const": "boolean" } },
+      "required": ["type"]
+    },
+    "typeOfNull": {
+      "properties": { "type": { "const": "null" } },
+      "required": ["type"]
+    },
+    "typeOfArray": {
+      "properties": { "type": { "const": "array" } },
+      "required": ["type"]
+    },
+    "typeOfObject": {
+      "properties": { "type": { "const": "object" } },
+      "required": ["type"]
+    },
+    "constIsString": {
+      "if": { "$ref": "#/definitions/typeOfString" },
+      "then": {
+        "properties": {
+          "const": { "type": "string" },
+          "enum": { "items": { "type": "string" } }
+        }
+      }
+    },
+    "constIsInteger": {
+      "if": { "$ref": "#/definitions/typeOfInteger" },
+      "then": {
+        "properties": {
+          "const": { "type": "integer" },
+          "enum": { "items": { "type": "integer" } }
+        }
+      }
+    },
+    "constIsNumber": {
+      "if": { "$ref": "#/definitions/typeOfNumber" },
+      "then": {
+        "properties": {
+          "const": { "type": "number" },
+          "enum": { "items": { "type": "number" } }
+        }
+      }
+    },
+    "constIsBoolean": {
+      "if": { "$ref": "#/definitions/typeOfBoolean" },
+      "then": {
+        "properties": {
+          "const": { "type": "boolean" },
+          "enum": { "items": { "type": "boolean" } }
+        }
+      }
+    },
+    "constIsNull": {
+      "if": { "$ref": "#/definitions/typeOfNull" },
+      "then": {
+        "properties": {
+          "const": { "type": "null" }
+        }
+      }
+    },
+    "constIsArray": {
+      "if": { "$ref": "#/definitions/typeOfArray" },
+      "then": {
+        "properties": {
+          "const": { "type": "array" }
+        }
+      }
+    },
+    "constIsObject": {
+      "if": { "$ref": "#/definitions/typeOfObject" },
+      "then": {
+        "properties": {
+          "const": { "type": "object" }
+        }
+      }
     }
   },
   "dependencies": {
@@ -239,7 +334,7 @@
       },
       "required": ["maxLength"]
     },
-    "properties": ["required"],
+    "properties": ["required", "maxProperties"],
     "patternProperties": {
       "required": ["maxProperties"],
       "properties": {
@@ -259,13 +354,159 @@
       "required": ["maxProperties"]
     },
     "multipleOf": {
+      "required": ["type"],
       "properties": {
         "type": { "$ref": "#/definitions/typeIntegerOrNumber" },
-        "multipleOf": { "exclusiveMinimum": 0 }
+        "multipleOf": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
       }
     },
+    "$ref": {
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^(#|https://)"
+        }
+      }
+    },
+    "$id": {
+      "properties": {
+        "$id": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    },
+    "$anchor": {
+      "properties": {
+        "$anchor": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "$dynamicRef": {
+      "properties": {
+        "$dynamicRef": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    },
+    "$dynamicAnchor": {
+      "properties": {
+        "$dynamicAnchor": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "contentMediaType": {
+      "$comment": "Media types must follow IANA registry format (RFC 6838). Source: https://www.iana.org/assignments/media-types/media-types.xhtml",
+      "properties": {
+        "contentMediaType": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^(application|audio|font|image|message|model|multipart|text|video)/[a-zA-Z0-9][a-zA-Z0-9!#$&\\-^_.+]*$"
+        }
+      }
+    },
+    "contentEncoding": {
+      "$comment": "Restrict content encoding to standard values. Source: https://json-schema.org/understanding-json-schema/reference/non_json_data#contentmediatype-and-contentencoding",
+      "properties": {
+        "contentEncoding": {
+          "type": "string",
+          "enum": [
+            "quoted-printable",
+            "base16",
+            "base32",
+            "base64"
+          ]
+        }
+      }
+    },
+    "title": {
+      "properties": {
+        "title": { "type": "string", "maxLength": 1024 }
+      }
+    },
+    "description": {
+      "properties": {
+        "description": { "type": "string", "maxLength": 4096 }
+      }
+    },
+    "$comment": {
+      "properties": {
+        "$comment": { "type": "string", "maxLength": 4096 }
+      }
+    },
+    "enum": {
+      "$comment": "Ensure enum values match the declared type",
+      "allOf": [
+        {
+          "properties": {
+            "enum": {
+              "$comment": "Using 2^18 for maxItems.",
+              "type": "array",
+              "maxItems": 262144
+            }
+          }
+        },
+        { "$ref": "#/definitions/constIsString" },
+        { "$ref": "#/definitions/constIsInteger" },
+        { "$ref": "#/definitions/constIsNumber" },
+        { "$ref": "#/definitions/constIsBoolean" }
+      ]
+    },
     "format": {
-      "required": ["maxLength"]
+      "$comment": "Formats from JSON Schema spec (https://json-schema.org/understanding-json-schema/reference/string#built-in-formats) and AJV (https://ajv.js.org/packages/ajv-formats.html)",
+      "required": ["maxLength"],
+      "properties": {
+        "format": {
+          "enum": [
+            "date-time",
+            "date",
+            "time",
+            "duration",
+            "email",
+            "idn-email",
+            "hostname",
+            "idn-hostname",
+            "ipv4",
+            "ipv6",
+            "uri",
+            "uri-reference",
+            "uri-template",
+            "iri",
+            "iri-reference",
+            "uuid",
+            "json-pointer",
+            "relative-json-pointer",
+            "regex",
+            "byte",
+            "int32",
+            "int64",
+            "float",
+            "double",
+            "password",
+            "binary"
+          ]
+        }
+      }
+    },
+    "const": {
+      "allOf": [
+        { "$ref": "#/definitions/constIsString" },
+        { "$ref": "#/definitions/constIsInteger" },
+        { "$ref": "#/definitions/constIsNumber" },
+        { "$ref": "#/definitions/constIsBoolean" },
+        { "$ref": "#/definitions/constIsNull" },
+        { "$ref": "#/definitions/constIsArray" },
+        { "$ref": "#/definitions/constIsObject" }
+      ]
     },
     "type": {
       "allOf": [
@@ -336,7 +577,7 @@
             "required": ["type"]
           },
           "then": {
-            "oneOf": [
+            "anyOf": [
               {
                 "required": ["const"]
               },
@@ -399,6 +640,10 @@
     },
     "prefixItems": { "$ref": "#/definitions/schemaArray" },
     "definitions": {
+      "additionalProperties": { "$ref": "#" }
+    },
+    "contentSchema": { "$ref": "#" },
+    "dependentSchemas": {
       "additionalProperties": { "$ref": "#" }
     },
     "patternProperties": {

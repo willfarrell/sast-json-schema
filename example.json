@@ -11,6 +11,7 @@
         "then": true,
         "else": true
       },
+      "maxProperties": 4,
       "required": []
     }
   },
@@ -32,6 +33,7 @@
           "$ref": "#/definitions/allowed"
         }
       },
+      "maxProperties": 4,
       "required": []
     },
     {
@@ -44,6 +46,7 @@
             "enum": [1]
           }
         },
+        "maxProperties": 4,
         "required": ["if"]
       },
       "then": {
@@ -58,6 +61,7 @@
             "enum": [0]
           }
         },
+        "maxProperties": 4,
         "required": ["then", "else"]
       },
       "else": {
@@ -72,6 +76,7 @@
             "enum": [0]
           }
         },
+        "maxProperties": 4,
         "required": ["then", "else"]
       }
     }

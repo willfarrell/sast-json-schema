@@ -35,6 +35,14 @@
           "const": "fixed-value"
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when const type does not match declared type",
+        "data": {
+          "type": "string",
+          "const": 42
+        },
+        "valid": false
       }
     ]
   },
@@ -65,6 +73,14 @@
           "type": ["string", "null"]
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when enum values do not match declared type",
+        "data": {
+          "type": "string",
+          "enum": [42, true]
+        },
+        "valid": false
       }
     ]
   },
@@ -73,17 +89,40 @@
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
     },
-    "$todo": [
-      "add in check for certain formats that have supreceeded",
-      "reject use of non-escaped ., charset ranges should be used instead"
-    ],
     "tests": [
       {
-        "description": "Should pass when format is set",
+        "description": "Should pass when format is set to uuid",
         "data": {
           "type": "string",
           "format": "uuid",
           "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when format is set to date-time",
+        "data": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 64
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when format is set to email",
+        "data": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when format is set to uri",
+        "data": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
         },
         "valid": true
       },
@@ -99,6 +138,15 @@
         "data": {
           "type": "string",
           "format": "uuid"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is unknown",
+        "data": {
+          "type": "string",
+          "format": "nonsense",
+          "maxLength": 100
         },
         "valid": false
       }
@@ -173,11 +221,101 @@
         "valid": false
       },
       {
+        "description": "Should fail when pattern contains `\\W` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000\\W0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains `\\D` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000\\D0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains `\\C` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000\\C0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains nested quantifier `(a+)+`",
+        "data": {
+          "type": "string",
+          "pattern": "^(a+)+$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains nested quantifier `([a-z]+)*`",
+        "data": {
+          "type": "string",
+          "pattern": "^([a-z]+)*$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains nested quantifier `(a+){2,}`",
+        "data": {
+          "type": "string",
+          "pattern": "^(a+){2,}$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains non-nested quantifier",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
         "description": "Should pass when pattern contains unicode character class escape",
         "data": {
           "type": "string",
           "pattern": "^[\\p{L}]*$",
           "maxLength": 256
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern contains empty negated character class [^]",
+        "data": {
+          "type": "string",
+          "pattern": "^[^]*$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains empty negated character class [^] with +",
+        "data": {
+          "type": "string",
+          "pattern": "^[^]+$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when negated character class has content [^a]",
+        "data": {
+          "type": "string",
+          "pattern": "^[^a]+$",
+          "maxLength": 36
         },
         "valid": true
       }
@@ -235,6 +373,168 @@
           "pattern": "^[\\p{L}]+$",
           "minLength": -1,
           "maxLength": 256
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with combined constraints",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when format and pattern are both set",
+        "data": {
+          "type": "string",
+          "format": "email",
+          "pattern": "^[a-z]+@example\\.com$",
+          "maxLength": 254
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when enum and format are both set",
+        "data": {
+          "type": "string",
+          "enum": ["user@example.com"],
+          "format": "email",
+          "maxLength": 254
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when none of const/enum/pattern/format is set",
+        "data": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with contentMediaType",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contentMediaType is application/json",
+        "data": {
+          "type": "string",
+          "contentMediaType": "application/json",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentMediaType is text/html",
+        "data": {
+          "type": "string",
+          "contentMediaType": "text/html",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentMediaType is a vendor type",
+        "data": {
+          "type": "string",
+          "contentMediaType": "application/vnd.api+json",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contentMediaType has invalid top-level type",
+        "data": {
+          "type": "string",
+          "contentMediaType": "foo/bar",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when contentMediaType has no subtype",
+        "data": {
+          "type": "string",
+          "contentMediaType": "application",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with contentEncoding",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contentEncoding is base64",
+        "data": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentEncoding is base32",
+        "data": {
+          "type": "string",
+          "contentEncoding": "base32",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentEncoding is base16",
+        "data": {
+          "type": "string",
+          "contentEncoding": "base16",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentEncoding is quoted-printable",
+        "data": {
+          "type": "string",
+          "contentEncoding": "quoted-printable",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contentEncoding is not in allowed list",
+        "data": {
+          "type": "string",
+          "contentEncoding": "7bit",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when contentEncoding is unknown",
+        "data": {
+          "type": "string",
+          "contentEncoding": "nonsense",
+          "format": "binary",
+          "maxLength": 1024
         },
         "valid": false
       }
