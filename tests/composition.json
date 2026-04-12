@@ -148,5 +148,96 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "boolean schema validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when schema is false (rejects everything)",
+        "data": false,
+        "valid": true
+      },
+      {
+        "description": "Should fail when schema is true (accepts everything)",
+        "data": true,
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema is a number",
+        "data": 42,
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema is a string",
+        "data": "not-a-schema",
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema is null",
+        "data": null,
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema is an array",
+        "data": [],
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema is an empty object",
+        "data": {},
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema has only annotations",
+        "data": {
+          "title": "My schema",
+          "description": "Does nothing"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "boolean schema in recursive positions",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when if uses boolean true",
+        "data": {
+          "if": true,
+          "then": { "type": "string", "const": "a" },
+          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when allOf contains boolean true",
+        "data": {
+          "allOf": [
+            true,
+            { "type": "string", "enum": ["a"] }
+          ]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when properties value is boolean true",
+        "data": {
+          "type": "object",
+          "properties": {
+            "name": true
+          },
+          "unevaluatedProperties": false,
+          "maxProperties": 1,
+          "required": ["name"]
+        },
+        "valid": false
+      }
+    ]
   }
 ]

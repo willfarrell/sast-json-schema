@@ -6,10 +6,10 @@
       "type": "object",
       "unevaluatedProperties": false,
       "properties": {
-        "allowed": true,
-        "if": true,
-        "then": true,
-        "else": true
+        "allowed": { "$ref": "#/definitions/allowed" },
+        "if": { "$ref": "#/definitions/allowed" },
+        "then": { "$ref": "#/definitions/allowed" },
+        "else": { "$ref": "#/definitions/allowed" }
       },
       "maxProperties": 4,
       "required": []

@@ -4,6 +4,24 @@
   "title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
   "description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
   "$comment": "Uses `dependencies` (draft-07) instead of `dependentSchemas`/`dependentRequired` (2019-09+) for backward compatibility.",
+  "oneOf": [
+    { "const": false },
+    {
+      "type": "object",
+      "anyOf": [
+        { "required": ["type"] },
+        { "required": ["const"] },
+        { "required": ["$ref"] },
+        { "required": ["allOf"] },
+        { "required": ["anyOf"] },
+        { "required": ["oneOf"] },
+        { "required": ["not"] },
+        { "required": ["if"] },
+        { "required": ["$defs"] },
+        { "required": ["definitions"] }
+      ]
+    }
+  ],
   "definitions": {
     "schemaArray": {
       "type": "array",
@@ -26,10 +44,11 @@
       "maximum": 1e308
     },
     "safePattern": {
-      "$comment": "Must start with ^, end with $, exclude broad character classes (., \\S, \\W, \\D, \\C), reject empty negated character class [^] (JS any-char equivalent), reject nested quantifiers (e.g. (a+)+), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Additional runtime ReDoS checking (e.g. safe-regex2, recheck) may be needed for full protection.",
+      "$comment": "Must start with ^, end with $, exclude broad character classes (., \\S, \\W, \\D, \\C, \\P), reject empty negated character class [^] (JS any-char equivalent), reject nested quantifiers (e.g. (a+)+), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Additional runtime ReDoS checking (e.g. safe-regex2, recheck) may be needed for full protection.",
       "allOf": [
+        { "maxLength": 1024 },
         {
-          "pattern": "^\\^(\\\\[.]|(?!\\\\[SWDC])(?!\\)[+*?{])[^.\n\r])*\\$$"
+          "pattern": "^\\^(\\\\[.]|(?!\\\\[SWDCP])(?!\\)[+*?{])[^.\n\r])*\\$$"
         },
         {
           "not": { "pattern": "\\[\\^\\]" }
@@ -376,7 +395,8 @@
       "properties": {
         "$id": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "pattern": "^(https://|[a-zA-Z0-9_-]+$)"
         }
       }
     },
@@ -392,7 +412,8 @@
       "properties": {
         "$dynamicRef": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "pattern": "^(#|https://)"
         }
       }
     },
@@ -443,15 +464,27 @@
         "$comment": { "type": "string", "maxLength": 4096 }
       }
     },
+    "$schema": {
+      "$comment": "Only allow supported JSON Schema drafts. Source: https://json-schema.org/specification-links",
+      "properties": {
+        "$schema": {
+          "enum": [
+            "https://json-schema.org/draft/2020-12/schema",
+            "https://json-schema.org/draft/2019-09/schema",
+            "https://json-schema.org/draft-07/schema"
+          ]
+        }
+      }
+    },
     "enum": {
       "$comment": "Ensure enum values match the declared type",
       "allOf": [
         {
           "properties": {
             "enum": {
-              "$comment": "Using 2^18 for maxItems.",
+              "$comment": "Using 2^13 for maxItems.",
               "type": "array",
-              "maxItems": 262144
+              "maxItems": 32768
             }
           }
         },

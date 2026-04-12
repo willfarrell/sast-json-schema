@@ -71,7 +71,7 @@ The following criteria should be considered when writing JSON Schemas used for i
 ## Known Limitations
 
 - **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default).
-- **`enum` size bounded to 2^18.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits. Needs feedback on a better limit and way to bypass for edge cases.
+- **`enum` size bounded to 2^13.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits. Needs feedback on a better limit and way to bypass for edge cases.
 - **Remote `$ref` safety depends on validator configuration.** Schemas can reference external URLs via `$ref`. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended.
 - **`default` values are not validated.** A schema can declare a `default` that doesn't match its own constraints. JSON Schema spec treats `default` as informational.
 - **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error.
