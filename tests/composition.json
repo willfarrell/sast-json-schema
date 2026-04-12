@@ -159,6 +159,35 @@
           "else": { "type": "integer", "minimum": 0, "maximum": 1 }
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when if is used without then (no-op schema)",
+        "data": {
+          "if": { "type": "string", "enum": ["a"], "maxLength": 256 }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when if is used with only else (no then)",
+        "data": {
+          "if": { "type": "string", "enum": ["a"], "maxLength": 256 },
+          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when then is used without if (no-op)",
+        "data": {
+          "then": { "type": "string", "const": "a", "maxLength": 256 }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when else is used without if (no-op)",
+        "data": {
+          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+        },
+        "valid": false
       }
     ]
   },

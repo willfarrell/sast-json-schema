@@ -72,7 +72,7 @@
         "valid": true
       },
       {
-        "description": "Should pass when uniqueItems is set to false",
+        "description": "Should fail when uniqueItems is set to false",
         "data": {
           "type": "array",
           "items": { "type": "integer", "minimum": 0, "maximum": 1 },
@@ -80,7 +80,7 @@
           "maxItems": 1,
           "unevaluatedItems": false
         },
-        "valid": true
+        "valid": false
       },
       {
         "description": "Should fail when uniqueItems is not set with items",

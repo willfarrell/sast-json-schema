@@ -65,20 +65,50 @@
       "maximum": 1e308
     },
     "safePattern": {
-      "$comment": "Must start with ^, end with $, exclude broad character classes (., \\S, \\W, \\D, \\C, \\P), reject empty negated character class [^] (JS any-char equivalent), reject nested quantifiers (e.g. (a+)+), reject positive lookahead (?=) and positive lookbehind (?<=), reject backreferences (\\1-\\9, \\k), reject bare alternation | outside groups (breaks anchoring), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Overlapping quantifiers without groups (e.g. ^[a-z]+[a-z]+$) can still cause O(n^2) backtracking. Additional runtime ReDoS checking (e.g. safe-regex2, recheck) is recommended for full protection.",
+      "$comment": "Use allowlist charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Overlapping quantifiers without groups (e.g. ^[a-z]+[a-z]+$) can still cause O(n^2) backtracking. Additional runtime ReDoS checking is recommended for full protection.",
       "allOf": [
-        { "maxLength": 1024 },
         {
-          "pattern": "^\\^(\\\\[.]|(?!\\\\[SWDCP])(?!\\\\[1-9])(?!\\\\k)(?!\\)[+*?{])(?!\\(\\?=)(?!\\(\\?<=)[^.\n\r])*\\$$"
+          "$comment": "Max pattern length",
+          "maxLength": 1024
         },
         {
-          "not": { "pattern": "\\[\\^\\]" }
+          "$comment": "Must start with ^, end with $. Only escaped dots (\\.) are allowed; unescaped . and newlines are rejected",
+          "pattern": "^\\^(\\\\[.]|[^.\n\r])*\\$$"
         },
         {
-          "$comment": "Reject bare | at top level (outside groups): | before any parenthesis, or | with no parentheses between it and the trailing $. Use (?:...) for alternation.",
+          "$comment": "Reject broad character class escapes: \\S (non-whitespace), \\W (non-word), \\D (non-digit), \\C (any byte), \\P (negated unicode property)",
+          "not": { "pattern": "\\\\[SWDCP]" }
+        },
+        {
+          "$comment": "Reject backreferences: \\1 through \\9",
+          "not": { "pattern": "\\\\[1-9]" }
+        },
+        {
+          "$comment": "Reject named backreference: \\k",
+          "not": { "pattern": "\\\\k" }
+        },
+        {
+          "$comment": "Reject nested quantifiers after groups: )+ )* )? ){",
+          "not": { "pattern": "\\)[+*?{]" }
+        },
+        {
+          "$comment": "Reject positive lookahead: (?=...)",
+          "not": { "pattern": "\\(\\?=" }
+        },
+        {
+          "$comment": "Reject positive lookbehind: (?<=...)",
+          "not": { "pattern": "\\(\\?<=" }
+        },
+        {
+          "$comment": "Reject negated character classes [^...] (broad denylist matchers)",
+          "not": { "pattern": "\\[\\^" }
+        },
+        {
+          "$comment": "Reject bare | before any group at top level (breaks anchoring). Use (?:...) for alternation.",
           "not": { "pattern": "^\\^[^()]*\\|" }
         },
         {
+          "$comment": "Reject bare | after last group at top level (breaks anchoring)",
           "not": { "pattern": "\\|[^()]*\\$$" }
         }
       ]
@@ -89,10 +119,11 @@
       "maxLength": 1024
     },
     "safeUrl":{
+      "$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection.",
       "type": "string",
       "allOf": [
         { "pattern": "^https://[-a-zA-Z0-9._/?&#%=~+]+$" },
-        { "not": { "pattern": "^https://(localhost|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])" } }
+        { "not": { "pattern": "^https://(localhost|0[xX][0-9a-fA-F]|[0-9]+\\.[0-9]+\\.[0-9]|[0-9]{5,}|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])" } }
       ],
       "maxLength": 1024
     },
@@ -261,13 +292,22 @@
   },
   "dependencies": {
     "contains": {
-      "required": ["maxContains", "maxItems", "uniqueItems", "unevaluatedItems"]
+      "required": ["maxContains", "maxItems", "uniqueItems", "unevaluatedItems"],
+      "properties": {
+        "uniqueItems": { "const": true }
+      }
     },
     "items": {
-      "required": ["maxItems", "uniqueItems", "unevaluatedItems"]
+      "required": ["maxItems", "uniqueItems", "unevaluatedItems"],
+      "properties": {
+        "uniqueItems": { "const": true }
+      }
     },
     "prefixItems": {
-      "required": ["maxItems", "uniqueItems", "unevaluatedItems"]
+      "required": ["maxItems", "uniqueItems", "unevaluatedItems"],
+      "properties": {
+        "uniqueItems": { "const": true }
+      }
     },
     "additionalProperties": {
       "required": ["maxProperties"],
@@ -741,6 +781,18 @@
           }
         }
       ]
+    },
+    "if": {
+      "anyOf": [
+        { "required": ["then"] },
+        { "required": ["else"] }
+      ]
+    },
+    "then": {
+      "required": ["if"]
+    },
+    "else": {
+      "required": ["if"]
     }
   },
   "properties": {
@@ -780,6 +832,13 @@
     "not": { "$ref": "#" },
     "contains": { "$ref": "#" },
     "propertyNames": { "$ref": "#" },
+    "const": {
+      "allOf": [
+        { "if": { "type": "string" }, "then": { "$ref":"#/definitions/safeStringLengthLimits" } },
+        { "if": { "type": "array" }, "then": { "$ref": "#/definitions/safeArrayItemsLimits" } },
+        { "if": { "type": "object" }, "then": { "$ref": "#/definitions/safeObjectPropertiesLimits" } }
+      ]
+    },
     "default": {
       "allOf": [
         { "if": { "type": "string" }, "then": { "$ref":"#/definitions/safeStringLengthLimits" } },

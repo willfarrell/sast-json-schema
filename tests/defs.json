@@ -175,6 +175,41 @@
           "$ref": "https://192.168.1.1/router"
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets hex IP (SSRF bypass 0x7f000001)",
+        "data": {
+          "$ref": "https://0x7f000001/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets octal IP (SSRF bypass 0177.0.0.1)",
+        "data": {
+          "$ref": "https://0177.0.0.1/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets decimal IP (SSRF bypass 2130706433)",
+        "data": {
+          "$ref": "https://2130706433/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets hex IP for metadata endpoint (SSRF bypass)",
+        "data": {
+          "$ref": "https://0xa9fea9fe/latest/meta-data/"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets dotted-numeric public IP",
+        "data": {
+          "$ref": "https://8.8.8.8/schema"
+        },
+        "valid": false
       }
     ]
   },

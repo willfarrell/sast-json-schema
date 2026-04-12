@@ -339,13 +339,13 @@
         "valid": false
       },
       {
-        "description": "Should pass when negated character class has content [^a]",
+        "description": "Should fail when negated character class has content [^a] (broad denylist)",
         "data": {
           "type": "string",
           "pattern": "^[^a]+$",
           "maxLength": 36
         },
-        "valid": true
+        "valid": false
       },
       {
         "description": "Should fail when pattern contains \\P{L} (negated unicode property escape)",
