@@ -9,7 +9,8 @@
         "description": "Should pass",
         "data": {
           "type": ["string", "null"],
-          "enum": ["test"]
+          "enum": ["test"],
+          "maxLength": 256
         },
         "valid": true
       },
@@ -32,9 +33,18 @@
         "description": "Should pass when const is set",
         "data": {
           "type": "string",
-          "const": "fixed-value"
+          "const": "fixed-value",
+          "maxLength": 256
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when const is set without maxLength",
+        "data": {
+          "type": "string",
+          "const": "fixed-value"
+        },
+        "valid": false
       },
       {
         "description": "Should fail when const type does not match declared type",
@@ -56,9 +66,18 @@
         "description": "Should pass when enum is set",
         "data": {
           "type": "string",
-          "enum": ["test"]
+          "enum": ["test"],
+          "maxLength": 256
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when enum is set without maxLength",
+        "data": {
+          "type": "string",
+          "enum": ["test"]
+        },
+        "valid": false
       },
       {
         "description": "Should fail when enum is not set",
@@ -615,6 +634,41 @@
           "contentEncoding": "nonsense",
           "format": "binary",
           "maxLength": 1024
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with backreference in pattern",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when pattern contains backreference \\1",
+        "data": {
+          "type": "string",
+          "pattern": "^(a)\\1+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains backreference \\2",
+        "data": {
+          "type": "string",
+          "pattern": "^(a)(b)\\2$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains named backreference \\k",
+        "data": {
+          "type": "string",
+          "pattern": "^(?<name>a)\\k<name>$",
+          "maxLength": 100
         },
         "valid": false
       }

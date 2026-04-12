@@ -9,8 +9,8 @@
         "description": "Should pass when allOf inner schemas are secure",
         "data": {
           "allOf": [
-            { "type": "string", "enum": ["a"] },
-            { "type": "string", "const": "a" }
+            { "type": "string", "enum": ["a"], "maxLength": 256 },
+            { "type": "string", "const": "a", "maxLength": 256 }
           ]
         },
         "valid": true
@@ -37,7 +37,7 @@
         "description": "Should pass when anyOf inner schemas are secure",
         "data": {
           "anyOf": [
-            { "type": "string", "enum": ["a"] },
+            { "type": "string", "enum": ["a"], "maxLength": 256 },
             { "type": "integer", "minimum": 0, "maximum": 1 }
           ]
         },
@@ -65,7 +65,7 @@
         "description": "Should pass when oneOf inner schemas are secure",
         "data": {
           "oneOf": [
-            { "type": "string", "enum": ["a"] },
+            { "type": "string", "enum": ["a"], "maxLength": 256 },
             { "type": "integer", "minimum": 0, "maximum": 1 }
           ]
         },
@@ -90,15 +90,28 @@
     },
     "tests": [
       {
-        "description": "Should pass when not inner schema is secure",
+        "description": "Should pass when not is used alongside type constraints",
         "data": {
-          "not": { "type": "string", "enum": ["a"] }
+          "type": "string",
+          "enum": ["a", "b"],
+          "maxLength": 256,
+          "not": { "type": "string", "const": "b", "maxLength": 256 }
         },
         "valid": true
       },
       {
+        "description": "Should fail when not is used standalone (accepts nearly everything)",
+        "data": {
+          "not": { "type": "null" }
+        },
+        "valid": false
+      },
+      {
         "description": "Should fail when not inner schema is insecure",
         "data": {
+          "type": "string",
+          "enum": ["a"],
+          "maxLength": 256,
           "not": { "type": "string" }
         },
         "valid": false
@@ -114,8 +127,8 @@
       {
         "description": "Should pass when if/then/else inner schemas are all secure",
         "data": {
-          "if": { "type": "string", "enum": ["a"] },
-          "then": { "type": "string", "const": "a" },
+          "if": { "type": "string", "enum": ["a"], "maxLength": 256 },
+          "then": { "type": "string", "const": "a", "maxLength": 256 },
           "else": { "type": "integer", "minimum": 0, "maximum": 1 }
         },
         "valid": true

@@ -365,7 +365,7 @@
         "data": {
           "type": "object",
           "properties": {
-            "name": { "type": "string", "enum": ["a", "b"] }
+            "name": { "type": "string", "enum": ["a", "b"], "maxLength": 256 }
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
@@ -509,7 +509,7 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"] }
+            "a": { "type": "string", "enum": ["x"], "maxLength": 256 }
           },
           "dependencies": {
             "a": {
@@ -531,7 +531,7 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"] },
+            "a": { "type": "string", "enum": ["x"], "maxLength": 256 },
             "b": { "type": "integer", "minimum": 0, "maximum": 1 }
           },
           "dependencies": {
@@ -571,7 +571,7 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"] }
+            "a": { "type": "string", "enum": ["x"], "maxLength": 256 }
           },
           "dependentSchemas": {
             "a": {
@@ -652,7 +652,7 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"] }
+            "a": { "type": "string", "enum": ["x"], "maxLength": 256 }
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,

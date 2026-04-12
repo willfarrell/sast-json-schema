@@ -15,7 +15,6 @@
         { "required": ["allOf"] },
         { "required": ["anyOf"] },
         { "required": ["oneOf"] },
-        { "required": ["not"] },
         { "required": ["if"] },
         { "required": ["$defs"] },
         { "required": ["definitions"] }
@@ -23,15 +22,36 @@
     }
   ],
   "definitions": {
-    "schemaArray": {
-      "type": "array",
-      "minItems": 1,
+    "safeAnchor":{
+      "$comment": "https://json-schema.org/draft/2020-12/json-schema-core#section-8.2.2",
+      "type": "string",
+      "pattern": "^[a-zA-Z_][-a-zA-Z0-9_.]*$",
+      "maxLength": 128
+    },
+    "safeArrayItemsLimits":{
+      "type":"array",
+      "minItems": 0,
       "maxItems": 1024,
-      "items": { "$ref": "#" }
+      "uniqueItems": true
+    },
+    "safeObjectPropertiesLimits": {
+      "type":"object",
+      "minProperties": 0,
+      "maxProperties": 1024
+    },
+    "safeStringLengthLimits":{
+      "type":"string",
+      "minLength":0,
+      "maxLength": 4096
     },
     "safeCount": {
       "description": "[0, Number.MAX_SAFE_INTEGER]",
       "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "safeMultipleOf": {
+      "description": "(0, Number.MAX_SAFE_INTEGER]",
+      "exclusiveMinimum": 0,
       "maximum": 9007199254740991
     },
     "safeInteger": {
@@ -45,16 +65,32 @@
       "maximum": 1e308
     },
     "safePattern": {
-      "$comment": "Must start with ^, end with $, exclude broad character classes (., \\S, \\W, \\D, \\C, \\P), reject empty negated character class [^] (JS any-char equivalent), reject nested quantifiers (e.g. (a+)+), reject positive lookahead (?=) and positive lookbehind (?<=), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Additional runtime ReDoS checking (e.g. safe-regex2, recheck) may be needed for full protection.",
+      "$comment": "Must start with ^, end with $, exclude broad character classes (., \\S, \\W, \\D, \\C, \\P), reject empty negated character class [^] (JS any-char equivalent), reject nested quantifiers (e.g. (a+)+), reject positive lookahead (?=) and positive lookbehind (?<=), reject backreferences (\\1-\\9, \\k), and use charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Overlapping quantifiers without groups (e.g. ^[a-z]+[a-z]+$) can still cause O(n^2) backtracking. Additional runtime ReDoS checking (e.g. safe-regex2, recheck) is recommended for full protection.",
       "allOf": [
         { "maxLength": 1024 },
         {
-          "pattern": "^\\^(\\\\[.]|(?!\\\\[SWDCP])(?!\\)[+*?{])(?!\\(\\?=)(?!\\(\\?<=)[^.\n\r])*\\$$"
+          "pattern": "^\\^(\\\\[.]|(?!\\\\[SWDCP])(?!\\\\[1-9])(?!\\\\k)(?!\\)[+*?{])(?!\\(\\?=)(?!\\(\\?<=)[^.\n\r])*\\$$"
         },
         {
           "not": { "pattern": "\\[\\^\\]" }
         }
       ]
+    },
+    "safeLocalRef": {
+      "type": "string",
+      "pattern": "^#[-a-zA-Z0-9_$/.]*$",
+      "maxLength": 1024
+    },
+    "safeUrl":{
+      "type": "string",
+      "pattern": "^https://[-a-zA-Z0-9._/?&#%=~+]+$",
+      "maxLength": 1024
+    },
+    "schemaArray": {
+      "type": "array",
+      "$ref":"#/definitions/safeArrayItemsLimits",
+      "minItems": 1,
+      "items": { "$ref": "#" }
     },
     "typeArray": {
       "oneOf": [
@@ -188,11 +224,30 @@
           "const": { "type": "object" }
         }
       }
+    },
+    "constIsUnionType": {
+      "$comment": "When type is an array (union type), restrict const/enum to primitive types to prevent type confusion bypasses.",
+      "if": {
+        "properties": { "type": { "type": "array" } },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "const": {
+            "type": ["string", "number", "integer", "boolean", "null"]
+          },
+          "enum": {
+            "items": {
+              "type": ["string", "number", "integer", "boolean", "null"]
+            }
+          }
+        }
+      }
     }
   },
   "dependencies": {
     "contains": {
-      "required": ["maxContains", "uniqueItems", "unevaluatedItems"]
+      "required": ["maxContains", "maxItems", "uniqueItems", "unevaluatedItems"]
     },
     "items": {
       "required": ["maxItems", "uniqueItems", "unevaluatedItems"]
@@ -379,51 +434,52 @@
       "properties": {
         "type": { "$ref": "#/definitions/typeIntegerOrNumber" },
         "multipleOf": {
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
+          "$ref": "#/definitions/safeMultipleOf"
         }
       }
     },
     "$ref": {
+      "$comment": "Only allow local (#) or HTTPS references. Remote $ref URLs can be SSRF vectors (e.g. internal IPs, metadata endpoints). Validators should independently restrict or disable remote schema loading.",
       "properties": {
         "$ref": {
-          "type": "string",
-          "maxLength": 1024,
-          "pattern": "^(#|https://)"
+          "oneOf": [
+            { "$ref": "#/definitions/safeUrl" },
+            { "$ref": "#/definitions/safeLocalRef" }
+          ]
         }
       }
     },
     "$id": {
       "properties": {
         "$id": {
-          "type": "string",
-          "maxLength": 1024,
-          "pattern": "^(https://[a-zA-Z0-9._/:?&#%=~+@-]+|[a-zA-Z0-9_-]+)$"
+          "oneOf": [
+            { "$ref": "#/definitions/safeUrl" },
+            { "type": "string", "maxLength": 1024, "pattern": "^[a-zA-Z0-9_-]+$" }
+          ]
         }
       }
     },
     "$anchor": {
       "properties": {
         "$anchor": {
-          "type": "string",
-          "maxLength": 128
+          "$ref": "#/definitions/safeAnchor"
         }
       }
     },
     "$dynamicRef": {
       "properties": {
         "$dynamicRef": {
-          "type": "string",
-          "maxLength": 1024,
-          "pattern": "^(#|https://)"
+          "oneOf": [
+            { "$ref": "#/definitions/safeUrl" },
+            { "$ref": "#/definitions/safeLocalRef" }
+          ]
         }
       }
     },
     "$dynamicAnchor": {
       "properties": {
         "$dynamicAnchor": {
-          "type": "string",
-          "maxLength": 128
+          "$ref": "#/definitions/safeAnchor"
         }
       }
     },
@@ -484,50 +540,62 @@
         {
           "properties": {
             "enum": {
-              "$comment": "Using 2^13 for maxItems.",
-              "type": "array",
-              "maxItems": 32768
+              "$ref": "#/definitions/safeArrayItemsLimits"
             }
           }
         },
         { "$ref": "#/definitions/constIsString" },
         { "$ref": "#/definitions/constIsInteger" },
         { "$ref": "#/definitions/constIsNumber" },
-        { "$ref": "#/definitions/constIsBoolean" }
+        { "$ref": "#/definitions/constIsBoolean" },
+        { "$ref": "#/definitions/constIsUnionType" }
       ]
     },
     "format": {
-      "$comment": "Formats from JSON Schema spec (https://json-schema.org/understanding-json-schema/reference/string#built-in-formats) and AJV (https://ajv.js.org/packages/ajv-formats.html)",
       "required": ["maxLength"],
       "properties": {
         "format": {
-          "enum": [
-            "date-time",
-            "date",
-            "time",
-            "duration",
-            "email",
-            "idn-email",
-            "hostname",
-            "idn-hostname",
-            "ipv4",
-            "ipv6",
-            "uri",
-            "uri-reference",
-            "uri-template",
-            "iri",
-            "iri-reference",
-            "uuid",
-            "json-pointer",
-            "relative-json-pointer",
-            "regex",
-            "byte",
-            "int32",
-            "int64",
-            "float",
-            "double",
-            "password",
-            "binary"
+          "anyOf":[
+            {
+              "$comment":"https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.7.3",
+              "enum": [
+                "date-time",
+                "date",
+                "time",
+                "duration",
+                "email",
+                "idn-email",
+                "hostname",
+                "idn-hostname",
+                "ipv4",
+                "ipv6",
+                "url",
+                "url-reference",
+                "uri",
+                "uri-reference",
+                "uri-template",
+                "iri",
+                "iri-reference",
+                "uuid",
+                "json-pointer",
+                "relative-json-pointer",
+                "regex"
+              ]
+            },
+            {
+              "$comment":"https://ajv.js.org/packages/ajv-formats.html",
+              "enum":[
+                "iso-time",
+                "iso-data-time",
+                "byte",
+                "int32",
+                "int64",
+                "float",
+                "double",
+                "password",
+                "binary"
+              ]
+            }
           ]
         }
       }
@@ -540,7 +608,8 @@
         { "$ref": "#/definitions/constIsBoolean" },
         { "$ref": "#/definitions/constIsNull" },
         { "$ref": "#/definitions/constIsArray" },
-        { "$ref": "#/definitions/constIsObject" }
+        { "$ref": "#/definitions/constIsObject" },
+        { "$ref": "#/definitions/constIsUnionType" }
       ]
     },
     "type": {
@@ -625,7 +694,8 @@
               {
                 "required": ["format"]
               }
-            ]
+            ],
+            "required": ["maxLength"]
           }
         },
         {
@@ -695,6 +765,33 @@
     "oneOf": { "$ref": "#/definitions/schemaArray" },
     "not": { "$ref": "#" },
     "contains": { "$ref": "#" },
-    "propertyNames": { "$ref": "#" }
+    "propertyNames": { "$ref": "#" },
+    "default": {
+      "allOf": [
+        { "if": { "type": "string" }, "then": { "$ref":"#/definitions/safeStringLengthLimits" } },
+        { "if": { "type": "array" }, "then": { "$ref": "#/definitions/safeArrayItemsLimits" } },
+        { "if": { "type": "object" }, "then": { "$ref": "#/definitions/safeObjectPropertiesLimits" } }
+      ]
+    },
+    "examples": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "allOf": [
+          { "if": { "type": "string" }, "then": { "$ref":"#/definitions/safeStringLengthLimits" } },
+          { "if": { "type": "array" }, "then": { "$ref": "#/definitions/safeArrayItemsLimits" } },
+          { "if": { "type": "object" }, "then": { "$ref": "#/definitions/safeObjectPropertiesLimits" } }
+        ]
+      }
+    },
+    "dependentRequired": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "maxLength": 256 },
+        "maxItems": 100,
+        "uniqueItems": true
+      }
+    }
   }
 }

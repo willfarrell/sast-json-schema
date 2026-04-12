@@ -14,7 +14,8 @@
               "enum": [
                 "a",
                 "b"
-              ]
+              ],
+              "maxLength": 256
             },
             "count": {
               "type": "integer",
@@ -53,7 +54,8 @@
               "enum": [
                 "a",
                 "b"
-              ]
+              ],
+              "maxLength": 256
             },
             "count": {
               "type": "integer",
@@ -229,6 +231,27 @@
           "$anchor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when $anchor contains special characters",
+        "data": {
+          "$anchor": "a<script>b"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $anchor contains spaces",
+        "data": {
+          "$anchor": "a b c"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $anchor starts with a digit",
+        "data": {
+          "$anchor": "1anchor"
+        },
+        "valid": false
       }
     ]
   },
@@ -287,6 +310,20 @@
         "description": "Should fail when $dynamicAnchor exceeds maxLength",
         "data": {
           "$dynamicAnchor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicAnchor contains special characters",
+        "data": {
+          "$dynamicAnchor": "a<script>b"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicAnchor contains spaces",
+        "data": {
+          "$dynamicAnchor": "a b c"
         },
         "valid": false
       }

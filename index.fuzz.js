@@ -58,12 +58,8 @@ test("fuzz: nested composition schemas should not throw", () => {
 		minimum: fc.option(fc.integer({ min: -1000, max: 1000 })),
 		maximum: fc.option(fc.integer({ min: -1000, max: 1000 })),
 		maxLength: fc.option(fc.nat({ max: 1000 })),
-		pattern: fc.option(
-			fc.constantFrom("^[a-z]+$", "^[0-9]+$", "^[\\p{L}]+$"),
-		),
-		format: fc.option(
-			fc.constantFrom("email", "uuid", "date-time", "uri"),
-		),
+		pattern: fc.option(fc.constantFrom("^[a-z]+$", "^[0-9]+$", "^[\\p{L}]+$")),
+		format: fc.option(fc.constantFrom("email", "uuid", "date-time", "uri")),
 	});
 
 	const composedSchema = fc.record({
@@ -74,7 +70,7 @@ test("fuzz: nested composition schemas should not throw", () => {
 	});
 
 	fc.assert(
-		fc.property(composedSchema, (jsonSchema) => {
+		fc.property(composedSchema.map((s) => JSON.parse(JSON.stringify(s))), (jsonSchema) => {
 			validate(jsonSchema);
 		}),
 		{ numRuns: 1000 },

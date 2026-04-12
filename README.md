@@ -71,11 +71,13 @@ The following criteria should be considered when writing JSON Schemas used for i
 ## Known Limitations
 
 - **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default).
-- **`enum` size bounded to 2^13.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits. Needs feedback on a better limit and way to bypass for edge cases.
+- **`enum` size bounded to 1024 items.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits. TODO need way to bypass for edge cases.
 - **Remote `$ref` safety depends on validator configuration.** Schemas can reference external URLs via `$ref`. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended.
-- **`default` values are not validated.** A schema can declare a `default` that doesn't match its own constraints. JSON Schema spec treats `default` as informational.
+- **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref` to `#` (local) or `https://` URLs, but does not validate hostnames. URLs targeting internal IPs (e.g. `169.254.169.254`, `localhost`, `127.0.0.1`) will pass. Validators should independently restrict or disable remote schema loading.
+- **`default` values have size limits but are not type-validated.** A schema can declare a `default` that doesn't match its own constraints. JSON Schema spec treats `default` as informational. String defaults are capped at 4096 chars, array defaults at 1024 items, object defaults at 1024 properties.
 - **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error.
-- **`not` keyword is not handled.** The `not` keyword is not evaluated by the SAST schema. Schemas using `not` to restrict values will not be checked for security constraints. Prefer allowlist approaches (e.g., `enum`, `pattern`, `const`) over `not` to define acceptable values.
+- **`not` keyword must be paired with explicit constraints.** Standalone `not` schemas (e.g., `{ "not": { "type": "null" } }`) are rejected because the negation semantics would accept nearly all input. Use `not` alongside `type`, `const`, `$ref`, or composition keywords. Prefer allowlist approaches (`enum`, `pattern`, `const`) over `not`.
+- **Overlapping regex quantifiers not fully detected.** The `safePattern` check blocks nested quantifiers like `(a+)+` and backreferences, but cannot detect overlapping quantifiers like `^[a-z]+[a-z]+$` which cause O(n^2) backtracking. Use runtime ReDoS checking (e.g. safe-regex2, recheck) for full protection.
 
 ## Sources
 
