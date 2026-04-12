@@ -133,6 +133,48 @@
           "$ref": "data:text/json,{}"
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets localhost (SSRF)",
+        "data": {
+          "$ref": "https://localhost/admin"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 127.0.0.1 (SSRF)",
+        "data": {
+          "$ref": "https://127.0.0.1/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 169.254.169.254 (SSRF cloud metadata)",
+        "data": {
+          "$ref": "https://169.254.169.254/latest/meta-data/"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 10.x.x.x (SSRF RFC1918)",
+        "data": {
+          "$ref": "https://10.0.0.1/internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 172.16.x.x (SSRF RFC1918)",
+        "data": {
+          "$ref": "https://172.16.0.1/internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 192.168.x.x (SSRF RFC1918)",
+        "data": {
+          "$ref": "https://192.168.1.1/router"
+        },
+        "valid": false
       }
     ]
   },

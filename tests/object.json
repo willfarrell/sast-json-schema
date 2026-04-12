@@ -8,7 +8,10 @@
       {
         "description": "Should pass",
         "data": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "unevaluatedProperties": false,
           "properties": {},
           "maxProperties": 10,
@@ -19,7 +22,10 @@
       {
         "description": "Should fail",
         "data": {
-          "type": ["object", "null"]
+          "type": [
+            "object",
+            "null"
+          ]
         },
         "valid": false
       }
@@ -162,9 +168,16 @@
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {
-            "a": { "type": "string", "enum": ["x"] }
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ]
+            }
           },
-          "required": ["a"]
+          "required": [
+            "a"
+          ]
         },
         "valid": false
       }
@@ -195,6 +208,40 @@
           "properties": {}
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when required item exceeds maxLength (4096)",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {},
+          "maxProperties": 10,
+          "required": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when required items are within limits",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "enum": [
+                "a"
+              ],
+              "maxLength": 256
+            }
+          },
+          "maxProperties": 10,
+          "required": [
+            "name"
+          ]
+        },
+        "valid": true
       }
     ]
   },
@@ -365,11 +412,20 @@
         "data": {
           "type": "object",
           "properties": {
-            "name": { "type": "string", "enum": ["a", "b"], "maxLength": 256 }
+            "name": {
+              "type": "string",
+              "enum": [
+                "a",
+                "b"
+              ],
+              "maxLength": 256
+            }
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
-          "required": ["name"]
+          "required": [
+            "name"
+          ]
         },
         "valid": true
       },
@@ -378,10 +434,14 @@
         "data": {
           "type": "object",
           "properties": {
-            "name": { "type": "string" }
+            "name": {
+              "type": "string"
+            }
           },
           "unevaluatedProperties": false,
-          "required": ["name"]
+          "required": [
+            "name"
+          ]
         },
         "valid": false
       }
@@ -509,7 +569,13 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"], "maxLength": 256 }
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ],
+              "maxLength": 256
+            }
           },
           "dependencies": {
             "a": {
@@ -531,11 +597,23 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"], "maxLength": 256 },
-            "b": { "type": "integer", "minimum": 0, "maximum": 1 }
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ],
+              "maxLength": 256
+            },
+            "b": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
           },
           "dependencies": {
-            "a": ["b"]
+            "a": [
+              "b"
+            ]
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
@@ -548,10 +626,17 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"] }
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ]
+            }
           },
           "dependencies": {
-            "a": { "type": "string" }
+            "a": {
+              "type": "string"
+            }
           },
           "unevaluatedProperties": false,
           "required": []
@@ -571,7 +656,13 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"], "maxLength": 256 }
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ],
+              "maxLength": 256
+            }
           },
           "dependentSchemas": {
             "a": {
@@ -593,10 +684,17 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"] }
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ]
+            }
           },
           "dependentSchemas": {
-            "a": { "type": "string" }
+            "a": {
+              "type": "string"
+            }
           },
           "unevaluatedProperties": false,
           "required": []
@@ -652,7 +750,13 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"], "maxLength": 256 }
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ],
+              "maxLength": 256
+            }
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
@@ -666,7 +770,12 @@
         "data": {
           "type": "object",
           "properties": {
-            "a": { "type": "string", "enum": ["x"] }
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ]
+            }
           },
           "unevaluatedProperties": false,
           "minProperties": -1,

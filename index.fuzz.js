@@ -70,9 +70,12 @@ test("fuzz: nested composition schemas should not throw", () => {
 	});
 
 	fc.assert(
-		fc.property(composedSchema.map((s) => JSON.parse(JSON.stringify(s))), (jsonSchema) => {
-			validate(jsonSchema);
-		}),
+		fc.property(
+			composedSchema.map((s) => JSON.parse(JSON.stringify(s))),
+			(jsonSchema) => {
+				validate(jsonSchema);
+			},
+		),
 		{ numRuns: 1000 },
 	);
 });

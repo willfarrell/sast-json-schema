@@ -161,6 +161,15 @@
         "valid": false
       },
       {
+        "description": "Should pass when format is set to iso-date-time",
+        "data": {
+          "type": "string",
+          "format": "iso-date-time",
+          "maxLength": 64
+        },
+        "valid": true
+      },
+      {
         "description": "Should fail when format is unknown",
         "data": {
           "type": "string",
@@ -400,6 +409,51 @@
           "maxLength": 100
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when pattern contains bare alternation (breaks anchoring)",
+        "data": {
+          "type": "string",
+          "pattern": "^abc|def|ghi$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has alternation with quantifiers (breaks anchoring)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+|[0-9]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when alternation is inside non-capturing group",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc|def|ghi)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when alternation is inside nested groups",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:(?:abc|def)|(?:ghi|jkl))$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when alternation is at top level after group closes",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a|b)|c$",
+          "maxLength": 100
+        },
+        "valid": false
       }
     ]
   },
