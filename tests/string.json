@@ -893,6 +893,113 @@
     ]
   },
   {
+    "description": "type=string with escaped literal backslash in pattern (false positive regression)",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when pattern contains literal backslash before S (\\\\S)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\S$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before W (\\\\W)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\W$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before D (\\\\D)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\D$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before 0 (\\\\0)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\0$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before digit (\\\\1)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\1$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before x00 (\\\\x00)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\x00$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before u0000 (\\\\u0000)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\u0000$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before cA (\\\\cA)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\cA$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before k (\\\\k)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\k$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when triple backslash before 0 (real null byte after literal backslash)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\\\0$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when quad backslash before 0 (two literal backslashes then zero)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\\\\\0$",
+          "maxLength": 100
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
     "description": "type=string with bare alternation between groups in pattern",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"

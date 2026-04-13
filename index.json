@@ -89,39 +89,39 @@
         },
         {
           "$comment": "Reject broad character class escapes: \\S (non-whitespace), \\W (non-word), \\D (non-digit), \\C (any byte), \\P (negated unicode property), \\B (non-word boundary)",
-          "not": { "pattern": "\\\\[SWDCPB]" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\[SWDCPB]" }
         },
         {
           "$comment": "Reject backreferences: \\1 through \\9",
-          "not": { "pattern": "\\\\[1-9]" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\[1-9]" }
         },
         {
           "$comment": "Reject null byte escape: \\0",
-          "not": { "pattern": "\\\\0" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\0" }
         },
         {
           "$comment": "Reject null byte via hex escape: \\x00",
-          "not": { "pattern": "\\\\x00" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\x00" }
         },
         {
           "$comment": "Reject null byte via unicode escape: \\u0000 or \\u{0...}",
-          "not": { "pattern": "\\\\u(0000|\\{0+\\})" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\u(0000|\\{0+\\})" }
         },
         {
           "$comment": "Reject control character escape: \\cA through \\cZ (matches control chars U+0001-U+001A)",
-          "not": { "pattern": "\\\\c[A-Za-z]" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\c[A-Za-z]" }
         },
         {
           "$comment": "Reject unicode general category C (control, format, surrogate, private-use, unassigned) in short form: \\p{C}, \\p{Cc}, \\p{Cf}, \\p{Cs}, \\p{Co}, \\p{Cn}. These bypass \\0/\\x00/\\cA checks.",
-          "not": { "pattern": "\\\\p\\{C[cfsno]?\\}" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\p\\{C[cfsno]?\\}" }
         },
         {
           "$comment": "Reject unicode general category C long names: \\p{Other}, \\p{Control}, \\p{Format}, \\p{Surrogate}, \\p{Private_Use}, \\p{Unassigned}",
-          "not": { "pattern": "\\\\p\\{(Other|Control|Format|Surrogate|Private_Use|Unassigned)\\}" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\p\\{(Other|Control|Format|Surrogate|Private_Use|Unassigned)\\}" }
         },
         {
           "$comment": "Reject named backreference: \\k",
-          "not": { "pattern": "\\\\k" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\k" }
         },
         {
           "$comment": "Reject nested quantifiers after groups: )+ )* )? ){",
