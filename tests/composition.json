@@ -125,28 +125,37 @@
     },
     "tests": [
       {
-        "description": "Should pass when if/then/else inner schemas are all secure",
+        "description": "Should pass when if/then/else used alongside type (primary keyword)",
         "data": {
+          "type": "string",
+          "enum": ["a", "b"],
+          "maxLength": 256,
           "if": { "type": "string", "enum": ["a"], "maxLength": 256 },
           "then": { "type": "string", "const": "a", "maxLength": 256 },
-          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+          "else": { "type": "string", "enum": ["b"], "maxLength": 256 }
         },
         "valid": true
       },
       {
         "description": "Should fail when then inner schema is insecure",
         "data": {
-          "if": { "type": "string", "enum": ["a"] },
+          "type": "string",
+          "enum": ["a", "b"],
+          "maxLength": 256,
+          "if": { "type": "string", "enum": ["a"], "maxLength": 256 },
           "then": { "type": "string" },
-          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+          "else": { "type": "string", "enum": ["b"], "maxLength": 256 }
         },
         "valid": false
       },
       {
         "description": "Should fail when else inner schema is insecure",
         "data": {
-          "if": { "type": "string", "enum": ["a"] },
-          "then": { "type": "string", "const": "a" },
+          "type": "string",
+          "enum": ["a", "b"],
+          "maxLength": 256,
+          "if": { "type": "string", "enum": ["a"], "maxLength": 256 },
+          "then": { "type": "string", "const": "a", "maxLength": 256 },
           "else": { "type": "string" }
         },
         "valid": false
@@ -154,9 +163,12 @@
       {
         "description": "Should fail when if inner schema is insecure",
         "data": {
+          "type": "string",
+          "enum": ["a", "b"],
+          "maxLength": 256,
           "if": { "type": "string" },
-          "then": { "type": "string", "const": "a" },
-          "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+          "then": { "type": "string", "const": "a", "maxLength": 256 },
+          "else": { "type": "string", "enum": ["b"], "maxLength": 256 }
         },
         "valid": false
       },
@@ -168,10 +180,29 @@
         "valid": false
       },
       {
-        "description": "Should pass when if is used with only else (no then)",
+        "description": "Should fail when if/else used without primary keyword (non-matching path unconstrained)",
         "data": {
           "if": { "type": "string", "enum": ["a"], "maxLength": 256 },
           "else": { "type": "integer", "minimum": 0, "maximum": 1 }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when if/then used without primary keyword (non-matching path unconstrained)",
+        "data": {
+          "if": { "type": "null" },
+          "then": { "type": "null" }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when if/then used alongside type (primary provides base constraint)",
+        "data": {
+          "type": "string",
+          "if": { "type": "string", "pattern": "^[a-z]+$", "maxLength": 100 },
+          "then": { "type": "string", "pattern": "^[a-z]{3,}$", "maxLength": 100 },
+          "maxLength": 100,
+          "pattern": "^[a-z]+$"
         },
         "valid": true
       },
@@ -378,6 +409,100 @@
           "required": ["a"],
           "maxProperties": 10,
           "unevaluatedProperties": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "default type consistency",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when default matches declared type (string)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+$",
+          "maxLength": 100,
+          "default": "hello"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when default matches declared type (integer)",
+        "data": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 42
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when default matches declared type (null)",
+        "data": {
+          "type": "null",
+          "default": null
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when default is integer but type is string",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+$",
+          "maxLength": 100,
+          "default": 12345
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when default is string but type is integer",
+        "data": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": "not-a-number"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when default is object but type is string",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+$",
+          "maxLength": 100,
+          "default": {"injected": true}
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when default is array but type is boolean",
+        "data": {
+          "type": "boolean",
+          "default": [1, 2, 3]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when default matches union type",
+        "data": {
+          "type": ["string", "null"],
+          "enum": ["test"],
+          "maxLength": 100,
+          "default": null
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when default is object for union type (non-primitive)",
+        "data": {
+          "type": ["string", "null"],
+          "enum": ["test"],
+          "maxLength": 100,
+          "default": {"injected": true}
         },
         "valid": false
       }

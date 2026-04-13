@@ -704,6 +704,42 @@
         "valid": true
       },
       {
+        "description": "Should fail when format is password (annotation-only, provides no content validation)",
+        "data": {
+          "type": "string",
+          "format": "password",
+          "maxLength": 128
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is binary (annotation-only, provides no content validation)",
+        "data": {
+          "type": "string",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is just a string (not in allowed list)",
+        "data": {
+          "type": "string",
+          "format": "custom-format",
+          "maxLength": 128
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when password field uses pattern for content validation",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{L}\\p{N}\\p{P}\\p{S}]+$",
+          "maxLength": 128
+        },
+        "valid": true
+      },
+      {
         "description": "Should fail when none of const/enum/pattern/format is set",
         "data": {
           "type": "string",
@@ -724,7 +760,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "application/json",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": true
@@ -734,7 +770,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "text/html",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": true
@@ -744,7 +780,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "application/vnd.api+json",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": true
@@ -754,7 +790,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "foo/bar",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": false
@@ -764,7 +800,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "application",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": false
@@ -782,7 +818,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "base64",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": true
@@ -792,7 +828,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "base32",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": true
@@ -802,7 +838,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "base16",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": true
@@ -812,7 +848,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "quoted-printable",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": true
@@ -822,7 +858,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "7bit",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": false
@@ -832,7 +868,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "nonsense",
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": false

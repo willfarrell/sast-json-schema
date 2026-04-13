@@ -37,6 +37,12 @@
       "required": []
     },
     {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "$ref": "#/definitions/allowedProperties",
+      "properties": {},
+      "maxProperties": 4,
+      "required": [],
       "if": {
         "type": "object",
         "unevaluatedProperties": false,

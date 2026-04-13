@@ -720,7 +720,7 @@
             "unevaluatedProperties": false,
             "required": []
           },
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": true
@@ -732,7 +732,7 @@
           "contentSchema": {
             "type": "string"
           },
-          "format": "binary",
+          "format": "byte",
           "maxLength": 1024
         },
         "valid": false
