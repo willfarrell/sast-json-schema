@@ -80,6 +80,7 @@ The following criteria should be considered when writing JSON Schemas used for i
 - **Literal `.` inside character classes is rejected.** The `safePattern` check rejects `.` everywhere, including inside character classes like `[a-z.]` where it is a literal dot (not a wildcard). Use the escaped form `[a-z\.]` instead.
 - **Negated character classes `[^...]` are rejected.** Negated character classes like `[^a]` are broad denylist matchers (equivalent to `.` in scope). Use allowlist patterns like `[\p{L}\p{N}]` instead.
 - **Overlapping regex quantifiers not fully detected.** The `safePattern` check blocks nested quantifiers like `(a+)+` and backreferences, but cannot detect overlapping quantifiers like `^[a-z]+[a-z]+$` which cause O(n^2) backtracking. Use runtime ReDoS checking (e.g. safe-regex2, recheck) for full protection.
+- **`format: "regex"` does not validate regex safety.** A schema using `format: "regex"` validates that input strings are syntactically valid regular expressions, but the meta-schema does not ensure those regex strings are safe from ReDoS. If your application compiles user-provided regex strings, use runtime ReDoS checking on the input.
 
 ## Sources
 

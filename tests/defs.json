@@ -93,11 +93,11 @@
         "valid": true
       },
       {
-        "description": "Should pass when $ref is a root reference",
+        "description": "Should fail when $ref is a root self-reference (infinite recursion)",
         "data": {
           "$ref": "#"
         },
-        "valid": true
+        "valid": false
       },
       {
         "description": "Should pass when $ref is a local $defs reference",
@@ -121,6 +121,13 @@
         "valid": false
       },
       {
+        "description": "Should fail when $ref uses http: scheme (downgrade)",
+        "data": {
+          "$ref": "http://example.com/schema.json"
+        },
+        "valid": false
+      },
+      {
         "description": "Should fail when $ref uses file: scheme",
         "data": {
           "$ref": "file:///etc/passwd"
@@ -131,6 +138,13 @@
         "description": "Should fail when $ref uses data: scheme",
         "data": {
           "$ref": "data:text/json,{}"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref uses javascript: scheme",
+        "data": {
+          "$ref": "javascript:alert(1)"
         },
         "valid": false
       },

@@ -39,6 +39,13 @@
       "minProperties": 0,
       "maxProperties": 1024
     },
+    "safeValueSizeLimits": {
+      "allOf": [
+        { "if": { "type": "string" }, "then": { "$ref": "#/definitions/safeStringLengthLimits" } },
+        { "if": { "type": "array" }, "then": { "$ref": "#/definitions/safeArrayItemsLimits" } },
+        { "if": { "type": "object" }, "then": { "$ref": "#/definitions/safeObjectPropertiesLimits" } }
+      ]
+    },
     "safeStringLengthLimits":{
       "type":"string",
       "minLength":0,
@@ -76,12 +83,16 @@
           "pattern": "^\\^(\\\\[.]|[^.\n\r])*\\$$"
         },
         {
-          "$comment": "Reject broad character class escapes: \\S (non-whitespace), \\W (non-word), \\D (non-digit), \\C (any byte), \\P (negated unicode property)",
-          "not": { "pattern": "\\\\[SWDCP]" }
+          "$comment": "Reject broad character class escapes: \\S (non-whitespace), \\W (non-word), \\D (non-digit), \\C (any byte), \\P (negated unicode property), \\B (non-word boundary)",
+          "not": { "pattern": "\\\\[SWDCPB]" }
         },
         {
           "$comment": "Reject backreferences: \\1 through \\9",
           "not": { "pattern": "\\\\[1-9]" }
+        },
+        {
+          "$comment": "Reject null byte escape: \\0",
+          "not": { "pattern": "\\\\0" }
         },
         {
           "$comment": "Reject named backreference: \\k",
@@ -110,19 +121,24 @@
         {
           "$comment": "Reject bare | after last group at top level (breaks anchoring)",
           "not": { "pattern": "\\|[^()]*\\$$" }
+        },
+        {
+          "$comment": "If alternation | is used, require outer group wrapping to preserve anchoring",
+          "if": { "pattern": "\\|" },
+          "then": { "pattern": "^\\^\\(.*\\)\\$$" }
         }
       ]
     },
     "safeLocalRef": {
       "type": "string",
-      "pattern": "^#[-a-zA-Z0-9_$/.]*$",
+      "pattern": "^#[-a-zA-Z0-9_$/.]+$",
       "maxLength": 1024
     },
     "safeUrl":{
       "$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection.",
       "type": "string",
       "allOf": [
-        { "pattern": "^https://[-a-zA-Z0-9._/?&#%=~+]+$" },
+        { "pattern": "^https://[-a-zA-Z0-9.]+(/[-a-zA-Z0-9._/?&#%=~+]*)?$" },
         { "not": { "pattern": "^https://(localhost|0[xX][0-9a-fA-F]|[0-9]+\\.[0-9]+\\.[0-9]|[0-9]{5,}|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])" } }
       ],
       "maxLength": 1024
@@ -589,12 +605,14 @@
       }
     },
     "enum": {
-      "$comment": "Ensure enum values match the declared type",
       "allOf": [
         {
           "properties": {
             "enum": {
-              "$ref": "#/definitions/safeArrayItemsLimits"
+              "allOf": [
+                { "$ref": "#/definitions/safeArrayItemsLimits" },
+                { "items": { "$ref": "#/definitions/safeValueSizeLimits" } }
+              ]
             }
           }
         },
@@ -832,30 +850,12 @@
     "not": { "$ref": "#" },
     "contains": { "$ref": "#" },
     "propertyNames": { "$ref": "#" },
-    "const": {
-      "allOf": [
-        { "if": { "type": "string" }, "then": { "$ref":"#/definitions/safeStringLengthLimits" } },
-        { "if": { "type": "array" }, "then": { "$ref": "#/definitions/safeArrayItemsLimits" } },
-        { "if": { "type": "object" }, "then": { "$ref": "#/definitions/safeObjectPropertiesLimits" } }
-      ]
-    },
-    "default": {
-      "allOf": [
-        { "if": { "type": "string" }, "then": { "$ref":"#/definitions/safeStringLengthLimits" } },
-        { "if": { "type": "array" }, "then": { "$ref": "#/definitions/safeArrayItemsLimits" } },
-        { "if": { "type": "object" }, "then": { "$ref": "#/definitions/safeObjectPropertiesLimits" } }
-      ]
-    },
+    "const": { "$ref": "#/definitions/safeValueSizeLimits" },
+    "default": { "$ref": "#/definitions/safeValueSizeLimits" },
     "examples": {
       "type": "array",
-      "maxItems": 100,
-      "items": {
-        "allOf": [
-          { "if": { "type": "string" }, "then": { "$ref":"#/definitions/safeStringLengthLimits" } },
-          { "if": { "type": "array" }, "then": { "$ref": "#/definitions/safeArrayItemsLimits" } },
-          { "if": { "type": "object" }, "then": { "$ref": "#/definitions/safeObjectPropertiesLimits" } }
-        ]
-      }
+      "$ref": "#/definitions/safeArrayItemsLimits"
+      "items": { "$ref": "#/definitions/safeValueSizeLimits" }
     },
     "required": {
       "type": "array",

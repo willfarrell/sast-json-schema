@@ -281,5 +281,50 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "deeply nested composition recursive validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when allOf contains anyOf contains oneOf with secure schemas",
+        "data": {
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "oneOf": [
+                    { "type": "string", "enum": ["a"], "maxLength": 256 },
+                    { "type": "integer", "minimum": 0, "maximum": 100 }
+                  ]
+                },
+                { "type": "boolean" }
+              ]
+            }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when deeply nested schema is insecure",
+        "data": {
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "oneOf": [
+                    { "type": "string", "enum": ["a"], "maxLength": 256 },
+                    { "type": "string" }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "valid": false
+      }
+    ]
   }
 ]
