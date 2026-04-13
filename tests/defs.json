@@ -383,6 +383,22 @@
           "type": "null"
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when $id URL contains fragment (spec 8.2.1 violation)",
+        "data": {
+          "$id": "https://example.com/schema.json#foo",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $id URL contains JSON Pointer fragment",
+        "data": {
+          "$id": "https://example.com/schema.json#/definitions/name",
+          "type": "null"
+        },
+        "valid": false
       }
     ]
   },

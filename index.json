@@ -39,11 +39,6 @@
       "minLength": 1,
       "maxLength": 1024
     },
-    "safeArray": {
-      "type": "array",
-      "items": { "type": "string", "$ref": "#/definitions/safeStringLengthLimits" },
-      "$ref": "#/definitions/safeArrayItemsLimits"
-    },
     "safePropertyNameArray": {
       "type": "array",
       "items": { "type": "string", "$ref": "#/definitions/safePropertyName" },
@@ -181,6 +176,13 @@
       "allOf": [
         { "$ref": "#/definitions/safeUrl" },
         { "not": { "pattern": "\\?" } }
+      ]
+    },
+    "safeIdUrl": {
+      "$comment": "Like safeUrl but rejects fragments. JSON Schema spec section 8.2.1: $id MUST NOT contain a non-empty fragment.",
+      "allOf": [
+        { "$ref": "#/definitions/safeUrl" },
+        { "not": { "pattern": "#" } }
       ]
     },
     "safeUrl":{
@@ -644,7 +646,7 @@
       "properties": {
         "$id": {
           "oneOf": [
-            { "$ref": "#/definitions/safeUrl" },
+            { "$ref": "#/definitions/safeIdUrl" },
             { "type": "string", "maxLength": 1024, "pattern": "^[a-zA-Z0-9_-]+$" }
           ]
         }
@@ -823,8 +825,36 @@
         { "if": { "$ref": "#/definitions/typeOfArray" }, "then": { "properties": { "default": { "type": "array" } } } },
         { "if": { "$ref": "#/definitions/typeOfObject" }, "then": { "properties": { "default": { "type": "object" } } } },
         {
-          "if": { "properties": { "type": { "type": "array" } }, "required": ["type"] },
-          "then": { "properties": { "default": { "type": ["string", "number", "integer", "boolean", "null"] } } }
+          "$comment": "When type is a union, default must match a type in the array. For each type category, if NOT in the union, reject defaults of that type.",
+          "if": { "properties": { "type": { "type": "array" } }, "required": ["type", "default"] },
+          "then": {
+            "allOf": [
+              {
+                "if": { "properties": { "type": { "not": { "contains": { "const": "string" } } } } },
+                "then": { "properties": { "default": { "not": { "type": "string" } } } }
+              },
+              {
+                "if": { "properties": { "type": { "not": { "contains": { "enum": ["integer", "number"] } } } } },
+                "then": { "properties": { "default": { "not": { "type": "number" } } } }
+              },
+              {
+                "if": { "properties": { "type": { "not": { "contains": { "const": "boolean" } } } } },
+                "then": { "properties": { "default": { "not": { "type": "boolean" } } } }
+              },
+              {
+                "if": { "properties": { "type": { "not": { "contains": { "const": "null" } } } } },
+                "then": { "properties": { "default": { "not": { "type": "null" } } } }
+              },
+              {
+                "if": { "properties": { "type": { "not": { "contains": { "const": "array" } } } } },
+                "then": { "properties": { "default": { "not": { "type": "array" } } } }
+              },
+              {
+                "if": { "properties": { "type": { "not": { "contains": { "const": "object" } } } } },
+                "then": { "properties": { "default": { "not": { "type": "object" } } } }
+              }
+            ]
+          }
         }
       ]
     },

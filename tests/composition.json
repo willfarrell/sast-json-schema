@@ -505,6 +505,55 @@
           "default": {"injected": true}
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when default is number but union type is [string, null]",
+        "data": {
+          "type": ["string", "null"],
+          "enum": ["test"],
+          "maxLength": 100,
+          "default": 42
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when default is boolean but union type is [string, null]",
+        "data": {
+          "type": ["string", "null"],
+          "enum": ["test"],
+          "maxLength": 100,
+          "default": true
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when default is string and union type includes string",
+        "data": {
+          "type": ["string", "null"],
+          "enum": ["test"],
+          "maxLength": 100,
+          "default": "test"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when default is string but union type is [integer, null]",
+        "data": {
+          "type": ["integer", "null"],
+          "enum": [1, 2],
+          "default": "not-a-number"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when default is integer and union type includes integer",
+        "data": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "default": 42
+        },
+        "valid": true
       }
     ]
   },
