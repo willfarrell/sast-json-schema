@@ -1000,6 +1000,50 @@
     ]
   },
   {
+    "description": "type=string with escaped metacharacters in pattern (false positive regression)",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when pattern contains escaped literal [ before ^ (\\[^...] is literal, not negated class)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\[^a-z\\]$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains escaped literal ( before ?= (\\(?= is literal, not lookahead)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\(?=[a-z]$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains escaped literal ( before ?<= (\\(?<= is literal, not lookbehind)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\(?<=[a-z]$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains escaped literal ) before quantifier (\\)+ is literal, not group closer)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\)+$",
+          "maxLength": 100
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
     "description": "type=string with bare alternation between groups in pattern",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"

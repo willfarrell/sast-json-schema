@@ -114,6 +114,13 @@
         "valid": true
       },
       {
+        "description": "Should fail when $ref uses single-label hostname (SSRF via DNS search domain)",
+        "data": {
+          "$ref": "https://intranet/schema"
+        },
+        "valid": false
+      },
+      {
         "description": "Should fail when $ref is a relative path",
         "data": {
           "$ref": "./other-schema.json"

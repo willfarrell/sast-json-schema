@@ -125,19 +125,19 @@
         },
         {
           "$comment": "Reject nested quantifiers after groups: )+ )* )? ){",
-          "not": { "pattern": "\\)[+*?{]" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\)[+*?{]" }
         },
         {
           "$comment": "Reject positive lookahead: (?=...)",
-          "not": { "pattern": "\\(\\?=" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?=" }
         },
         {
           "$comment": "Reject positive lookbehind: (?<=...)",
-          "not": { "pattern": "\\(\\?<=" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?<=" }
         },
         {
           "$comment": "Reject negated character classes [^...] (broad denylist matchers)",
-          "not": { "pattern": "\\[\\^" }
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\[\\^" }
         },
         {
           "$comment": "Reject bare | before any group at top level (breaks anchoring). Use (?:...) for alternation.",
@@ -163,7 +163,7 @@
       "$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection.",
       "type": "string",
       "allOf": [
-        { "pattern": "^https://[-a-zA-Z0-9.]+(/[-a-zA-Z0-9._/?&#%=~+]*)?$" },
+        { "pattern": "^https://[-a-zA-Z0-9.]+\\.[a-z]+(/[-a-zA-Z0-9._/?&#%=~+]*)?$" },
         { "not": { "pattern": "^https://(localhost|0[xX][0-9a-fA-F]|[0-9]+\\.[0-9]+\\.[0-9]|[0-9]{5,}|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])" } }
       ],
       "maxLength": 1024
@@ -883,7 +883,13 @@
           "items": { "enum": ["string", "integer", "number", "boolean", "null", "array", "object"] },
           "minItems": 1,
           "maxItems": 7,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "not": {
+            "allOf": [
+              { "contains": { "const": "integer" } },
+              { "contains": { "const": "number" } }
+            ]
+          }
         }
       ]
     },
