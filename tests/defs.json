@@ -224,6 +224,83 @@
           "$ref": "https://8.8.8.8/schema"
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains port number (SSRF bypass)",
+        "data": {
+          "$ref": "https://evil.com:8080/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains userinfo (credential leak)",
+        "data": {
+          "$ref": "https://user:pass@evil.com/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains IPv6 brackets (SSRF bypass)",
+        "data": {
+          "$ref": "https://[::1]/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains percent-encoded host (SSRF bypass)",
+        "data": {
+          "$ref": "https://127%2e0%2e0%2e1/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains unicode homoglyph in host",
+        "data": {
+          "$ref": "https://\u0435xample.com/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains backslash (protocol confusion)",
+        "data": {
+          "$ref": "https://evil.com\\@good.com/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref is a local JSON Pointer",
+        "data": {
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $ref is #/$defs path",
+        "data": {
+          "$ref": "#/$defs/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $ref local path contains dot segments (valid JSON Pointer key, not traversal)",
+        "data": {
+          "$ref": "#/../../../etc/passwd"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref targets 172.31.x.x (SSRF RFC1918 upper range)",
+        "data": {
+          "$ref": "https://172.31.255.255/internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets hex IP with uppercase 0X prefix",
+        "data": {
+          "$ref": "https://0X7F000001/secret"
+        },
+        "valid": false
       }
     ]
   },
@@ -378,6 +455,48 @@
         "description": "Should fail when $dynamicRef uses http: scheme",
         "data": {
           "$dynamicRef": "http://evil.com/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef targets localhost (SSRF)",
+        "data": {
+          "$dynamicRef": "https://localhost/admin"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef targets 169.254.169.254 (SSRF cloud metadata)",
+        "data": {
+          "$dynamicRef": "https://169.254.169.254/latest/meta-data/"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef targets 10.x.x.x (SSRF RFC1918)",
+        "data": {
+          "$dynamicRef": "https://10.0.0.1/internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef targets hex IP (SSRF bypass)",
+        "data": {
+          "$dynamicRef": "https://0x7f000001/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef is a root self-reference",
+        "data": {
+          "$dynamicRef": "#"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef URL contains port number",
+        "data": {
+          "$dynamicRef": "https://evil.com:8080/schema"
         },
         "valid": false
       }

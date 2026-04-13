@@ -784,6 +784,166 @@
     ]
   },
   {
+    "description": "type=string with pattern escape sequences",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when pattern contains \\t (tab literal)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\t]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\b (word boundary)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\b[a-z]+\\b$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\x hex escape",
+        "data": {
+          "type": "string",
+          "pattern": "^\\x41+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\u unicode escape",
+        "data": {
+          "type": "string",
+          "pattern": "^\\u0041+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\d (digit class)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\d+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\w (word class)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\w+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\s (whitespace class)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\s+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern is empty anchors (matches empty string only)",
+        "data": {
+          "type": "string",
+          "pattern": "^$",
+          "maxLength": 0
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=string with pattern group edge cases",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when pattern contains quantified non-capturing group (?:a+)+",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a+)+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains quantified non-capturing group (?:a+)*",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a+)*$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains quantified non-capturing group (?:a+){2,}",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a+){2,}$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when non-capturing group has quantifier (?:abc)+",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc)+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains named capture group with quantifier (?<name>a+)+",
+        "data": {
+          "type": "string",
+          "pattern": "^(?<name>a+)+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains named capture group without nested quantifier",
+        "data": {
+          "type": "string",
+          "pattern": "^(?<name>abc)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern contains \\r (carriage return literal)",
+        "data": {
+          "type": "string",
+          "pattern": "^abc\rdef$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\n (newline literal)",
+        "data": {
+          "type": "string",
+          "pattern": "^abc\ndef$",
+          "maxLength": 100
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
     "description": "type=string with enum item size limits",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
