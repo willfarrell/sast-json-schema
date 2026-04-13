@@ -375,6 +375,42 @@
         "valid": true
       },
       {
+        "description": "Should fail when pattern has semantically overlapping quantifiers \\w+\\d+ (superset overlap)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\w+\\d+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers \\d+\\w+ (superset overlap)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\d+\\w+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers \\w*\\d+ (superset overlap)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\w*\\d+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern has \\w followed by \\s (disjoint, no overlap)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\w+\\s+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
         "description": "Should fail when pattern contains `\\S` char",
         "data": {
           "type": "string",

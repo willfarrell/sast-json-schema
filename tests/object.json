@@ -877,6 +877,35 @@
     ]
   },
   {
+    "description": "type=object with empty string in dependencies array",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when dependencies array contains empty string",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "boolean"
+            },
+            "": {
+              "type": "boolean"
+            }
+          },
+          "dependencies": {
+            "a": [""]
+          },
+          "unevaluatedProperties": false,
+          "maxProperties": 10,
+          "required": ["a"]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
     "description": "type=object with empty string in dependentRequired",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"

@@ -149,6 +149,10 @@
           "not": { "pattern": "(\\\\d[+*]\\[0-9\\][+*]|\\[0-9\\][+*]\\\\d[+*])" }
         },
         {
+          "$comment": "Reject semantically overlapping quantifiers: \\w ⊃ \\d (e.g. \\w+\\d+, \\d+\\w+)",
+          "not": { "pattern": "(\\\\w[+*]\\\\d[+*]|\\\\d[+*]\\\\w[+*])" }
+        },
+        {
           "$comment": "Reject negated character classes [^...] (broad denylist matchers)",
           "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\[\\^" }
         },
@@ -361,7 +365,7 @@
     "dependencies": {
       "additionalProperties": {
         "anyOf": [
-          { "$ref": "#/definitions/safeArray" },
+          { "$ref": "#/definitions/safePropertyNameArray" },
           { "$ref": "#" }
         ]
       }
