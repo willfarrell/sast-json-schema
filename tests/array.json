@@ -476,5 +476,48 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "type=array with prefixItems and items together (tuple with catch-all)",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when prefixItems and items are both set (standard tuple pattern)",
+        "data": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "string", "maxLength": 100, "const": "header" }
+          ],
+          "items": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "maxItems": 10,
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=array with items and contains together",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when items and contains are both set",
+        "data": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 100, "pattern": "^[a-z]+$" },
+          "contains": { "type": "string", "maxLength": 100, "const": "special" },
+          "maxItems": 10,
+          "maxContains": 5,
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      }
+    ]
   }
 ]

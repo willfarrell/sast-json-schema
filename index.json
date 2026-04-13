@@ -51,6 +51,11 @@
       "minLength":0,
       "maxLength": 4096
     },
+    "safeArray": {
+      "type": "array",
+      "items": { "type": "string", "$ref": "#/definitions/safeStringLengthLimits" },
+      "$ref": "#/definitions/safeArrayItemsLimits"
+    },
     "safeCount": {
       "description": "[0, Number.MAX_SAFE_INTEGER]",
       "minimum": 0,
@@ -105,6 +110,14 @@
         {
           "$comment": "Reject control character escape: \\cA through \\cZ (matches control chars U+0001-U+001A)",
           "not": { "pattern": "\\\\c[A-Za-z]" }
+        },
+        {
+          "$comment": "Reject unicode general category C (control, format, surrogate, private-use, unassigned) in short form: \\p{C}, \\p{Cc}, \\p{Cf}, \\p{Cs}, \\p{Co}, \\p{Cn}. These bypass \\0/\\x00/\\cA checks.",
+          "not": { "pattern": "\\\\p\\{C[cfsno]?\\}" }
+        },
+        {
+          "$comment": "Reject unicode general category C long names: \\p{Other}, \\p{Control}, \\p{Format}, \\p{Surrogate}, \\p{Private_Use}, \\p{Unassigned}",
+          "not": { "pattern": "\\\\p\\{(Other|Control|Format|Surrogate|Private_Use|Unassigned)\\}" }
         },
         {
           "$comment": "Reject named backreference: \\k",
@@ -709,7 +722,7 @@
             "required": ["type"]
           },
           "then": {
-            "oneOf": [
+            "anyOf": [
               { "required": ["prefixItems"] },
               {
                 "required": ["items"]
@@ -833,7 +846,10 @@
     "additionalProperties": { "$ref": "#" },
     "dependencies": {
       "additionalProperties": {
-        "anyOf": [{ "type": "array" }, { "$ref": "#" }]
+        "anyOf": [
+          { "$ref": "#/definitions/safeArray" },
+          { "$ref": "#" }
+        ]
       }
     },
     "items": {
@@ -859,6 +875,18 @@
     "allOf": { "$ref": "#/definitions/schemaArray" },
     "anyOf": { "$ref": "#/definitions/schemaArray" },
     "oneOf": { "$ref": "#/definitions/schemaArray" },
+    "type": {
+      "oneOf": [
+        { "enum": ["string", "integer", "number", "boolean", "null", "array", "object"] },
+        {
+          "type": "array",
+          "items": { "enum": ["string", "integer", "number", "boolean", "null", "array", "object"] },
+          "minItems": 1,
+          "maxItems": 7,
+          "uniqueItems": true
+        }
+      ]
+    },
     "not": { "$ref": "#" },
     "contains": { "$ref": "#" },
     "propertyNames": { "$ref": "#" },
@@ -869,18 +897,10 @@
       "$ref": "#/definitions/safeArrayItemsLimits",
       "items": { "$ref": "#/definitions/safeValueSizeLimits" }
     },
-    "required": {
-      "type": "array",
-      "items": { "type": "string", "$ref":"#/definitions/safeStringLengthLimits" },
-      "$ref": "#/definitions/safeArrayItemsLimits"
-    },
+    "required": { "$ref": "#/definitions/safeArray" },
     "dependentRequired": {
       "type": "object",
-      "additionalProperties": {
-        "type": "array",
-        "items": { "type": "string", "$ref":"#/definitions/safeStringLengthLimits" },
-        "$ref": "#/definitions/safeArrayItemsLimits"
-      }
+      "additionalProperties": { "$ref": "#/definitions/safeArray" }
     }
   }
 }

@@ -740,6 +740,53 @@
     ]
   },
   {
+    "description": "type=object with dependentRequired",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when dependentRequired values are valid string arrays",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "boolean"
+            },
+            "b": {
+              "type": "boolean"
+            }
+          },
+          "dependentRequired": {
+            "a": ["b"]
+          },
+          "unevaluatedProperties": false,
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when dependentRequired array contains non-string values",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "boolean"
+            }
+          },
+          "dependentRequired": {
+            "a": [123, null]
+          },
+          "unevaluatedProperties": false,
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
     "description": "type=object with minProperties",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"

@@ -283,6 +283,107 @@
     ]
   },
   {
+    "description": "type value validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when type is an invalid string value",
+        "data": {
+          "type": "invalid"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when type array contains invalid values",
+        "data": {
+          "type": ["string", "invalid"],
+          "maxLength": 100,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when type array contains non-string values",
+        "data": {
+          "type": [null, 123],
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when type array has duplicates",
+        "data": {
+          "type": ["string", "string"],
+          "maxLength": 100,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when type is a valid single string",
+        "data": {
+          "type": "string",
+          "maxLength": 100,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when type is a valid union array",
+        "data": {
+          "type": ["string", "null"],
+          "maxLength": 100,
+          "enum": ["test"]
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "dependencies array value validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when dependency value is a valid string array",
+        "data": {
+          "type": "object",
+          "dependencies": {
+            "a": ["b", "c"]
+          },
+          "properties": {
+            "a": { "type": "boolean" },
+            "b": { "type": "boolean" },
+            "c": { "type": "boolean" }
+          },
+          "required": ["a"],
+          "maxProperties": 10,
+          "unevaluatedProperties": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when dependency array contains non-string values",
+        "data": {
+          "type": "object",
+          "dependencies": {
+            "a": [123, null, true]
+          },
+          "properties": {
+            "a": { "type": "boolean" }
+          },
+          "required": ["a"],
+          "maxProperties": 10,
+          "unevaluatedProperties": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
     "description": "deeply nested composition recursive validation",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"

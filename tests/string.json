@@ -526,6 +526,78 @@
           "maxLength": 100
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{C} (all control/format/surrogate/private-use chars)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{C}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Cc} (control characters, bypasses \\0 and \\cA checks)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Cc}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Cs} (surrogate characters)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Cs}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Co} (private use area)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Co}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Control} (long name for \\p{Cc})",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Control}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Surrogate} (long name for \\p{Cs})",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Surrogate}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains \\p{L} (letters, safe allowlist)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{L}]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\p{Sc} (currency symbols, safe allowlist)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Sc}]+$",
+          "maxLength": 100
+        },
+        "valid": true
       }
     ]
   },
