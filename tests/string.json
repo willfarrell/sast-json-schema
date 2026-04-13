@@ -258,6 +258,33 @@
         "valid": false
       },
       {
+        "description": "Should pass when pattern contains `.` inside character class [a-z.]",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z.]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains `.` inside character class [.]",
+        "data": {
+          "type": "string",
+          "pattern": "^[.]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern contains `.` outside character class after [...]",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z.]foo.bar$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
         "description": "Should fail when pattern contains `\\S` char",
         "data": {
           "type": "string",
@@ -312,13 +339,40 @@
         "valid": false
       },
       {
-        "description": "Should fail when pattern contains nested quantifier `(a+){2,}`",
+        "description": "Should fail when pattern contains unbounded group repeat `(a+){2,}` (equivalent to (a+)+)",
         "data": {
           "type": "string",
           "pattern": "^(a+){2,}$",
           "maxLength": 36
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains optional group `(?:abc)?`",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc)?$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains exact group repeat `(?:abc){3}`",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc){3}$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains bounded group repeat `(?:abc){3,5}`",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc){3,5}$",
+          "maxLength": 36
+        },
+        "valid": true
       },
       {
         "description": "Should pass when pattern contains non-nested quantifier",
@@ -1237,22 +1291,22 @@
         "valid": true
       },
       {
-        "description": "Should fail when pattern contains \\r (carriage return literal)",
+        "description": "Should pass when pattern contains \\r (literal carriage return, matches CR in input)",
         "data": {
           "type": "string",
           "pattern": "^abc\rdef$",
           "maxLength": 100
         },
-        "valid": false
+        "valid": true
       },
       {
-        "description": "Should fail when pattern contains \\n (newline literal)",
+        "description": "Should pass when pattern contains \\n (literal newline, matches LF in input)",
         "data": {
           "type": "string",
           "pattern": "^abc\ndef$",
           "maxLength": 100
         },
-        "valid": false
+        "valid": true
       }
     ]
   },

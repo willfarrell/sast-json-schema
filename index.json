@@ -60,19 +60,31 @@
       "maximum": 1e308
     },
     "safePattern": {
-      "$comment": "Use allowlist charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$. Overlapping quantifiers without groups (e.g. ^[a-z]+[a-z]+$) can still cause O(n^2) backtracking. Additional runtime ReDoS checking is recommended for full protection.",
+      "$comment": "Use allowlist charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$.",
       "allOf": [
         {
           "$comment": "Max pattern length",
           "maxLength": 1024
         },
         {
-          "$comment": "Must start with ^, end with $. Only escaped dots (\\.) are allowed; unescaped . and newlines are rejected",
-          "pattern": "^\\^(\\\\[.]|[^.\n\r])*\\$$"
+          "$comment": "Must start with ^",
+          "pattern": "^\\^"
+        },
+        {
+          "$comment": "Must end with $",
+          "pattern": "\\$$"
+        },
+        {
+          "$comment": "Reject unescaped . (wildcard) outside character classes. Escaped \\. and dots inside [...] are allowed.",
+          "not": { "pattern": "^(\\\\.|\\[([^\\\\\\]]|\\\\.)*\\]|[^.\\[\\\\])*\\." }
         },
         {
           "$comment": "Reject broad character class escapes: \\S (non-whitespace), \\W (non-word), \\D (non-digit), \\C (any byte), \\P (negated unicode property), \\B (non-word boundary)",
           "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\[SWDCPB]" }
+        },
+        {
+          "$comment": "Reject named backreference: \\k",
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\k" }
         },
         {
           "$comment": "Reject backreferences: \\1 through \\9",
@@ -103,12 +115,12 @@
           "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\p\\{(Other|Control|Format|Surrogate|Private_Use|Unassigned)\\}" }
         },
         {
-          "$comment": "Reject named backreference: \\k",
-          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\k" }
+          "$comment": "Reject unbounded group repetition: )+ )*. Allows )? (optional), ){n} (exact), ){n,m} (bounded).",
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\)[+*]" }
         },
         {
-          "$comment": "Reject nested quantifiers after groups: )+ )* )? ){",
-          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\)[+*?{]" }
+          "$comment": "Reject unbounded group repeat {n,} (no upper bound, equivalent to )+)",
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\)\\{[0-9]+,\\}" }
         },
         {
           "$comment": "Reject positive lookahead: (?=...)",
