@@ -682,6 +682,108 @@
           "$ref": "https://example.com/a.b/schema.json"
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when $ref URL contains percent-encoded path traversal (%2e%2e)",
+        "data": {
+          "$ref": "https://example.com/%2e%2e/%2e%2e/internal/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains double percent-encoded traversal (%252e)",
+        "data": {
+          "$ref": "https://example.com/%252e%252e/internal/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains percent-encoded characters in path",
+        "data": {
+          "$ref": "https://example.com/path%20with%20spaces/schema.json"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$ref URL query string restriction",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $ref URL contains query string",
+        "data": {
+          "$ref": "https://example.com/schema.json?version=2"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains query string with redirect",
+        "data": {
+          "$ref": "https://example.com/schema?redirect=http://internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref is local reference (no query string concern)",
+        "data": {
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "$dynamicRef URL query string restriction",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $dynamicRef URL contains query string",
+        "data": {
+          "$dynamicRef": "https://example.com/schema.json?version=2",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $dynamicRef is local reference",
+        "data": {
+          "$dynamicRef": "#my-anchor",
+          "type": "null"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "$vocabulary validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $vocabulary is used to disable validation vocabulary",
+        "data": {
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/validation": false
+          },
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $vocabulary is present at all",
+        "data": {
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/core": true
+          },
+          "type": "null"
+        },
+        "valid": false
       }
     ]
   }

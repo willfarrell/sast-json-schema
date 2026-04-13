@@ -833,5 +833,76 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "type=object with empty string in required",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when required contains empty string",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "": {
+              "type": "string",
+              "enum": ["x"],
+              "maxLength": 1
+            }
+          },
+          "maxProperties": 1,
+          "required": [""]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when required contains non-empty string",
+        "data": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "enum": ["a"],
+              "maxLength": 256
+            }
+          },
+          "maxProperties": 10,
+          "required": ["name"]
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=object with empty string in dependentRequired",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when dependentRequired value contains empty string",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "boolean"
+            },
+            "": {
+              "type": "boolean"
+            }
+          },
+          "dependentRequired": {
+            "a": [""]
+          },
+          "unevaluatedProperties": false,
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
   }
 ]

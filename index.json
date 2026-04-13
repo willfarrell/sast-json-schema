@@ -34,9 +34,19 @@
       "minLength":0,
       "maxLength": 4096
     },
+    "safePropertyName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
     "safeArray": {
       "type": "array",
       "items": { "type": "string", "$ref": "#/definitions/safeStringLengthLimits" },
+      "$ref": "#/definitions/safeArrayItemsLimits"
+    },
+    "safePropertyNameArray": {
+      "type": "array",
+      "items": { "type": "string", "$ref": "#/definitions/safePropertyName" },
       "$ref": "#/definitions/safeArrayItemsLimits"
     },
     "safeCount": {
@@ -135,6 +145,10 @@
           "not": { "pattern": "(\\[[^\\]]+\\]|\\\\.|.)[+*]\\1[+*]" }
         },
         {
+          "$comment": "Reject semantically overlapping quantifiers: \\d and [0-9] are identical character classes (e.g. \\d+[0-9]+, [0-9]*\\d+)",
+          "not": { "pattern": "(\\\\d[+*]\\[0-9\\][+*]|\\[0-9\\][+*]\\\\d[+*])" }
+        },
+        {
           "$comment": "Reject negated character classes [^...] (broad denylist matchers)",
           "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\[\\^" }
         },
@@ -158,11 +172,18 @@
       "pattern": "^#[-a-zA-Z0-9_$/.]+$",
       "maxLength": 1024
     },
+    "safeSchemaUrl": {
+      "$comment": "Like safeUrl but also rejects query strings. Schema references should not need query parameters.",
+      "allOf": [
+        { "$ref": "#/definitions/safeUrl" },
+        { "not": { "pattern": "\\?" } }
+      ]
+    },
     "safeUrl":{
       "$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection.",
       "type": "string",
       "allOf": [
-        { "pattern": "^https://[-a-zA-Z0-9.]+\\.[a-z]+(/[-a-zA-Z0-9._/?&#%=~+]*)?$" },
+        { "pattern": "^https://[-a-zA-Z0-9.]+\\.[a-z]+(/[-a-zA-Z0-9._/?&#=~+]*)?$" },
         { "not": { "pattern": "^https://(localhost|0[xX][0-9a-fA-F]|[0-9]+\\.[0-9]+\\.[0-9]|[0-9]{5,}|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])" } },
         { "$comment": "Reject path traversal sequences", "not": { "pattern": "/\\.\\." } }
       ],
@@ -396,10 +417,10 @@
       "$ref": "#/definitions/safeArrayItemsLimits",
       "items": { "$ref": "#/definitions/safeValueSizeLimits" }
     },
-    "required": { "$ref": "#/definitions/safeArray" },
+    "required": { "$ref": "#/definitions/safePropertyNameArray" },
     "dependentRequired": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/definitions/safeArray" }
+      "additionalProperties": { "$ref": "#/definitions/safePropertyNameArray" }
     }
   },
   "dependencies": {
@@ -609,7 +630,7 @@
       "properties": {
         "$ref": {
           "oneOf": [
-            { "$ref": "#/definitions/safeUrl" },
+            { "$ref": "#/definitions/safeSchemaUrl" },
             { "$ref": "#/definitions/safeLocalRef" }
           ]
         }
@@ -636,7 +657,7 @@
       "properties": {
         "$dynamicRef": {
           "oneOf": [
-            { "$ref": "#/definitions/safeUrl" },
+            { "$ref": "#/definitions/safeSchemaUrl" },
             { "$ref": "#/definitions/safeLocalRef" }
           ]
         }
@@ -689,6 +710,12 @@
     "$comment": {
       "properties": {
         "$comment": { "type": "string", "maxLength": 4096 }
+      }
+    },
+    "$vocabulary": {
+      "$comment": "$vocabulary can disable validation vocabularies, making type/minimum/maximum/etc. no-ops. Block it entirely.",
+      "properties": {
+        "$vocabulary": false
       }
     },
     "$schema": {
