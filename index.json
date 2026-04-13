@@ -854,7 +854,7 @@
     "default": { "$ref": "#/definitions/safeValueSizeLimits" },
     "examples": {
       "type": "array",
-      "$ref": "#/definitions/safeArrayItemsLimits"
+      "$ref": "#/definitions/safeArrayItemsLimits",
       "items": { "$ref": "#/definitions/safeValueSizeLimits" }
     },
     "required": {
