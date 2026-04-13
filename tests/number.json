@@ -191,6 +191,50 @@
     ]
   },
   {
+    "description": "type=[integer,number] union rejected (integer is subset of number)",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when type is [integer,number] (redundant, ambiguous range semantics)",
+        "data": {
+          "type": ["integer", "number"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when type is [integer,number,null] (integer+number still redundant)",
+        "data": {
+          "type": ["integer", "number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when type is [integer,null] (not redundant)",
+        "data": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when type is [number,null] (not redundant)",
+        "data": {
+          "type": ["number", "null"],
+          "minimum": -1e308,
+          "maximum": 1e308
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
     "description": "type=number with multipleOf",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"

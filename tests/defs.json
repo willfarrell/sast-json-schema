@@ -9,8 +9,19 @@
         "description": "Should pass when $defs inner schemas are secure",
         "data": {
           "$defs": {
-            "name": { "type": "string", "enum": ["a", "b"] },
-            "count": { "type": "integer", "minimum": 0, "maximum": 100 }
+            "name": {
+              "type": "string",
+              "enum": [
+                "a",
+                "b"
+              ],
+              "maxLength": 256
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
           }
         },
         "valid": true
@@ -19,7 +30,9 @@
         "description": "Should fail when $defs contains an insecure inner schema",
         "data": {
           "$defs": {
-            "name": { "type": "string" }
+            "name": {
+              "type": "string"
+            }
           }
         },
         "valid": false
@@ -36,8 +49,19 @@
         "description": "Should pass when definitions inner schemas are secure",
         "data": {
           "definitions": {
-            "name": { "type": "string", "enum": ["a", "b"] },
-            "count": { "type": "integer", "minimum": 0, "maximum": 100 }
+            "name": {
+              "type": "string",
+              "enum": [
+                "a",
+                "b"
+              ],
+              "maxLength": 256
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
           }
         },
         "valid": true
@@ -46,8 +70,734 @@
         "description": "Should fail when definitions contains an insecure inner schema",
         "data": {
           "definitions": {
-            "name": { "type": "string" }
+            "name": {
+              "type": "string"
+            }
           }
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$ref validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $ref is a local reference",
+        "data": {
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref is a root self-reference (infinite recursion)",
+        "data": {
+          "$ref": "#"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref is a local $defs reference",
+        "data": {
+          "$ref": "#/$defs/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $ref is an https URL",
+        "data": {
+          "$ref": "https://example.com/schema.json"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref uses single-label hostname (SSRF via DNS search domain)",
+        "data": {
+          "$ref": "https://intranet/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref is a relative path",
+        "data": {
+          "$ref": "./other-schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref uses http: scheme (downgrade)",
+        "data": {
+          "$ref": "http://example.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref uses file: scheme",
+        "data": {
+          "$ref": "file:///etc/passwd"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref uses data: scheme",
+        "data": {
+          "$ref": "data:text/json,{}"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref uses javascript: scheme",
+        "data": {
+          "$ref": "javascript:alert(1)"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets localhost (SSRF)",
+        "data": {
+          "$ref": "https://localhost/admin"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 127.0.0.1 (SSRF)",
+        "data": {
+          "$ref": "https://127.0.0.1/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 169.254.169.254 (SSRF cloud metadata)",
+        "data": {
+          "$ref": "https://169.254.169.254/latest/meta-data/"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 10.x.x.x (SSRF RFC1918)",
+        "data": {
+          "$ref": "https://10.0.0.1/internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 172.16.x.x (SSRF RFC1918)",
+        "data": {
+          "$ref": "https://172.16.0.1/internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets 192.168.x.x (SSRF RFC1918)",
+        "data": {
+          "$ref": "https://192.168.1.1/router"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets hex IP (SSRF bypass 0x7f000001)",
+        "data": {
+          "$ref": "https://0x7f000001/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets octal IP (SSRF bypass 0177.0.0.1)",
+        "data": {
+          "$ref": "https://0177.0.0.1/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets decimal IP (SSRF bypass 2130706433)",
+        "data": {
+          "$ref": "https://2130706433/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets hex IP for metadata endpoint (SSRF bypass)",
+        "data": {
+          "$ref": "https://0xa9fea9fe/latest/meta-data/"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets dotted-numeric public IP",
+        "data": {
+          "$ref": "https://8.8.8.8/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains port number (SSRF bypass)",
+        "data": {
+          "$ref": "https://evil.com:8080/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains userinfo (credential leak)",
+        "data": {
+          "$ref": "https://user:pass@evil.com/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains IPv6 brackets (SSRF bypass)",
+        "data": {
+          "$ref": "https://[::1]/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains percent-encoded host (SSRF bypass)",
+        "data": {
+          "$ref": "https://127%2e0%2e0%2e1/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains unicode homoglyph in host",
+        "data": {
+          "$ref": "https://\u0435xample.com/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains backslash (protocol confusion)",
+        "data": {
+          "$ref": "https://evil.com\\@good.com/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref is a local JSON Pointer",
+        "data": {
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $ref is #/$defs path",
+        "data": {
+          "$ref": "#/$defs/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $ref local path contains dot segments (valid JSON Pointer key, not traversal)",
+        "data": {
+          "$ref": "#/../../../etc/passwd"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref targets 172.31.x.x (SSRF RFC1918 upper range)",
+        "data": {
+          "$ref": "https://172.31.255.255/internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets hex IP with uppercase 0X prefix",
+        "data": {
+          "$ref": "https://0X7F000001/secret"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$id validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $id is a short URI",
+        "data": {
+          "$id": "https://example.com/schema.json",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $id is a relative URI",
+        "data": {
+          "$id": "my-schema",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $id exceeds maxLength",
+        "data": {
+          "$id": "https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $id uses file: scheme",
+        "data": {
+          "$id": "file:///etc/passwd"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $id uses http: scheme",
+        "data": {
+          "$id": "http://example.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $id contains dots",
+        "data": {
+          "$id": "my.schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $id contains spaces",
+        "data": {
+          "$id": "my schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $id contains angle brackets",
+        "data": {
+          "$id": "https://evil.com/<script>",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $id has path and query params",
+        "data": {
+          "$id": "https://example.com/schemas/user.json?v=2",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $id URL contains fragment (spec 8.2.1 violation)",
+        "data": {
+          "$id": "https://example.com/schema.json#foo",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $id URL contains JSON Pointer fragment",
+        "data": {
+          "$id": "https://example.com/schema.json#/definitions/name",
+          "type": "null"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$anchor validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $anchor is a short identifier",
+        "data": {
+          "$anchor": "my-anchor",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $anchor exceeds maxLength",
+        "data": {
+          "$anchor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $anchor contains special characters",
+        "data": {
+          "$anchor": "a<script>b"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $anchor contains spaces",
+        "data": {
+          "$anchor": "a b c"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $anchor starts with a digit",
+        "data": {
+          "$anchor": "1anchor"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$dynamicRef validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $dynamicRef is a short reference",
+        "data": {
+          "$dynamicRef": "#my-anchor",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $dynamicRef exceeds maxLength",
+        "data": {
+          "$dynamicRef": "https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef uses file: scheme",
+        "data": {
+          "$dynamicRef": "file:///etc/passwd"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef uses http: scheme",
+        "data": {
+          "$dynamicRef": "http://evil.com/schema"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef targets localhost (SSRF)",
+        "data": {
+          "$dynamicRef": "https://localhost/admin"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef targets 169.254.169.254 (SSRF cloud metadata)",
+        "data": {
+          "$dynamicRef": "https://169.254.169.254/latest/meta-data/"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef targets 10.x.x.x (SSRF RFC1918)",
+        "data": {
+          "$dynamicRef": "https://10.0.0.1/internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef targets hex IP (SSRF bypass)",
+        "data": {
+          "$dynamicRef": "https://0x7f000001/secret"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef is a root self-reference",
+        "data": {
+          "$dynamicRef": "#"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicRef URL contains port number",
+        "data": {
+          "$dynamicRef": "https://evil.com:8080/schema"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$dynamicAnchor validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $dynamicAnchor is a short identifier",
+        "data": {
+          "$dynamicAnchor": "my-anchor",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $dynamicAnchor exceeds maxLength",
+        "data": {
+          "$dynamicAnchor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicAnchor contains special characters",
+        "data": {
+          "$dynamicAnchor": "a<script>b"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $dynamicAnchor contains spaces",
+        "data": {
+          "$dynamicAnchor": "a b c"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "title validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when title is within maxLength",
+        "data": {
+          "title": "A short title",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when title exceeds maxLength",
+        "data": {
+          "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "description validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when description is within maxLength",
+        "data": {
+          "description": "A short description",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when description exceeds maxLength",
+        "data": {
+          "description": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$comment validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $comment is within maxLength",
+        "data": {
+          "$comment": "A short comment",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $comment exceeds maxLength (4096)",
+        "data": {
+          "$comment": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$schema validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $schema is official JSON Schema URI",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $schema is older draft URI",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $schema is an arbitrary URL",
+        "data": {
+          "$schema": "https://evil.com/permissive-schema",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $schema uses http: scheme",
+        "data": {
+          "$schema": "http://json-schema.org/draft-07/schema",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $schema is an unsupported draft",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "type": "null"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$ref URL path traversal prevention",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $ref URL contains .. path traversal",
+        "data": {
+          "$ref": "https://example.com/public/../internal/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref URL contains single dots in path segments",
+        "data": {
+          "$ref": "https://example.com/a.b/schema.json"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref URL contains percent-encoded path traversal (%2e%2e)",
+        "data": {
+          "$ref": "https://example.com/%2e%2e/%2e%2e/internal/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains double percent-encoded traversal (%252e)",
+        "data": {
+          "$ref": "https://example.com/%252e%252e/internal/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains percent-encoded characters in path",
+        "data": {
+          "$ref": "https://example.com/path%20with%20spaces/schema.json"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$ref URL query string restriction",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $ref URL contains query string",
+        "data": {
+          "$ref": "https://example.com/schema.json?version=2"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains query string with redirect",
+        "data": {
+          "$ref": "https://example.com/schema?redirect=http://internal"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref is local reference (no query string concern)",
+        "data": {
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "$dynamicRef URL query string restriction",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $dynamicRef URL contains query string",
+        "data": {
+          "$dynamicRef": "https://example.com/schema.json?version=2",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $dynamicRef is local reference",
+        "data": {
+          "$dynamicRef": "#my-anchor",
+          "type": "null"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "$vocabulary validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $vocabulary is used to disable validation vocabulary",
+        "data": {
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/validation": false
+          },
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $vocabulary is present at all",
+        "data": {
+          "$vocabulary": {
+            "https://json-schema.org/draft/2020-12/vocab/core": true
+          },
+          "type": "null"
         },
         "valid": false
       }

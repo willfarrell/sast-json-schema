@@ -6,11 +6,12 @@
       "type": "object",
       "unevaluatedProperties": false,
       "properties": {
-        "allowed": true,
-        "if": true,
-        "then": true,
-        "else": true
+        "allowed": { "$ref": "#/definitions/allowed" },
+        "if": { "$ref": "#/definitions/allowed" },
+        "then": { "$ref": "#/definitions/allowed" },
+        "else": { "$ref": "#/definitions/allowed" }
       },
+      "maxProperties": 4,
       "required": []
     }
   },
@@ -32,18 +33,27 @@
           "$ref": "#/definitions/allowed"
         }
       },
+      "maxProperties": 4,
       "required": []
     },
     {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "$ref": "#/definitions/allowedProperties",
+      "properties": {},
+      "maxProperties": 4,
+      "required": [],
       "if": {
         "type": "object",
         "unevaluatedProperties": false,
         "$ref": "#/definitions/allowedProperties",
         "properties": {
           "if": {
+            "type": "integer",
             "enum": [1]
           }
         },
+        "maxProperties": 4,
         "required": ["if"]
       },
       "then": {
@@ -52,12 +62,15 @@
         "$ref": "#/definitions/allowedProperties",
         "properties": {
           "then": {
+            "type": "integer",
             "enum": [1]
           },
           "else": {
+            "type": "integer",
             "enum": [0]
           }
         },
+        "maxProperties": 4,
         "required": ["then", "else"]
       },
       "else": {
@@ -66,12 +79,15 @@
         "$ref": "#/definitions/allowedProperties",
         "properties": {
           "else": {
+            "type": "integer",
             "enum": [1]
           },
           "then": {
+            "type": "integer",
             "enum": [0]
           }
         },
+        "maxProperties": 4,
         "required": ["then", "else"]
       }
     }

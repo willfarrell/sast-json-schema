@@ -8,15 +8,24 @@
       {
         "description": "Should pass",
         "data": {
-          "type": ["string", "null"],
-          "enum": ["test"]
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "test"
+          ],
+          "maxLength": 256
         },
         "valid": true
       },
       {
         "description": "Should fail",
         "data": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "valid": false
       }
@@ -32,9 +41,26 @@
         "description": "Should pass when const is set",
         "data": {
           "type": "string",
-          "const": "fixed-value"
+          "const": "fixed-value",
+          "maxLength": 256
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when const is set without maxLength",
+        "data": {
+          "type": "string",
+          "const": "fixed-value"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when const type does not match declared type",
+        "data": {
+          "type": "string",
+          "const": 42
+        },
+        "valid": false
       }
     ]
   },
@@ -48,9 +74,22 @@
         "description": "Should pass when enum is set",
         "data": {
           "type": "string",
-          "enum": ["test"]
+          "enum": [
+            "test"
+          ],
+          "maxLength": 256
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when enum is set without maxLength",
+        "data": {
+          "type": "string",
+          "enum": [
+            "test"
+          ]
+        },
+        "valid": false
       },
       {
         "description": "Should fail when enum is not set",
@@ -62,7 +101,21 @@
       {
         "description": "Should fail when enum is not set",
         "data": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when enum values do not match declared type",
+        "data": {
+          "type": "string",
+          "enum": [
+            42,
+            true
+          ]
         },
         "valid": false
       }
@@ -73,17 +126,40 @@
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
     },
-    "$todo": [
-      "add in check for certain formats that have supreceeded",
-      "reject use of non-escaped ., charset ranges should be used instead"
-    ],
     "tests": [
       {
-        "description": "Should pass when format is set",
+        "description": "Should pass when format is set to uuid",
         "data": {
           "type": "string",
           "format": "uuid",
           "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when format is set to date-time",
+        "data": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 64
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when format is set to email",
+        "data": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when format is set to uri",
+        "data": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
         },
         "valid": true
       },
@@ -99,6 +175,24 @@
         "data": {
           "type": "string",
           "format": "uuid"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when format is set to iso-date-time",
+        "data": {
+          "type": "string",
+          "format": "iso-date-time",
+          "maxLength": 64
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when format is unknown",
+        "data": {
+          "type": "string",
+          "format": "nonsense",
+          "maxLength": 100
         },
         "valid": false
       }
@@ -164,6 +258,159 @@
         "valid": false
       },
       {
+        "description": "Should pass when pattern contains `.` inside character class [a-z.]",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z.]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains `.` inside character class [.]",
+        "data": {
+          "type": "string",
+          "pattern": "^[.]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern contains `.` outside character class after [...]",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z.]foo.bar$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has overlapping quantifiers [a-z]+[a-z]+",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+[a-z]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has overlapping quantifiers [a-z]*[a-z]+",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]*[a-z]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has overlapping quantifiers \\d+\\d+",
+        "data": {
+          "type": "string",
+          "pattern": "^\\d+\\d+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern has non-overlapping adjacent classes [a-z]+[0-9]+",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+[0-9]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern has adjacent class without second quantifier [a-z]+[a-z]",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+[a-z]$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers \\d+[0-9]+",
+        "data": {
+          "type": "string",
+          "pattern": "^\\d+[0-9]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers [0-9]+\\d+",
+        "data": {
+          "type": "string",
+          "pattern": "^[0-9]+\\d+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers \\d*[0-9]+",
+        "data": {
+          "type": "string",
+          "pattern": "^\\d*[0-9]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers [0-9]*\\d+",
+        "data": {
+          "type": "string",
+          "pattern": "^[0-9]*\\d+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern has \\d followed by [a-z] (non-overlapping)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\d+[a-z]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers \\w+\\d+ (superset overlap)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\w+\\d+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers \\d+\\w+ (superset overlap)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\d+\\w+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has semantically overlapping quantifiers \\w*\\d+ (superset overlap)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\w*\\d+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern has \\w followed by \\s (disjoint, no overlap)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\w+\\s+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
         "description": "Should fail when pattern contains `\\S` char",
         "data": {
           "type": "string",
@@ -173,6 +420,96 @@
         "valid": false
       },
       {
+        "description": "Should fail when pattern contains `\\W` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000\\W0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains `\\D` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000\\D0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains `\\C` char",
+        "data": {
+          "type": "string",
+          "pattern": "^00000000\\C0000-0000-0000-000000000000$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains nested quantifier `(a+)+`",
+        "data": {
+          "type": "string",
+          "pattern": "^(a+)+$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains nested quantifier `([a-z]+)*`",
+        "data": {
+          "type": "string",
+          "pattern": "^([a-z]+)*$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains unbounded group repeat `(a+){2,}` (equivalent to (a+)+)",
+        "data": {
+          "type": "string",
+          "pattern": "^(a+){2,}$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains optional group `(?:abc)?`",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc)?$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains exact group repeat `(?:abc){3}`",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc){3}$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains bounded group repeat `(?:abc){3,5}`",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc){3,5}$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains non-nested quantifier",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+$",
+          "maxLength": 36
+        },
+        "valid": true
+      },
+      {
         "description": "Should pass when pattern contains unicode character class escape",
         "data": {
           "type": "string",
@@ -180,6 +517,419 @@
           "maxLength": 256
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when pattern contains empty negated character class [^]",
+        "data": {
+          "type": "string",
+          "pattern": "^[^]*$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains empty negated character class [^] with +",
+        "data": {
+          "type": "string",
+          "pattern": "^[^]+$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when negated character class has content [^a] (broad denylist)",
+        "data": {
+          "type": "string",
+          "pattern": "^[^a]+$",
+          "maxLength": 36
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\P{L} (negated unicode property escape)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\P{L}+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\P{N} in character class",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\P{N}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains positive lookahead (?=...)",
+        "data": {
+          "type": "string",
+          "pattern": "^(?=.*[A-Z])[a-zA-Z]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains positive lookbehind (?<=...)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+(?<=a)$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains non-capturing group (?:...)",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc|def)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains negative lookahead (?!...)",
+        "data": {
+          "type": "string",
+          "pattern": "^(?!admin)[a-z]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when negative lookahead contains alternation",
+        "data": {
+          "type": "string",
+          "pattern": "^(?!admin|root)[a-z]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when negative lookbehind contains alternation",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+(?<!admin|root)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains negative lookbehind (?<!...)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+(?<!admin)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern contains bare alternation (breaks anchoring)",
+        "data": {
+          "type": "string",
+          "pattern": "^abc|def|ghi$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern has alternation with quantifiers (breaks anchoring)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+|[0-9]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when alternation is inside non-capturing group",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc|def|ghi)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when alternation is inside nested groups",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:(?:abc|def)|(?:ghi|jkl))$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when alternation is inside depth-3 right-nested groups",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a|(?:b|(?:c|d)))$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when alternation is inside depth-3 left-nested groups",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:(?:(?:a|b)|c)|d)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when alternation is at top level after group closes",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a|b)|c$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when top-level alternation is disguised by groups on both sides",
+        "data": {
+          "type": "string",
+          "pattern": "^(x)a|[a-z]+(y)$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when top-level alternation has groups at edges but | is outside them",
+        "data": {
+          "type": "string",
+          "pattern": "^(a)b|c(d)$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when top-level alternation sits between two separate groups",
+        "data": {
+          "type": "string",
+          "pattern": "^(abc)|(def)$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when null byte is written as hex escape \\x00",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x00]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as hex escape \\x01",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x01]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as hex escape \\x0a (newline)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x0a]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as hex escape \\x0d (carriage return)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x0d]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as hex escape \\x1f",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x1f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when DEL is written as hex escape \\x7f",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x7f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when null byte is written as unicode escape \\u0000",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u0000]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as unicode escape \\u0001",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u0001]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as unicode escape \\u001f",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u001f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when DEL is written as unicode escape \\u007f",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u007f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as unicode brace escape \\u{1}",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u{1}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as unicode brace escape \\u{1f}",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u{1f}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when DEL is written as unicode brace escape \\u{7f}",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u{7f}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control character escape \\cA is used",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\cA-\\cZ]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{C} (all control/format/surrogate/private-use chars)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{C}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Cc} (control characters, bypasses \\0 and \\cA checks)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Cc}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Cs} (surrogate characters)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Cs}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Co} (private use area)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Co}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Control} (long name for \\p{Cc})",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Control}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\p{Surrogate} (long name for \\p{Cs})",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Surrogate}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains \\p{L} (letters, safe allowlist)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{L}]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\p{Sc} (currency symbols, safe allowlist)",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{Sc}]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=string with pattern length",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when pattern exceeds maxLength (1024)",
+        "data": {
+          "type": "string",
+          "pattern": "^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa$",
+          "maxLength": 2000
+        },
+        "valid": false
       }
     ]
   },
@@ -235,6 +985,646 @@
           "pattern": "^[\\p{L}]+$",
           "minLength": -1,
           "maxLength": 256
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with combined constraints",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when format and pattern are both set",
+        "data": {
+          "type": "string",
+          "format": "email",
+          "pattern": "^[a-z]+@example\\.com$",
+          "maxLength": 254
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when enum and format are both set",
+        "data": {
+          "type": "string",
+          "enum": [
+            "user@example.com"
+          ],
+          "format": "email",
+          "maxLength": 254
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when format is password (annotation-only, provides no content validation)",
+        "data": {
+          "type": "string",
+          "format": "password",
+          "maxLength": 128
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is binary (annotation-only, provides no content validation)",
+        "data": {
+          "type": "string",
+          "format": "binary",
+          "maxLength": 1024
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is just a string (not in allowed list)",
+        "data": {
+          "type": "string",
+          "format": "custom-format",
+          "maxLength": 128
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when password field uses pattern for content validation",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\p{L}\\p{N}\\p{P}\\p{S}]+$",
+          "maxLength": 128
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when none of const/enum/pattern/format is set",
+        "data": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with contentMediaType",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contentMediaType is application/json",
+        "data": {
+          "type": "string",
+          "contentMediaType": "application/json",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentMediaType is text/html",
+        "data": {
+          "type": "string",
+          "contentMediaType": "text/html",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentMediaType is a vendor type",
+        "data": {
+          "type": "string",
+          "contentMediaType": "application/vnd.api+json",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contentMediaType has invalid top-level type",
+        "data": {
+          "type": "string",
+          "contentMediaType": "foo/bar",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when contentMediaType has no subtype",
+        "data": {
+          "type": "string",
+          "contentMediaType": "application",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with contentEncoding",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contentEncoding is base64",
+        "data": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentEncoding is base32",
+        "data": {
+          "type": "string",
+          "contentEncoding": "base32",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentEncoding is base16",
+        "data": {
+          "type": "string",
+          "contentEncoding": "base16",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when contentEncoding is quoted-printable",
+        "data": {
+          "type": "string",
+          "contentEncoding": "quoted-printable",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contentEncoding is not in allowed list",
+        "data": {
+          "type": "string",
+          "contentEncoding": "7bit",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when contentEncoding is unknown",
+        "data": {
+          "type": "string",
+          "contentEncoding": "nonsense",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with backreference in pattern",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when pattern contains backreference \\1",
+        "data": {
+          "type": "string",
+          "pattern": "^(a)\\1+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains backreference \\2",
+        "data": {
+          "type": "string",
+          "pattern": "^(a)(b)\\2$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains named backreference \\k",
+        "data": {
+          "type": "string",
+          "pattern": "^(?<name>a)\\k<name>$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains null byte escape \\0",
+        "data": {
+          "type": "string",
+          "pattern": "^abc\\0def$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains \\B (non-word boundary)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]+\\B[a-z]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with escaped literal backslash in pattern (false positive regression)",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when pattern contains literal backslash before S (\\\\S)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\S$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before W (\\\\W)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\W$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before D (\\\\D)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\D$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before 0 (\\\\0)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\0$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before digit (\\\\1)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\1$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before x00 (\\\\x00)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\x00$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before u0000 (\\\\u0000)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\u0000$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before cA (\\\\cA)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\cA$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains literal backslash before k (\\\\k)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\k$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when triple backslash before 0 (real null byte after literal backslash)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\\\0$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when quad backslash before 0 (two literal backslashes then zero)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\\\\\\\0$",
+          "maxLength": 100
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=string with escaped metacharacters in pattern (false positive regression)",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when pattern contains escaped literal [ before ^ (\\[^...] is literal, not negated class)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\[^a-z\\]$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains escaped literal ( before ?= (\\(?= is literal, not lookahead)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\(?=[a-z]$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains escaped literal ( before ?<= (\\(?<= is literal, not lookbehind)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\(?<=[a-z]$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains escaped literal ) before quantifier (\\)+ is literal, not group closer)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z]\\)+$",
+          "maxLength": 100
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=string with bare alternation between groups in pattern",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when pattern has bare alternation between groups (breaks anchoring)",
+        "data": {
+          "type": "string",
+          "pattern": "^(?!x)abc|(?!y)def$",
+          "maxLength": 100
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with pattern escape sequences",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when pattern contains \\t (tab literal)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\t]+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\b (word boundary)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\b[a-z]+\\b$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\x hex escape",
+        "data": {
+          "type": "string",
+          "pattern": "^\\x41+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\u unicode escape",
+        "data": {
+          "type": "string",
+          "pattern": "^\\u0041+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\d (digit class)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\d+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\w (word class)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\w+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\s (whitespace class)",
+        "data": {
+          "type": "string",
+          "pattern": "^\\s+$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern is empty anchors (matches empty string only)",
+        "data": {
+          "type": "string",
+          "pattern": "^$",
+          "maxLength": 0
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=string with pattern group edge cases",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when pattern contains quantified non-capturing group (?:a+)+",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a+)+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains quantified non-capturing group (?:a+)*",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a+)*$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains quantified non-capturing group (?:a+){2,}",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a+){2,}$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when non-capturing group has quantifier (?:abc)+",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:abc)+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains named capture group with quantifier (?<name>a+)+",
+        "data": {
+          "type": "string",
+          "pattern": "^(?<name>a+)+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when pattern contains named capture group without nested quantifier",
+        "data": {
+          "type": "string",
+          "pattern": "^(?<name>abc)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\r (literal carriage return, matches CR in input)",
+        "data": {
+          "type": "string",
+          "pattern": "^abc\rdef$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when pattern contains \\n (literal newline, matches LF in input)",
+        "data": {
+          "type": "string",
+          "pattern": "^abc\ndef$",
+          "maxLength": 100
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=string with enum item size limits",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when enum items are within size limits",
+        "data": {
+          "type": "string",
+          "enum": [
+            "short"
+          ],
+          "maxLength": 256
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when enum item string exceeds safe length (4096)",
+        "data": {
+          "type": "string",
+          "enum": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "maxLength": 256
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=string with contentSchema dependency",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contentSchema is used with contentMediaType",
+        "data": {
+          "type": "string",
+          "contentSchema": { "type": "string", "enum": ["a"], "maxLength": 100 },
+          "contentMediaType": "application/json",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contentSchema is used without contentMediaType",
+        "data": {
+          "type": "string",
+          "contentSchema": { "type": "string", "enum": ["a"], "maxLength": 100 },
+          "format": "byte",
+          "maxLength": 1024
         },
         "valid": false
       }

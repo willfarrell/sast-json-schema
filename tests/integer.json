@@ -35,6 +35,14 @@
           "const": 42
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when const type does not match declared type",
+        "data": {
+          "type": "integer",
+          "const": "not-a-number"
+        },
+        "valid": false
       }
     ]
   },
@@ -51,6 +59,14 @@
           "enum": [-9007199254740991, 9007199254740991]
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when enum values do not match declared type",
+        "data": {
+          "type": "integer",
+          "enum": ["not-a-number", true]
+        },
+        "valid": false
       },
       {
         "description": "Should fail when enum is not set",
@@ -223,6 +239,23 @@
           "minimum": 0,
           "maximum": 100,
           "multipleOf": -1
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when multipleOf is used without type",
+        "data": {
+          "multipleOf": 5
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when multipleOf exceeds Number.MAX_SAFE_INTEGER",
+        "data": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "multipleOf": 9007199254740992
         },
         "valid": false
       }
