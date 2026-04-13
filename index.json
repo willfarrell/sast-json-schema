@@ -95,6 +95,18 @@
           "not": { "pattern": "\\\\0" }
         },
         {
+          "$comment": "Reject null byte via hex escape: \\x00",
+          "not": { "pattern": "\\\\x00" }
+        },
+        {
+          "$comment": "Reject null byte via unicode escape: \\u0000 or \\u{0...}",
+          "not": { "pattern": "\\\\u(0000|\\{0+\\})" }
+        },
+        {
+          "$comment": "Reject control character escape: \\cA through \\cZ (matches control chars U+0001-U+001A)",
+          "not": { "pattern": "\\\\c[A-Za-z]" }
+        },
+        {
           "$comment": "Reject named backreference: \\k",
           "not": { "pattern": "\\\\k" }
         },
@@ -123,9 +135,9 @@
           "not": { "pattern": "\\|[^()]*\\$$" }
         },
         {
-          "$comment": "If alternation | is used, require outer group wrapping to preserve anchoring",
+          "$comment": "If alternation | is used, require outer group wrapping to preserve anchoring. Inner content allows non-paren chars or one level of balanced inner groups.",
           "if": { "pattern": "\\|" },
-          "then": { "pattern": "^\\^\\(.*\\)\\$$" }
+          "then": { "pattern": "^\\^\\(([^()]|\\([^()]*\\))*\\)\\$$" }
         }
       ]
     },

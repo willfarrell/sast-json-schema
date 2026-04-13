@@ -472,6 +472,60 @@
           "maxLength": 100
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when top-level alternation is disguised by groups on both sides",
+        "data": {
+          "type": "string",
+          "pattern": "^(x)a|[a-z]+(y)$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when top-level alternation has groups at edges but | is outside them",
+        "data": {
+          "type": "string",
+          "pattern": "^(a)b|c(d)$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when top-level alternation sits between two separate groups",
+        "data": {
+          "type": "string",
+          "pattern": "^(abc)|(def)$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when null byte is written as hex escape \\x00",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x00]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when null byte is written as unicode escape \\u0000",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u0000]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control character escape \\cA is used",
+        "data": {
+          "type": "string",
+          "pattern": "^[\\cA-\\cZ]+$",
+          "maxLength": 100
+        },
+        "valid": false
       }
     ]
   },
