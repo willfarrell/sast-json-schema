@@ -726,10 +726,109 @@
         "valid": false
       },
       {
+        "description": "Should fail when control char is written as hex escape \\x01",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x01]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as hex escape \\x0a (newline)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x0a]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as hex escape \\x0d (carriage return)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x0d]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as hex escape \\x1f",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x1f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when DEL is written as hex escape \\x7f",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\x7f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
         "description": "Should fail when null byte is written as unicode escape \\u0000",
         "data": {
           "type": "string",
           "pattern": "^[a-z\\u0000]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as unicode escape \\u0001",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u0001]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as unicode escape \\u001f",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u001f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when DEL is written as unicode escape \\u007f",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u007f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as unicode brace escape \\u{1}",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u{1}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when control char is written as unicode brace escape \\u{1f}",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u{1f}]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when DEL is written as unicode brace escape \\u{7f}",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\u{7f}]+$",
           "maxLength": 100
         },
         "valid": false

@@ -100,12 +100,16 @@
           "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\0" }
         },
         {
-          "$comment": "Reject null byte via hex escape: \\x00",
-          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\x00" }
+          "$comment": "Reject control characters via hex escape: \\x00-\\x1f and \\x7f (DEL). Use \\r \\n \\t for those specific chars instead.",
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\x(0[0-9a-fA-F]|1[0-9a-fA-F]|7[fF])" }
         },
         {
-          "$comment": "Reject null byte via unicode escape: \\u0000 or \\u{0...}",
-          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\u(0000|\\{0+\\})" }
+          "$comment": "Reject control characters via unicode escape: \\u0000-\\u001f and \\u007f",
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\u00(0[0-9a-fA-F]|1[0-9a-fA-F]|7[fF])" }
+        },
+        {
+          "$comment": "Reject control characters via unicode brace escape: \\u{0}-\\u{1f} and \\u{7f}",
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\u\\{0*(0|[1-9a-fA-F]|1[0-9a-fA-F]|7[fF])\\}" }
         },
         {
           "$comment": "Reject control character escape: \\cA through \\cZ (matches control chars U+0001-U+001A)",
