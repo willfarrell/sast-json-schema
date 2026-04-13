@@ -662,5 +662,27 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "$ref URL path traversal prevention",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $ref URL contains .. path traversal",
+        "data": {
+          "$ref": "https://example.com/public/../internal/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref URL contains single dots in path segments",
+        "data": {
+          "$ref": "https://example.com/a.b/schema.json"
+        },
+        "valid": true
+      }
+    ]
   }
 ]

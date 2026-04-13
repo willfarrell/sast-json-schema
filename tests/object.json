@@ -720,6 +720,7 @@
             "unevaluatedProperties": false,
             "required": []
           },
+          "contentMediaType": "application/json",
           "format": "byte",
           "maxLength": 1024
         },
@@ -732,6 +733,7 @@
           "contentSchema": {
             "type": "string"
           },
+          "contentMediaType": "application/json",
           "format": "byte",
           "maxLength": 1024
         },

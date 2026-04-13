@@ -131,6 +131,10 @@
           "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?<=" }
         },
         {
+          "$comment": "Reject overlapping quantifiers: identical adjacent atoms with unbounded quantifiers cause O(n²) backtracking (e.g. [a-z]+[a-z]+, \\d+\\d+, a+a+)",
+          "not": { "pattern": "(\\[[^\\]]+\\]|\\\\.|.)[+*]\\1[+*]" }
+        },
+        {
           "$comment": "Reject negated character classes [^...] (broad denylist matchers)",
           "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\[\\^" }
         },
@@ -143,9 +147,9 @@
           "not": { "pattern": "\\|[^()]*\\$$" }
         },
         {
-          "$comment": "If alternation | is used, require outer group wrapping to preserve anchoring. Inner content allows non-paren chars or one level of balanced inner groups.",
+          "$comment": "If alternation | is used, all | must be inside balanced groups. Escaped chars (\\x) are treated as atoms, not group delimiters. Supports up to 3 levels of group nesting.",
           "if": { "pattern": "\\|" },
-          "then": { "pattern": "^\\^\\(([^()]|\\([^()]*\\))*\\)\\$$" }
+          "then": { "pattern": "^\\^(\\\\.|[^()|\\\\]|\\(([^()]|\\(([^()]|\\([^()]*\\))*\\))*\\))*\\$$" }
         }
       ]
     },
@@ -159,7 +163,8 @@
       "type": "string",
       "allOf": [
         { "pattern": "^https://[-a-zA-Z0-9.]+\\.[a-z]+(/[-a-zA-Z0-9._/?&#%=~+]*)?$" },
-        { "not": { "pattern": "^https://(localhost|0[xX][0-9a-fA-F]|[0-9]+\\.[0-9]+\\.[0-9]|[0-9]{5,}|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])" } }
+        { "not": { "pattern": "^https://(localhost|0[xX][0-9a-fA-F]|[0-9]+\\.[0-9]+\\.[0-9]|[0-9]{5,}|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])" } },
+        { "$comment": "Reject path traversal sequences", "not": { "pattern": "/\\.\\." } }
       ],
       "maxLength": 1024
     },
@@ -653,6 +658,9 @@
           "pattern": "^(application|audio|font|image|message|model|multipart|text|video)/[a-zA-Z0-9][a-zA-Z0-9!#$&\\-^_.+]*$"
         }
       }
+    },
+    "contentSchema": {
+      "required": ["contentMediaType"]
     },
     "contentEncoding": {
       "$comment": "Restrict content encoding to standard values. Source: https://json-schema.org/understanding-json-schema/reference/non_json_data#contentmediatype-and-contentencoding",
