@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
@@ -38,7 +40,7 @@ jobs:
           echo "prerelease=$([ ${tag##*-*} ] && echo false || echo true)" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: |
-          npm ci
+          npm ci --ignore-scripts
       - name: Build
         run: |
           npm run build --if-present
@@ -115,8 +117,8 @@ jobs:
       - name: npm publish (next)
         if: ${{ needs.release.outputs.prerelease == 'true' }}
         run: |
-          find . -name '*.tgz' -exec npm publish --tag next --provenance --access public {} \;
+          npm publish ${{ needs.release.outputs.tag }}/*.tgz --tag next --provenance --access public
       - name: npm publish (latest)
         if: ${{ needs.release.outputs.prerelease == 'false' }}
         run: |
-          find . -name '*.tgz' -exec npm publish --tag latest --provenance --access public {} \;
+          npm publish ${{ needs.release.outputs.tag }}/*.tgz --tag latest --provenance --access public

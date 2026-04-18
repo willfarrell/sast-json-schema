@@ -26,6 +26,8 @@
 		"2019-09.json",
 		"2020-12.json",
 		"src/$defs.json",
+		"lib/crawl.js",
+		"lib/ssrf.js",
 		"cli.js",
 		"SECURITY.md"
 	],
@@ -51,7 +53,7 @@
 		"test:dast": "npm run test:dast:fuzz",
 		"test:dast:fuzz": "node --test ./*.fuzz.js",
 		"test:sast": "npm run test:sast:license",
-		"test:sast:license": "license-check-and-add check -f license.json"
+		"test:sast:license": "license-check-and-add check -f .license.config.json"
 	},
 	"keywords": [
 		"JSON",

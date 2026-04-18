@@ -61,12 +61,10 @@
 		"maxLength": 1024
 	},
 	"safePropertyNameArray": {
-		"type": "array",
+		"$ref": "#/$defs/safeArrayItemsLimits",
 		"items": {
-			"type": "string",
 			"$ref": "#/$defs/safePropertyName"
-		},
-		"$ref": "#/$defs/safeArrayItemsLimits"
+		}
 	},
 	"safeCount": {
 		"description": "[0, Number.MAX_SAFE_INTEGER]",
