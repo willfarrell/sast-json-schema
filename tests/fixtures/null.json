@@ -1,0 +1,93 @@
+[
+  {
+    "description": "type=null",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when type is null",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "null"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=null with enum type consistency",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when enum contains only null",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "null",
+          "enum": [
+            null
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when enum contains non-null value (type confusion)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "null",
+          "enum": [
+            null,
+            42
+          ]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when enum contains string instead of null",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "null",
+          "enum": [
+            null,
+            "sneaky"
+          ]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=null with const type consistency",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when const is null",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "null",
+          "const": null
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when const is not null",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "null",
+          "const": "not-null"
+        },
+        "valid": false
+      }
+    ]
+  }
+]

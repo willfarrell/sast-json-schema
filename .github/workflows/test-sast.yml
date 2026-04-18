@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Trivy
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
@@ -38,6 +40,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
@@ -64,6 +68,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
@@ -91,26 +97,52 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@babb554ede22fd5605947329c4d04d8e7a0b8155 # v2.27.7
+        uses: github/codeql-action/init@5f8171a638ada777af81d42b55959a643bb29017 # v3.28.12
         with:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
       - name: Autobuild
-        uses: github/codeql-action/autobuild@babb554ede22fd5605947329c4d04d8e7a0b8155 # v2.27.7
+        uses: github/codeql-action/autobuild@5f8171a638ada777af81d42b55959a643bb29017 # v3.28.12
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@babb554ede22fd5605947329c4d04d8e7a0b8155 # v2.27.7
+        uses: github/codeql-action/analyze@5f8171a638ada777af81d42b55959a643bb29017 # v3.28.12
         with:
           category: '/language:${{ matrix.language }}'
+
+  license:
+    name: "License headers"
+    runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts
+      - name: License check
+        run: |
+          npm run test:sast:license
 
   semgrep:
     name: 'semgrep: SAST'
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep:1.111.0
+      image: semgrep/semgrep:1.111.0@sha256:3e6e5065d9e68abffddffdb536a8db2d79a8fa92dc424daa48d3a4b7d9bc65d0
     if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: semgrep
         run: semgrep ci

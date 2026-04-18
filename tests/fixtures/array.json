@@ -1,0 +1,801 @@
+[
+  {
+    "description": "type=[array,null]",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with items",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when items is set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when items is not set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with uniqueItems",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when uniqueItems is set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when uniqueItems is set to false",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": false,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when uniqueItems is not set with items",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when uniqueItems is not set with prefixItems",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ],
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when uniqueItems is not set with contains",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with maxItems",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when maxItems is set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when maxItems is not set w/ items",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when maxItems is not set w/ prefixItems",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ],
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with unevaluatedItems",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when unevaluatedItems is set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when unevaluatedItems is set to true",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": true
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when unevaluatedItems is not set with items",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when unevaluatedItems is not set with contains",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when unevaluatedItems is not set with prefixItems",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ],
+          "uniqueItems": true,
+          "maxItems": 1
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with contains",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contains is set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 10,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contains is set without maxItems",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when contains is not set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "uniqueItems": true,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with maxContains",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when maxContains is set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 10,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when maxContains is not set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when maxContains is set without contains",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "maxContains": 5,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with prefixItems recursive validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when prefixItems inner schemas are secure",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "string",
+              "enum": [
+                "a",
+                "b"
+              ],
+              "maxLength": 256
+            }
+          ],
+          "uniqueItems": true,
+          "maxItems": 2,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when prefixItems inner schema is insecure (missing constraints)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "string"
+            }
+          ],
+          "uniqueItems": true,
+          "maxItems": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with items recursive validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when items inner schema is secure",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "a",
+              "b"
+            ],
+            "maxLength": 256
+          },
+          "uniqueItems": true,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when items inner schema is insecure (missing constraints)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with contains recursive validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when contains inner schema is secure",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "string",
+            "enum": [
+              "a"
+            ],
+            "maxLength": 256
+          },
+          "uniqueItems": true,
+          "maxItems": 10,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when contains inner schema is insecure (missing constraints)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "maxContains": 1,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with additionalItems recursive validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when additionalItems inner schema is secure",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ],
+          "additionalItems": {
+            "type": "string",
+            "enum": [
+              "a"
+            ],
+            "maxLength": 256
+          },
+          "uniqueItems": true,
+          "maxItems": 2,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when additionalItems inner schema is insecure (missing constraints)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ],
+          "additionalItems": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "maxItems": 2,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with minItems",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when minItems is a valid safeCount",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when minItems is below 0",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "minItems": -1,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with minContains",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when minContains is a valid safeCount",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "minContains": 1,
+          "maxItems": 10,
+          "maxContains": 5,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when minContains is below 0",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "contains": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "minContains": -1,
+          "maxContains": 5,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when minContains is set without contains",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uniqueItems": true,
+          "minContains": 1,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=array with prefixItems and items together (tuple with catch-all)",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when prefixItems and items are both set (standard tuple pattern)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "string",
+              "maxLength": 100,
+              "const": "header"
+            }
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "maxItems": 10,
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "type=array with items and contains together",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when items and contains are both set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+$"
+          },
+          "contains": {
+            "type": "string",
+            "maxLength": 100,
+            "const": "special"
+          },
+          "maxItems": 10,
+          "maxContains": 5,
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      }
+    ]
+  }
+]

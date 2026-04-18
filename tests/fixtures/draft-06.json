@@ -1,0 +1,132 @@
+[
+  {
+    "description": "draft-06 base validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-06"
+    },
+    "tests": [
+      {
+        "description": "Should pass minimal secure draft-06 schema",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "maxProperties": 10,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass draft-06 schema with const",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "string",
+          "const": "a",
+          "maxLength": 8
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when schema uses $ref alone (no type required)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $schema declares draft-07",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses $comment (draft-07+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "$comment": "note",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses if/then/else (draft-07+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "string",
+          "enum": [
+            "a",
+            "b"
+          ],
+          "maxLength": 8,
+          "if": {
+            "type": "string",
+            "const": "a",
+            "maxLength": 8
+          },
+          "then": {
+            "type": "string",
+            "const": "a",
+            "maxLength": 8
+          },
+          "else": {
+            "type": "string",
+            "const": "b",
+            "maxLength": 8
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses contentMediaType (draft-07+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$",
+          "contentMediaType": "text/plain"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses $defs (2019-09+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "$defs": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      }
+    ]
+  }
+]

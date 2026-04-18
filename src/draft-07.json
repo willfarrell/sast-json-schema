@@ -1,0 +1,249 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "urn:willfarrell:sast-json-schema:draft-07",
+	"title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
+	"description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
+	"$defs": {
+		"schemaBase": {
+			"properties": {
+				"additionalItems": {
+					"$ref": "#/$defs/properties.additionalItems"
+				},
+				"additionalProperties": {
+					"$ref": "#/$defs/properties.additionalProperties"
+				},
+				"dependencies": false,
+				"items": {
+					"$ref": "#/$defs/properties.items"
+				},
+				"patternProperties": {
+					"$ref": "#/$defs/properties.patternProperties"
+				},
+				"properties": {
+					"$ref": "#/$defs/properties.properties"
+				},
+				"if": {
+					"$ref": "#/$defs/properties.if"
+				},
+				"then": {
+					"$ref": "#/$defs/properties.then"
+				},
+				"else": {
+					"$ref": "#/$defs/properties.else"
+				},
+				"allOf": {
+					"$ref": "#/$defs/properties.allOf"
+				},
+				"anyOf": {
+					"$ref": "#/$defs/properties.anyOf"
+				},
+				"oneOf": {
+					"$ref": "#/$defs/properties.oneOf"
+				},
+				"type": {
+					"$ref": "#/$defs/properties.type"
+				},
+				"not": {
+					"$ref": "#/$defs/properties.not"
+				},
+				"contains": {
+					"$ref": "#/$defs/properties.contains"
+				},
+				"propertyNames": {
+					"$ref": "#/$defs/properties.propertyNames"
+				},
+				"const": {
+					"$ref": "#/$defs/properties.const"
+				},
+				"default": {
+					"$ref": "#/$defs/properties.default"
+				},
+				"examples": {
+					"$ref": "#/$defs/properties.examples"
+				},
+				"required": {
+					"$ref": "#/$defs/properties.required"
+				},
+				"$anchor": false,
+				"$recursiveRef": false,
+				"$recursiveAnchor": false,
+				"$dynamicRef": false,
+				"$dynamicAnchor": false,
+				"unevaluatedProperties": false,
+				"unevaluatedItems": false,
+				"dependentRequired": false,
+				"dependentSchemas": false,
+				"minContains": false,
+				"maxContains": false,
+				"prefixItems": false,
+				"contentSchema": false,
+				"$vocabulary": false
+			},
+			"dependentRequired": {
+				"properties": ["required", "maxProperties"]
+			},
+			"dependentSchemas": {
+				"additionalProperties": {
+					"$ref": "#/$defs/dependentSchemas.additionalProperties"
+				},
+				"items": {
+					"$ref": "#/$defs/dependentSchemas.items.draft-06-07"
+				},
+				"contains": {
+					"$ref": "#/$defs/dependentSchemas.contains.draft-06-07"
+				},
+				"type": {
+					"$ref": "#/$defs/dependentSchemas.type.draft-06-07"
+				},
+				"maximum": {
+					"$ref": "#/$defs/dependentSchemas.maximum"
+				},
+				"minimum": {
+					"$ref": "#/$defs/dependentSchemas.minimum"
+				},
+				"exclusiveMaximum": {
+					"$ref": "#/$defs/dependentSchemas.exclusiveMaximum"
+				},
+				"exclusiveMinimum": {
+					"$ref": "#/$defs/dependentSchemas.exclusiveMinimum"
+				},
+				"minItems": {
+					"$ref": "#/$defs/dependentSchemas.minItems"
+				},
+				"maxItems": {
+					"$ref": "#/$defs/dependentSchemas.maxItems"
+				},
+				"minLength": {
+					"$ref": "#/$defs/dependentSchemas.minLength"
+				},
+				"maxLength": {
+					"$ref": "#/$defs/dependentSchemas.maxLength"
+				},
+				"minProperties": {
+					"$ref": "#/$defs/dependentSchemas.minProperties"
+				},
+				"maxProperties": {
+					"$ref": "#/$defs/dependentSchemas.maxProperties"
+				},
+				"multipleOf": {
+					"$ref": "#/$defs/dependentSchemas.multipleOf"
+				},
+				"$ref": {
+					"$ref": "#/$defs/dependentSchemas.$ref"
+				},
+				"if": {
+					"$ref": "#/$defs/dependentSchemas.if"
+				},
+				"then": {
+					"$ref": "#/$defs/dependentSchemas.then"
+				},
+				"else": {
+					"$ref": "#/$defs/dependentSchemas.else"
+				},
+				"pattern": {
+					"$ref": "#/$defs/dependentSchemas.pattern"
+				},
+				"patternProperties": {
+					"$ref": "#/$defs/dependentSchemas.patternProperties"
+				},
+				"propertyNames": {
+					"$ref": "#/$defs/dependentSchemas.propertyNames"
+				},
+				"title": {
+					"$ref": "#/$defs/dependentSchemas.title"
+				},
+				"description": {
+					"$ref": "#/$defs/dependentSchemas.description"
+				},
+				"$comment": {
+					"$ref": "#/$defs/dependentSchemas.$comment"
+				},
+				"enum": {
+					"$ref": "#/$defs/dependentSchemas.enum"
+				},
+				"format": {
+					"$ref": "#/$defs/dependentSchemas.format"
+				},
+				"const": {
+					"$ref": "#/$defs/dependentSchemas.const"
+				},
+				"default": {
+					"$ref": "#/$defs/dependentSchemas.default"
+				},
+				"contentMediaType": {
+					"$ref": "#/$defs/dependentSchemas.contentMediaType"
+				},
+				"contentEncoding": {
+					"$ref": "#/$defs/dependentSchemas.contentEncoding"
+				}
+			},
+			"oneOf": [
+				{
+					"const": false
+				},
+				{
+					"type": "object",
+					"anyOf": [
+						{
+							"required": ["type"]
+						},
+						{
+							"required": ["const"]
+						},
+						{
+							"required": ["$ref"]
+						},
+						{
+							"required": ["allOf"]
+						},
+						{
+							"required": ["anyOf"]
+						},
+						{
+							"required": ["oneOf"]
+						},
+						{
+							"required": ["definitions"]
+						}
+					]
+				}
+			]
+		},
+		"schemaRules": {
+			"$ref": "#/$defs/schemaBase",
+			"properties": {
+				"$schema": false,
+				"$id": false,
+				"$defs": false,
+				"definitions": false
+			}
+		}
+	},
+	"$ref": "#/$defs/schemaBase",
+	"properties": {
+		"$schema": {
+			"const": "https://json-schema.org/draft-07/schema"
+		},
+		"$id": {
+			"oneOf": [
+				{
+					"$ref": "#/$defs/safeIdUrl"
+				},
+				{
+					"$ref": "#/$defs/safeUrn"
+				},
+				{
+					"type": "string",
+					"maxLength": 1024,
+					"pattern": "^[a-zA-Z0-9_-]+$"
+				}
+			]
+		},
+		"id": false,
+		"$defs": false,
+		"definitions": {
+			"$ref": "#/$defs/properties.$defs"
+		}
+	},
+	"required": ["$schema", "$id"]
+}

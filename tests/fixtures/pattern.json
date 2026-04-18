@@ -1,0 +1,330 @@
+[
+  {
+    "description": "safePattern rejection catalog",
+    "$comment": "Locks in each branch of safePattern's reject list. If a check is removed or weakened, the matching test here fails.",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "reject: missing ^ anchor",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "[a-z]+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: missing $ anchor",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a-z]+",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: unescaped . wildcard",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^a.b$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: \\S broad class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\S+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: \\W broad class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\W+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: \\D broad class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\D+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: \\k named backreference",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?<n>a)\\k<n>$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: numeric backreference \\1",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(a)\\1$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: null byte escape \\0",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\0$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: control char via \\x00",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\x00$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: control char via \\u0000",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\u0000$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: control char via \\u{0}",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\u{0}$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: control char escape \\cA",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\cA$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: \\p{C} unicode control category",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\p{C}+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: \\p{Control} long-form category",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\p{Control}+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: unbounded group repeat )+",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(ab)+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: unbounded group repeat {n,}",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(ab){1,}$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: positive lookahead (?=)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?=a)ab$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: positive lookbehind (?<=)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^a(?<=a)b$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: overlapping quantifiers [a-z]+[a-z]+",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a-z]+[a-z]+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: \\d and [0-9] overlap",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\d+[0-9]+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: \\w ⊃ \\d overlap",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\w+\\d+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: negated character class [^...]",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[^abc]+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: bare | before any group",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^a|b$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "accept: allowlist charset with ^ and $ anchors",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: bounded repetition",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a-z]{1,10}$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: escaped dot",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^a\\.b$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: dot inside character class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a.b]+$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: alternation inside non-capturing group",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:foo|bar)$",
+          "maxLength": 10
+        },
+        "valid": true
+      }
+    ]
+  }
+]

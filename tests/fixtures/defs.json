@@ -2,12 +2,14 @@
   {
     "description": "$defs recursive validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when $defs inner schemas are secure",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$defs": {
             "name": {
               "type": "string",
@@ -29,6 +31,8 @@
       {
         "description": "Should fail when $defs contains an insecure inner schema",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$defs": {
             "name": {
               "type": "string"
@@ -42,12 +46,14 @@
   {
     "description": "definitions recursive validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when definitions inner schemas are secure",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "definitions": {
             "name": {
               "type": "string",
@@ -69,6 +75,8 @@
       {
         "description": "Should fail when definitions contains an insecure inner schema",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "definitions": {
             "name": {
               "type": "string"
@@ -82,12 +90,14 @@
   {
     "description": "$ref validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when $ref is a local reference",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "#/definitions/name"
         },
         "valid": true
@@ -95,6 +105,8 @@
       {
         "description": "Should fail when $ref is a root self-reference (infinite recursion)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "#"
         },
         "valid": false
@@ -102,6 +114,8 @@
       {
         "description": "Should pass when $ref is a local $defs reference",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "#/$defs/name"
         },
         "valid": true
@@ -109,6 +123,8 @@
       {
         "description": "Should pass when $ref is an https URL",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://example.com/schema.json"
         },
         "valid": true
@@ -116,6 +132,8 @@
       {
         "description": "Should fail when $ref uses single-label hostname (SSRF via DNS search domain)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://intranet/schema"
         },
         "valid": false
@@ -123,6 +141,8 @@
       {
         "description": "Should fail when $ref is a relative path",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "./other-schema.json"
         },
         "valid": false
@@ -130,6 +150,8 @@
       {
         "description": "Should fail when $ref uses http: scheme (downgrade)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "http://example.com/schema.json"
         },
         "valid": false
@@ -137,6 +159,8 @@
       {
         "description": "Should fail when $ref uses file: scheme",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "file:///etc/passwd"
         },
         "valid": false
@@ -144,6 +168,8 @@
       {
         "description": "Should fail when $ref uses data: scheme",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "data:text/json,{}"
         },
         "valid": false
@@ -151,6 +177,8 @@
       {
         "description": "Should fail when $ref uses javascript: scheme",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "javascript:alert(1)"
         },
         "valid": false
@@ -158,6 +186,8 @@
       {
         "description": "Should fail when $ref targets localhost (SSRF)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://localhost/admin"
         },
         "valid": false
@@ -165,6 +195,8 @@
       {
         "description": "Should fail when $ref targets 127.0.0.1 (SSRF)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://127.0.0.1/secret"
         },
         "valid": false
@@ -172,6 +204,8 @@
       {
         "description": "Should fail when $ref targets 169.254.169.254 (SSRF cloud metadata)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://169.254.169.254/latest/meta-data/"
         },
         "valid": false
@@ -179,6 +213,8 @@
       {
         "description": "Should fail when $ref targets 10.x.x.x (SSRF RFC1918)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://10.0.0.1/internal"
         },
         "valid": false
@@ -186,6 +222,8 @@
       {
         "description": "Should fail when $ref targets 172.16.x.x (SSRF RFC1918)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://172.16.0.1/internal"
         },
         "valid": false
@@ -193,6 +231,8 @@
       {
         "description": "Should fail when $ref targets 192.168.x.x (SSRF RFC1918)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://192.168.1.1/router"
         },
         "valid": false
@@ -200,6 +240,8 @@
       {
         "description": "Should fail when $ref targets hex IP (SSRF bypass 0x7f000001)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://0x7f000001/secret"
         },
         "valid": false
@@ -207,6 +249,8 @@
       {
         "description": "Should fail when $ref targets octal IP (SSRF bypass 0177.0.0.1)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://0177.0.0.1/secret"
         },
         "valid": false
@@ -214,6 +258,8 @@
       {
         "description": "Should fail when $ref targets decimal IP (SSRF bypass 2130706433)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://2130706433/secret"
         },
         "valid": false
@@ -221,6 +267,8 @@
       {
         "description": "Should fail when $ref targets hex IP for metadata endpoint (SSRF bypass)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://0xa9fea9fe/latest/meta-data/"
         },
         "valid": false
@@ -228,6 +276,8 @@
       {
         "description": "Should fail when $ref targets dotted-numeric public IP",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://8.8.8.8/schema"
         },
         "valid": false
@@ -235,6 +285,8 @@
       {
         "description": "Should fail when $ref URL contains port number (SSRF bypass)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://evil.com:8080/schema"
         },
         "valid": false
@@ -242,6 +294,8 @@
       {
         "description": "Should fail when $ref URL contains userinfo (credential leak)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://user:pass@evil.com/schema"
         },
         "valid": false
@@ -249,6 +303,8 @@
       {
         "description": "Should fail when $ref URL contains IPv6 brackets (SSRF bypass)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://[::1]/schema"
         },
         "valid": false
@@ -256,6 +312,8 @@
       {
         "description": "Should fail when $ref URL contains percent-encoded host (SSRF bypass)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://127%2e0%2e0%2e1/schema"
         },
         "valid": false
@@ -263,13 +321,17 @@
       {
         "description": "Should fail when $ref URL contains unicode homoglyph in host",
         "data": {
-          "$ref": "https://\u0435xample.com/schema"
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://еxample.com/schema"
         },
         "valid": false
       },
       {
         "description": "Should fail when $ref URL contains backslash (protocol confusion)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://evil.com\\@good.com/schema"
         },
         "valid": false
@@ -277,6 +339,8 @@
       {
         "description": "Should pass when $ref is a local JSON Pointer",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "#/definitions/name"
         },
         "valid": true
@@ -284,20 +348,26 @@
       {
         "description": "Should pass when $ref is #/$defs path",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "#/$defs/name"
         },
         "valid": true
       },
       {
-        "description": "Should pass when $ref local path contains dot segments (valid JSON Pointer key, not traversal)",
+        "description": "Should fail when $ref local path contains double-dot segments (defensive: block traversal-like patterns)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "#/../../../etc/passwd"
         },
-        "valid": true
+        "valid": false
       },
       {
         "description": "Should fail when $ref targets 172.31.x.x (SSRF RFC1918 upper range)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://172.31.255.255/internal"
         },
         "valid": false
@@ -305,6 +375,8 @@
       {
         "description": "Should fail when $ref targets hex IP with uppercase 0X prefix",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://0X7F000001/secret"
         },
         "valid": false
@@ -314,12 +386,13 @@
   {
     "description": "$id validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when $id is a short URI",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/schema.json",
           "type": "null"
         },
@@ -328,6 +401,7 @@
       {
         "description": "Should pass when $id is a relative URI",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "my-schema",
           "type": "null"
         },
@@ -336,6 +410,7 @@
       {
         "description": "Should fail when $id exceeds maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
         },
         "valid": false
@@ -343,6 +418,7 @@
       {
         "description": "Should fail when $id uses file: scheme",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "file:///etc/passwd"
         },
         "valid": false
@@ -350,6 +426,7 @@
       {
         "description": "Should fail when $id uses http: scheme",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "http://example.com/schema.json"
         },
         "valid": false
@@ -357,6 +434,7 @@
       {
         "description": "Should fail when $id contains dots",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "my.schema"
         },
         "valid": false
@@ -364,6 +442,7 @@
       {
         "description": "Should fail when $id contains spaces",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "my schema"
         },
         "valid": false
@@ -371,6 +450,7 @@
       {
         "description": "Should fail when $id contains angle brackets",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://evil.com/<script>",
           "type": "null"
         },
@@ -379,6 +459,7 @@
       {
         "description": "Should pass when $id has path and query params",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/schemas/user.json?v=2",
           "type": "null"
         },
@@ -387,6 +468,7 @@
       {
         "description": "Should fail when $id URL contains fragment (spec 8.2.1 violation)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/schema.json#foo",
           "type": "null"
         },
@@ -395,6 +477,7 @@
       {
         "description": "Should fail when $id URL contains JSON Pointer fragment",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://example.com/schema.json#/definitions/name",
           "type": "null"
         },
@@ -405,12 +488,14 @@
   {
     "description": "$anchor validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when $anchor is a short identifier",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$anchor": "my-anchor",
           "type": "null"
         },
@@ -419,6 +504,8 @@
       {
         "description": "Should fail when $anchor exceeds maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$anchor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         "valid": false
@@ -426,6 +513,8 @@
       {
         "description": "Should fail when $anchor contains special characters",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$anchor": "a<script>b"
         },
         "valid": false
@@ -433,6 +522,8 @@
       {
         "description": "Should fail when $anchor contains spaces",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$anchor": "a b c"
         },
         "valid": false
@@ -440,6 +531,8 @@
       {
         "description": "Should fail when $anchor starts with a digit",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$anchor": "1anchor"
         },
         "valid": false
@@ -449,12 +542,14 @@
   {
     "description": "$dynamicRef validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when $dynamicRef is a short reference",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "#my-anchor",
           "type": "null"
         },
@@ -463,6 +558,8 @@
       {
         "description": "Should fail when $dynamicRef exceeds maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"
         },
         "valid": false
@@ -470,6 +567,8 @@
       {
         "description": "Should fail when $dynamicRef uses file: scheme",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "file:///etc/passwd"
         },
         "valid": false
@@ -477,6 +576,8 @@
       {
         "description": "Should fail when $dynamicRef uses http: scheme",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "http://evil.com/schema"
         },
         "valid": false
@@ -484,6 +585,8 @@
       {
         "description": "Should fail when $dynamicRef targets localhost (SSRF)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "https://localhost/admin"
         },
         "valid": false
@@ -491,6 +594,8 @@
       {
         "description": "Should fail when $dynamicRef targets 169.254.169.254 (SSRF cloud metadata)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "https://169.254.169.254/latest/meta-data/"
         },
         "valid": false
@@ -498,6 +603,8 @@
       {
         "description": "Should fail when $dynamicRef targets 10.x.x.x (SSRF RFC1918)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "https://10.0.0.1/internal"
         },
         "valid": false
@@ -505,6 +612,8 @@
       {
         "description": "Should fail when $dynamicRef targets hex IP (SSRF bypass)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "https://0x7f000001/secret"
         },
         "valid": false
@@ -512,6 +621,8 @@
       {
         "description": "Should fail when $dynamicRef is a root self-reference",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "#"
         },
         "valid": false
@@ -519,6 +630,8 @@
       {
         "description": "Should fail when $dynamicRef URL contains port number",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "https://evil.com:8080/schema"
         },
         "valid": false
@@ -528,12 +641,14 @@
   {
     "description": "$dynamicAnchor validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when $dynamicAnchor is a short identifier",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicAnchor": "my-anchor",
           "type": "null"
         },
@@ -542,6 +657,8 @@
       {
         "description": "Should fail when $dynamicAnchor exceeds maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicAnchor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         "valid": false
@@ -549,6 +666,8 @@
       {
         "description": "Should fail when $dynamicAnchor contains special characters",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicAnchor": "a<script>b"
         },
         "valid": false
@@ -556,6 +675,8 @@
       {
         "description": "Should fail when $dynamicAnchor contains spaces",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicAnchor": "a b c"
         },
         "valid": false
@@ -565,12 +686,14 @@
   {
     "description": "title validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when title is within maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "title": "A short title",
           "type": "null"
         },
@@ -579,6 +702,8 @@
       {
         "description": "Should fail when title exceeds maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         "valid": false
@@ -588,12 +713,14 @@
   {
     "description": "description validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when description is within maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "description": "A short description",
           "type": "null"
         },
@@ -602,6 +729,8 @@
       {
         "description": "Should fail when description exceeds maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "description": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         "valid": false
@@ -611,12 +740,14 @@
   {
     "description": "$comment validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when $comment is within maxLength",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$comment": "A short comment",
           "type": "null"
         },
@@ -625,6 +756,8 @@
       {
         "description": "Should fail when $comment exceeds maxLength (4096)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$comment": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
         "valid": false
@@ -634,29 +767,41 @@
   {
     "description": "$schema validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when $schema is official JSON Schema URI",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "null"
         },
         "valid": true
       },
       {
-        "description": "Should pass when $schema is older draft URI",
+        "description": "Should fail when $schema is draft-07 (unsupported)",
         "data": {
           "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
           "type": "null"
         },
-        "valid": true
+        "valid": false
+      },
+      {
+        "description": "Should fail when $schema is draft 2019-09 (use the dedicated 2019-09 meta-schema)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "$id": "test",
+          "type": "null"
+        },
+        "valid": false
       },
       {
         "description": "Should fail when $schema is an arbitrary URL",
         "data": {
           "$schema": "https://evil.com/permissive-schema",
+          "$id": "test",
           "type": "null"
         },
         "valid": false
@@ -665,6 +810,7 @@
         "description": "Should fail when $schema uses http: scheme",
         "data": {
           "$schema": "http://json-schema.org/draft-07/schema",
+          "$id": "test",
           "type": "null"
         },
         "valid": false
@@ -673,6 +819,7 @@
         "description": "Should fail when $schema is an unsupported draft",
         "data": {
           "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
           "type": "null"
         },
         "valid": false
@@ -682,12 +829,14 @@
   {
     "description": "$ref URL path traversal prevention",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should fail when $ref URL contains .. path traversal",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://example.com/public/../internal/schema.json"
         },
         "valid": false
@@ -695,6 +844,8 @@
       {
         "description": "Should pass when $ref URL contains single dots in path segments",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://example.com/a.b/schema.json"
         },
         "valid": true
@@ -702,6 +853,8 @@
       {
         "description": "Should fail when $ref URL contains percent-encoded path traversal (%2e%2e)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://example.com/%2e%2e/%2e%2e/internal/schema.json"
         },
         "valid": false
@@ -709,6 +862,8 @@
       {
         "description": "Should fail when $ref URL contains double percent-encoded traversal (%252e)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://example.com/%252e%252e/internal/schema.json"
         },
         "valid": false
@@ -716,6 +871,8 @@
       {
         "description": "Should fail when $ref URL contains percent-encoded characters in path",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://example.com/path%20with%20spaces/schema.json"
         },
         "valid": false
@@ -725,12 +882,14 @@
   {
     "description": "$ref URL query string restriction",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should fail when $ref URL contains query string",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://example.com/schema.json?version=2"
         },
         "valid": false
@@ -738,6 +897,8 @@
       {
         "description": "Should fail when $ref URL contains query string with redirect",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "https://example.com/schema?redirect=http://internal"
         },
         "valid": false
@@ -745,6 +906,8 @@
       {
         "description": "Should pass when $ref is local reference (no query string concern)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$ref": "#/definitions/name"
         },
         "valid": true
@@ -754,12 +917,14 @@
   {
     "description": "$dynamicRef URL query string restriction",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should fail when $dynamicRef URL contains query string",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "https://example.com/schema.json?version=2",
           "type": "null"
         },
@@ -768,6 +933,8 @@
       {
         "description": "Should pass when $dynamicRef is local reference",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$dynamicRef": "#my-anchor",
           "type": "null"
         },
@@ -778,12 +945,14 @@
   {
     "description": "$vocabulary validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should fail when $vocabulary is used to disable validation vocabulary",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$vocabulary": {
             "https://json-schema.org/draft/2020-12/vocab/validation": false
           },
@@ -794,10 +963,322 @@
       {
         "description": "Should fail when $vocabulary is present at all",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "$vocabulary": {
             "https://json-schema.org/draft/2020-12/vocab/core": true
           },
           "type": "null"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$ref URL double-dot hostname prevention",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $ref URL contains double-dot in hostname",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://a..b.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref URL has single dots in hostname (normal domain)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://schemas.example.com/schema.json"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "$ref URL hostname hyphen validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should fail when hostname starts with a hyphen (invalid DNS)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://-example.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when hostname label ends with a hyphen before dot (invalid DNS)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example-.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when hostname contains hyphens in valid positions",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://my-schemas.example-site.com/schema.json"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "$recursiveRef validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $recursiveRef is a local reference",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveRef": "#/definitions/name",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $recursiveRef is an https URL",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveRef": "https://example.com/schema.json",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $recursiveRef is a root self-reference",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveRef": "#"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveRef uses http: scheme",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveRef": "http://evil.com/schema",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveRef targets localhost (SSRF)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveRef": "https://localhost/admin",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveRef targets hex IP (SSRF bypass)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveRef": "https://0x7f000001/secret",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveRef URL contains query string",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveRef": "https://example.com/schema.json?version=2",
+          "type": "null"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$recursiveAnchor validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $recursiveAnchor is true",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveAnchor": true,
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $recursiveAnchor is a string (must be boolean)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveAnchor": "my-anchor",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveAnchor is a number",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveAnchor": 1,
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveAnchor is false (no-op, enforce intentionality)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$recursiveAnchor": false,
+          "type": "null"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "safeUrl edge cases",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $ref is a valid HTTPS URL",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example.com/schemas/user.json"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref URL contains path traversal (/../)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example.com/schemas/../secret.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains double-slash in path",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example.com//schemas/user.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL has double-dot in hostname",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example..com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL hostname starts with hyphen",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://-example.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL targets localhost",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://localhost/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL targets 127.x private IP",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://127.0.0.1/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL targets 10.x private IP",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://10.0.0.1/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL targets 192.168.x private IP",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://192.168.1.1/schema.json"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "safeLocalRef edge cases",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $ref is a normal local JSON Pointer",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "properties": {
+            "a": { "$ref": "#/$defs/name" }
+          },
+          "$defs": {
+            "name": { "type": "string", "maxLength": 100, "pattern": "^[a-z]+$" }
+          },
+          "required": ["a"],
+          "unevaluatedProperties": false,
+          "maxProperties": 5
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when local $ref contains path traversal (..)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "#/$defs/../secret"
         },
         "valid": false
       }

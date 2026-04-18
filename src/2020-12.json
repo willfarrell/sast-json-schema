@@ -1,0 +1,286 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "urn:willfarrell:sast-json-schema:2020-12",
+	"title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
+	"description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
+	"$defs": {
+		"schemaBase": {
+			"properties": {
+				"additionalItems": {
+					"$ref": "#/$defs/properties.additionalItems"
+				},
+				"additionalProperties": {
+					"$ref": "#/$defs/properties.additionalProperties"
+				},
+				"dependencies": false,
+				"items": {
+					"$ref": "#/$defs/properties.items"
+				},
+				"prefixItems": {
+					"$ref": "#/$defs/schemaArray"
+				},
+				"contentSchema": {
+					"$ref": "#/$defs/properties.contentSchema"
+				},
+				"dependentSchemas": {
+					"$ref": "#/$defs/properties.dependentSchemas"
+				},
+				"patternProperties": {
+					"$ref": "#/$defs/properties.patternProperties"
+				},
+				"properties": {
+					"$ref": "#/$defs/properties.properties"
+				},
+				"if": {
+					"$ref": "#/$defs/properties.if"
+				},
+				"then": {
+					"$ref": "#/$defs/properties.then"
+				},
+				"else": {
+					"$ref": "#/$defs/properties.else"
+				},
+				"allOf": {
+					"$ref": "#/$defs/properties.allOf"
+				},
+				"anyOf": {
+					"$ref": "#/$defs/properties.anyOf"
+				},
+				"oneOf": {
+					"$ref": "#/$defs/properties.oneOf"
+				},
+				"type": {
+					"$ref": "#/$defs/properties.type"
+				},
+				"not": {
+					"$ref": "#/$defs/properties.not"
+				},
+				"contains": {
+					"$ref": "#/$defs/properties.contains"
+				},
+				"propertyNames": {
+					"$ref": "#/$defs/properties.propertyNames"
+				},
+				"const": {
+					"$ref": "#/$defs/properties.const"
+				},
+				"default": {
+					"$ref": "#/$defs/properties.default"
+				},
+				"examples": {
+					"$ref": "#/$defs/properties.examples"
+				},
+				"required": {
+					"$ref": "#/$defs/properties.required"
+				},
+				"dependentRequired": {
+					"$ref": "#/$defs/properties.dependentRequired"
+				},
+				"$vocabulary": false
+			},
+			"dependentRequired": {
+				"properties": ["required", "maxProperties"]
+			},
+			"dependentSchemas": {
+				"contains": {
+					"$ref": "#/$defs/dependentSchemas.contains"
+				},
+				"items": {
+					"$ref": "#/$defs/dependentSchemas.items"
+				},
+				"prefixItems": {
+					"$ref": "#/$defs/dependentSchemas.prefixItems"
+				},
+				"additionalProperties": {
+					"$ref": "#/$defs/dependentSchemas.additionalProperties"
+				},
+				"unevaluatedProperties": {
+					"$ref": "#/$defs/dependentSchemas.unevaluatedProperties"
+				},
+				"unevaluatedItems": {
+					"$ref": "#/$defs/dependentSchemas.unevaluatedItems"
+				},
+				"maximum": {
+					"$ref": "#/$defs/dependentSchemas.maximum"
+				},
+				"exclusiveMaximum": {
+					"$ref": "#/$defs/dependentSchemas.exclusiveMaximum"
+				},
+				"minimum": {
+					"$ref": "#/$defs/dependentSchemas.minimum"
+				},
+				"exclusiveMinimum": {
+					"$ref": "#/$defs/dependentSchemas.exclusiveMinimum"
+				},
+				"minContains": {
+					"$ref": "#/$defs/dependentSchemas.minContains"
+				},
+				"maxContains": {
+					"$ref": "#/$defs/dependentSchemas.maxContains"
+				},
+				"minItems": {
+					"$ref": "#/$defs/dependentSchemas.minItems"
+				},
+				"maxItems": {
+					"$ref": "#/$defs/dependentSchemas.maxItems"
+				},
+				"minLength": {
+					"$ref": "#/$defs/dependentSchemas.minLength"
+				},
+				"maxLength": {
+					"$ref": "#/$defs/dependentSchemas.maxLength"
+				},
+				"minProperties": {
+					"$ref": "#/$defs/dependentSchemas.minProperties"
+				},
+				"maxProperties": {
+					"$ref": "#/$defs/dependentSchemas.maxProperties"
+				},
+				"pattern": {
+					"$ref": "#/$defs/dependentSchemas.pattern"
+				},
+				"patternProperties": {
+					"$ref": "#/$defs/dependentSchemas.patternProperties"
+				},
+				"propertyNames": {
+					"$ref": "#/$defs/dependentSchemas.propertyNames"
+				},
+				"multipleOf": {
+					"$ref": "#/$defs/dependentSchemas.multipleOf"
+				},
+				"$ref": {
+					"$ref": "#/$defs/dependentSchemas.$ref"
+				},
+				"$anchor": {
+					"$ref": "#/$defs/dependentSchemas.$anchor"
+				},
+				"$dynamicRef": {
+					"$ref": "#/$defs/dependentSchemas.$dynamicRef"
+				},
+				"$dynamicAnchor": {
+					"$ref": "#/$defs/dependentSchemas.$dynamicAnchor"
+				},
+				"$recursiveRef": {
+					"$ref": "#/$defs/dependentSchemas.$recursiveRef"
+				},
+				"$recursiveAnchor": {
+					"$ref": "#/$defs/dependentSchemas.$recursiveAnchor"
+				},
+				"contentMediaType": {
+					"$ref": "#/$defs/dependentSchemas.contentMediaType"
+				},
+				"contentSchema": {
+					"$ref": "#/$defs/dependentSchemas.contentSchema"
+				},
+				"contentEncoding": {
+					"$ref": "#/$defs/dependentSchemas.contentEncoding"
+				},
+				"title": {
+					"$ref": "#/$defs/dependentSchemas.title"
+				},
+				"description": {
+					"$ref": "#/$defs/dependentSchemas.description"
+				},
+				"$comment": {
+					"$ref": "#/$defs/dependentSchemas.$comment"
+				},
+				"enum": {
+					"$ref": "#/$defs/dependentSchemas.enum"
+				},
+				"format": {
+					"$ref": "#/$defs/dependentSchemas.format"
+				},
+				"const": {
+					"$ref": "#/$defs/dependentSchemas.const"
+				},
+				"default": {
+					"$ref": "#/$defs/dependentSchemas.default"
+				},
+				"type": {
+					"$ref": "#/$defs/dependentSchemas.type"
+				},
+				"if": {
+					"$ref": "#/$defs/dependentSchemas.if"
+				},
+				"then": {
+					"$ref": "#/$defs/dependentSchemas.then"
+				},
+				"else": {
+					"$ref": "#/$defs/dependentSchemas.else"
+				}
+			},
+			"oneOf": [
+				{
+					"const": false
+				},
+				{
+					"type": "object",
+					"anyOf": [
+						{
+							"required": ["type"]
+						},
+						{
+							"required": ["const"]
+						},
+						{
+							"required": ["$ref"]
+						},
+						{
+							"required": ["allOf"]
+						},
+						{
+							"required": ["anyOf"]
+						},
+						{
+							"required": ["oneOf"]
+						},
+						{
+							"required": ["$defs"]
+						},
+						{
+							"required": ["definitions"]
+						}
+					]
+				}
+			]
+		},
+		"schemaRules": {
+			"$ref": "#/$defs/schemaBase",
+			"properties": {
+				"$schema": false,
+				"$id": false,
+				"$defs": false,
+				"definitions": false
+			}
+		}
+	},
+	"$ref": "#/$defs/schemaBase",
+	"properties": {
+		"$schema": {
+			"const": "https://json-schema.org/draft/2020-12/schema"
+		},
+		"$id": {
+			"oneOf": [
+				{
+					"$ref": "#/$defs/safeIdUrl"
+				},
+				{
+					"$ref": "#/$defs/safeUrn"
+				},
+				{
+					"type": "string",
+					"maxLength": 1024,
+					"pattern": "^[a-zA-Z0-9_-]+$"
+				}
+			]
+		},
+		"id": false,
+		"$defs": {
+			"$ref": "#/$defs/properties.definitions"
+		},
+		"definitions": {
+			"$ref": "#/$defs/properties.$defs"
+		}
+	},
+	"required": ["$schema", "$id"]
+}

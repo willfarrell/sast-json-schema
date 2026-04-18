@@ -1,0 +1,218 @@
+[
+  {
+    "description": "draft-04 base validation",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-04"
+    },
+    "tests": [
+      {
+        "description": "Should pass minimal secure draft-04 schema",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "maxProperties": 10,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass draft-04 schema with legacy `id` identifier",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "https://example.com/schemas/name",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass integer schema with boolean exclusiveMinimum",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "integer",
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "maximum": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass draft-04 schema with definitions",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when schema uses $ref alone (no type required)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $schema declares draft-06",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "id": "test",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses $id (draft-06+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "$id": "https://example.com/schemas/name",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses const (draft-06+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "string",
+          "const": "a",
+          "maxLength": 8
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses contains (draft-06+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 8,
+            "pattern": "^[a-z]+$"
+          },
+          "contains": {
+            "type": "string",
+            "maxLength": 8,
+            "pattern": "^[a-z]+$"
+          },
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses propertyNames (draft-06+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "maxProperties": 10,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z]+$"
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses examples (draft-06+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$",
+          "examples": [
+            "abc"
+          ]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when exclusiveMinimum is numeric (draft-04 requires boolean)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "integer",
+          "minimum": 0,
+          "exclusiveMinimum": 5,
+          "maximum": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when `id` is missing entirely (required)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when `id` URL contains a fragment (safeIdUrl rejects #)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "https://example.com/schemas/name#frag",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when `id` is a URN",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "urn:example:test",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": true
+      }
+    ]
+  }
+]

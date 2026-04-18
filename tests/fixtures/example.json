@@ -1,0 +1,80 @@
+[
+  {
+    "description": "example meta-schema",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass SAST",
+        "dataFile": "../example.json",
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "example schema",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/example.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when using allowed",
+        "data": {
+          "allowed": 1,
+          "if": 0,
+          "then": 0,
+          "else": 1
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when using disallowed",
+        "data": {
+          "allowed": 1,
+          "disallowed": 0,
+          "if": 1,
+          "then": 1,
+          "else": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when using if/then",
+        "data": {
+          "if": 1,
+          "then": 1,
+          "else": 0
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when using if/then",
+        "data": {
+          "if": 0,
+          "then": 1,
+          "else": 0
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when using if/else",
+        "data": {
+          "if": 0,
+          "then": 0,
+          "else": 1
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when using if/else",
+        "data": {
+          "if": 1,
+          "then": 0,
+          "else": 1
+        },
+        "valid": false
+      }
+    ]
+  }
+]

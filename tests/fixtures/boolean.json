@@ -2,12 +2,14 @@
   {
     "description": "type=boolean",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
         "description": "Should pass when type is boolean",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "boolean"
         },
         "valid": true
@@ -15,7 +17,12 @@
       {
         "description": "Should pass when type is [boolean, null]",
         "data": {
-          "type": ["boolean", "null"]
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "valid": true
       }

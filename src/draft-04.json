@@ -1,0 +1,360 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "urn:willfarrell:sast-json-schema:draft-04",
+	"title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
+	"description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
+	"$defs": {
+		"dependentSchemas.type": {
+			"allOf": [
+				{
+					"description": "Ensure `array` has strictness.",
+					"if": {
+						"properties": {
+							"type": {
+								"$ref": "#/$defs/typeArray"
+							}
+						},
+						"required": ["type"]
+					},
+					"then": {
+						"required": ["items"]
+					}
+				},
+				{
+					"description": "Ensure `integer`/`number` has strictness. Draft-04 has no `const`.",
+					"if": {
+						"properties": {
+							"type": {
+								"$ref": "#/$defs/typeIntegerOrNumber"
+							}
+						},
+						"required": ["type"]
+					},
+					"then": {
+						"allOf": [
+							{
+								"anyOf": [
+									{
+										"required": ["enum"]
+									},
+									{
+										"required": ["minimum"]
+									}
+								]
+							},
+							{
+								"anyOf": [
+									{
+										"required": ["enum"]
+									},
+									{
+										"required": ["maximum"]
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"description": "Ensure `string` has strictness. Draft-04 has no `const`.",
+					"if": {
+						"properties": {
+							"type": {
+								"$ref": "#/$defs/typeString"
+							}
+						},
+						"required": ["type"]
+					},
+					"then": {
+						"anyOf": [
+							{
+								"required": ["enum"]
+							},
+							{
+								"required": ["pattern"]
+							},
+							{
+								"required": ["format"]
+							}
+						],
+						"required": ["maxLength"]
+					}
+				},
+				{
+					"description": "Ensure `object` has strictness. Draft-04 has no `propertyNames`.",
+					"if": {
+						"properties": {
+							"type": {
+								"$ref": "#/$defs/typeObject"
+							}
+						},
+						"required": ["type"]
+					},
+					"then": {
+						"anyOf": [
+							{
+								"required": ["additionalProperties"]
+							},
+							{
+								"required": ["properties"]
+							},
+							{
+								"required": ["patternProperties"]
+							}
+						],
+						"required": ["required"]
+					}
+				}
+			]
+		},
+		"dependentSchemas.items": {
+			"required": ["maxItems", "uniqueItems"],
+			"properties": {
+				"uniqueItems": {
+					"const": true
+				}
+			}
+		},
+		"dependentSchemas.exclusiveMinimum": {
+			"$comment": "In draft-04, exclusiveMinimum is a boolean modifier that requires minimum to be present.",
+			"required": ["minimum"],
+			"properties": {
+				"exclusiveMinimum": {
+					"type": "boolean"
+				}
+			}
+		},
+		"dependentSchemas.exclusiveMaximum": {
+			"$comment": "In draft-04, exclusiveMaximum is a boolean modifier that requires maximum to be present.",
+			"required": ["maximum"],
+			"properties": {
+				"exclusiveMaximum": {
+					"type": "boolean"
+				}
+			}
+		},
+		"dependentSchemas.id": {
+			"$comment": "Draft-04 used `id` as the identifier keyword; draft-06+ renamed it to $id. Same URL/local-ref rules apply.",
+			"properties": {
+				"id": {
+					"oneOf": [
+						{
+							"$ref": "#/$defs/safeIdUrl"
+						},
+						{
+							"$ref": "#/$defs/safeUrn"
+						},
+						{
+							"type": "string",
+							"maxLength": 1024,
+							"pattern": "^[a-zA-Z0-9_-]+$"
+						}
+					]
+				}
+			}
+		},
+		"schemaBase": {
+			"properties": {
+				"additionalItems": {
+					"$ref": "#/$defs/properties.additionalItems"
+				},
+				"additionalProperties": {
+					"$ref": "#/$defs/properties.additionalProperties"
+				},
+				"dependencies": false,
+				"items": {
+					"$ref": "#/$defs/properties.items"
+				},
+				"patternProperties": {
+					"$ref": "#/$defs/properties.patternProperties"
+				},
+				"properties": {
+					"$ref": "#/$defs/properties.properties"
+				},
+				"allOf": {
+					"$ref": "#/$defs/properties.allOf"
+				},
+				"anyOf": {
+					"$ref": "#/$defs/properties.anyOf"
+				},
+				"oneOf": {
+					"$ref": "#/$defs/properties.oneOf"
+				},
+				"type": {
+					"$ref": "#/$defs/properties.type"
+				},
+				"not": {
+					"$ref": "#/$defs/properties.not"
+				},
+				"default": {
+					"$ref": "#/$defs/properties.default"
+				},
+				"required": {
+					"$ref": "#/$defs/properties.required"
+				},
+				"$anchor": false,
+				"$recursiveRef": false,
+				"$recursiveAnchor": false,
+				"$dynamicRef": false,
+				"$dynamicAnchor": false,
+				"unevaluatedProperties": false,
+				"unevaluatedItems": false,
+				"dependentRequired": false,
+				"dependentSchemas": false,
+				"minContains": false,
+				"maxContains": false,
+				"prefixItems": false,
+				"contentSchema": false,
+				"$comment": false,
+				"if": false,
+				"then": false,
+				"else": false,
+				"contentMediaType": false,
+				"contentEncoding": false,
+				"readOnly": false,
+				"writeOnly": false,
+				"const": false,
+				"contains": false,
+				"propertyNames": false,
+				"examples": false,
+				"$vocabulary": false
+			},
+			"dependentRequired": {
+				"properties": ["required", "maxProperties"]
+			},
+			"dependentSchemas": {
+				"additionalProperties": {
+					"$ref": "#/$defs/dependentSchemas.additionalProperties"
+				},
+				"items": {
+					"$ref": "#/$defs/dependentSchemas.items"
+				},
+				"type": {
+					"$ref": "#/$defs/dependentSchemas.type"
+				},
+				"maximum": {
+					"$ref": "#/$defs/dependentSchemas.maximum"
+				},
+				"minimum": {
+					"$ref": "#/$defs/dependentSchemas.minimum"
+				},
+				"exclusiveMaximum": {
+					"$ref": "#/$defs/dependentSchemas.exclusiveMaximum"
+				},
+				"exclusiveMinimum": {
+					"$ref": "#/$defs/dependentSchemas.exclusiveMinimum"
+				},
+				"minItems": {
+					"$ref": "#/$defs/dependentSchemas.minItems"
+				},
+				"maxItems": {
+					"$ref": "#/$defs/dependentSchemas.maxItems"
+				},
+				"minLength": {
+					"$ref": "#/$defs/dependentSchemas.minLength"
+				},
+				"maxLength": {
+					"$ref": "#/$defs/dependentSchemas.maxLength"
+				},
+				"minProperties": {
+					"$ref": "#/$defs/dependentSchemas.minProperties"
+				},
+				"maxProperties": {
+					"$ref": "#/$defs/dependentSchemas.maxProperties"
+				},
+				"multipleOf": {
+					"$ref": "#/$defs/dependentSchemas.multipleOf"
+				},
+				"$ref": {
+					"$ref": "#/$defs/dependentSchemas.$ref"
+				},
+				"pattern": {
+					"$ref": "#/$defs/dependentSchemas.pattern"
+				},
+				"patternProperties": {
+					"$ref": "#/$defs/dependentSchemas.patternProperties"
+				},
+				"title": {
+					"$ref": "#/$defs/dependentSchemas.title"
+				},
+				"description": {
+					"$ref": "#/$defs/dependentSchemas.description"
+				},
+				"enum": {
+					"$ref": "#/$defs/dependentSchemas.enum"
+				},
+				"format": {
+					"$ref": "#/$defs/dependentSchemas.format"
+				},
+				"default": {
+					"$ref": "#/$defs/dependentSchemas.default"
+				}
+			},
+			"oneOf": [
+				{
+					"const": false
+				},
+				{
+					"type": "object",
+					"anyOf": [
+						{
+							"required": ["type"]
+						},
+						{
+							"required": ["$ref"]
+						},
+						{
+							"required": ["allOf"]
+						},
+						{
+							"required": ["anyOf"]
+						},
+						{
+							"required": ["oneOf"]
+						},
+						{
+							"required": ["definitions"]
+						}
+					]
+				}
+			]
+		},
+		"schemaRules": {
+			"$ref": "#/$defs/schemaBase",
+			"properties": {
+				"$schema": false,
+				"$id": false,
+				"$defs": false,
+				"definitions": false,
+				"id": false
+			}
+		}
+	},
+	"$ref": "#/$defs/schemaBase",
+	"properties": {
+		"$schema": {
+			"const": "https://json-schema.org/draft-04/schema"
+		},
+		"$id": false,
+		"id": {
+			"oneOf": [
+				{
+					"$ref": "#/$defs/safeIdUrl"
+				},
+				{
+					"$ref": "#/$defs/safeUrn"
+				},
+				{
+					"type": "string",
+					"maxLength": 1024,
+					"pattern": "^[a-zA-Z0-9_-]+$"
+				}
+			]
+		},
+		"$defs": false,
+		"definitions": {
+			"$ref": "#/$defs/properties.$defs"
+		}
+	},
+	"required": ["$schema", "id"]
+}

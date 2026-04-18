@@ -1,0 +1,120 @@
+[
+  {
+    "description": "2020-12 draft-specific keywords",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass minimal secure 2020-12 schema",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "maxProperties": 10,
+          "unevaluatedProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when using prefixItems",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "string",
+              "maxLength": 8,
+              "pattern": "^[a-z]+$"
+            }
+          ],
+          "maxItems": 10,
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when using $dynamicRef to a local fragment",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$dynamicRef": "#/$defs/name",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when using $dynamicAnchor",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$dynamicAnchor": "name",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $schema declares 2019-09",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "$id": "test",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when schema uses $ref alone (no type required)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "#/$defs/name"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when schema uses dependencies (banned by policy)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "maxProperties": 10,
+          "unevaluatedProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "dependencies": {
+            "name": [
+              "other"
+            ]
+          }
+        },
+        "valid": false
+      }
+    ]
+  }
+]
