@@ -1,7 +1,7 @@
 import test from "node:test";
 import Ajv from "ajv/dist/2020.js";
 import { Bench } from "tinybench";
-import schema from "./2020-12.json" with { type: "json" };
+import schema from "../2020-12.json" with { type: "json" };
 
 test("perf: schema validation benchmarks", async () => {
 	const ajv = new Ajv({ strictTypes: false });

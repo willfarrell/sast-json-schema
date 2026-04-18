@@ -1,11 +1,11 @@
 import test from "node:test";
 import Ajv from "ajv/dist/2020.js";
 import fc from "fast-check";
-import schema201909 from "./2019-09.json" with { type: "json" };
-import schema202012 from "./2020-12.json" with { type: "json" };
-import schemaDraft04 from "./draft-04.json" with { type: "json" };
-import schemaDraft06 from "./draft-06.json" with { type: "json" };
-import schemaDraft07 from "./draft-07.json" with { type: "json" };
+import schema201909 from "../2019-09.json" with { type: "json" };
+import schema202012 from "../2020-12.json" with { type: "json" };
+import schemaDraft04 from "../draft-04.json" with { type: "json" };
+import schemaDraft06 from "../draft-06.json" with { type: "json" };
+import schemaDraft07 from "../draft-07.json" with { type: "json" };
 
 const drafts = [
 	["2020-12", schema202012],
