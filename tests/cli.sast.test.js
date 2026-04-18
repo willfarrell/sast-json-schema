@@ -1,6 +1,6 @@
 import { ok, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
-import sast, { analyze, MAX_SCHEMA_SIZE } from "./cli.js";
+import sast, { analyze, MAX_SCHEMA_SIZE } from "../cli.js";
 
 test("sast should return a validate function", () => {
 	const validate = sast();

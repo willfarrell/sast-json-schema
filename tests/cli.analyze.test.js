@@ -1,7 +1,7 @@
 import { ok, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
-import schema202012 from "./2020-12.json" with { type: "json" };
-import { analyze, resolveSSRFRefs } from "./cli.js";
+import schema202012 from "../2020-12.json" with { type: "json" };
+import { analyze, resolveSSRFRefs } from "../cli.js";
 
 test("analyze should filter errors matching options.ignore by instancePath", async () => {
 	const schema = {

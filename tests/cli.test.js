@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
-const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+const cliPath = fileURLToPath(new URL("../cli.js", import.meta.url));
 
 const runCli = async (args, { cwd } = {}) => {
 	try {
@@ -31,6 +31,15 @@ describe("cli.", () => {
 		ok(r.stdout.includes("--format"));
 	});
 
+	test("--help documents exit codes", async () => {
+		const r = await runCli(["--help"]);
+		strictEqual(r.code, 0);
+		ok(r.stdout.includes("Exit codes"));
+		ok(/0\b.*no issues/i.test(r.stdout));
+		ok(/1\b.*issues/i.test(r.stdout));
+		ok(/2\b.*(usage|tool)/i.test(r.stdout));
+	});
+
 	test("--version prints a semver-looking string", async () => {
 		const r = await runCli(["--version"]);
 		strictEqual(r.code, 0);
@@ -49,6 +58,24 @@ describe("cli.", () => {
 		ok(r.stderr.includes("cannot read file"));
 	});
 
+	test("oversized file is rejected before being read", async () => {
+		const { mkdtemp, open } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const { MAX_SCHEMA_SIZE } = await import("../cli.js");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "oversize.json");
+		const fh = await open(path, "w");
+		try {
+			await fh.truncate(MAX_SCHEMA_SIZE + 1);
+		} finally {
+			await fh.close();
+		}
+		const r = await runCli(["--offline", path]);
+		strictEqual(r.code, 2);
+		ok(r.stderr.includes("exceeds"));
+	});
+
 	test("invalid JSON exits 2", async () => {
 		const { writeFile, mkdtemp } = await import("node:fs/promises");
 		const { tmpdir } = await import("node:os");
@@ -59,6 +86,19 @@ describe("cli.", () => {
 		const r = await runCli(["--offline", path]);
 		strictEqual(r.code, 2);
 		ok(r.stderr.includes("invalid JSON"));
+	});
+
+	test("invalid JSON error does not leak parser internals", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "bad.json");
+		await writeFile(path, "{not json");
+		const r = await runCli(["--offline", path]);
+		strictEqual(r.code, 2);
+		ok(!/position\s+\d+/i.test(r.stderr));
+		ok(!/line\s+\d+/i.test(r.stderr));
 	});
 
 	test("unsupported $schema exits 2", async () => {

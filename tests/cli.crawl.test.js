@@ -1,6 +1,6 @@
 import { ok, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
-import { crawlSchema } from "./cli.js";
+import { crawlSchema } from "../cli.js";
 
 describe("crawlSchema", () => {
 	test("should return empty result for null input", () => {
@@ -336,6 +336,33 @@ describe("crawlSchema", () => {
 			pattern: "^[a-z]{1,99999999999999999}$",
 		});
 		ok(r.errors.some((e) => e.message.includes("could not be parsed")));
+	});
+
+	test("ReDoS-vulnerable pattern reports reason: hitMaxScore", () => {
+		const r = crawlSchema({ pattern: "^(a+)+$" });
+		const err = r.errors.find((e) => e.keyword === "pattern");
+		ok(err, "expected a pattern error");
+		strictEqual(err.params.reason, "hitMaxScore");
+		ok(err.message.includes("vulnerable to ReDoS"));
+	});
+
+	test("step-exhaustion pattern reports reason: hitMaxSteps", () => {
+		const r = crawlSchema({
+			pattern: "^(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+$",
+		});
+		const err = r.errors.find((e) => e.keyword === "pattern");
+		ok(err, "expected a pattern error");
+		strictEqual(err.params.reason, "hitMaxSteps");
+		ok(err.message.includes("step limit"));
+	});
+
+	test("unparseable pattern reports reason: parseError", () => {
+		const r = crawlSchema({
+			pattern: "^[a-z]{1,99999999999999999}$",
+		});
+		const err = r.errors.find((e) => e.keyword === "pattern");
+		ok(err, "expected a pattern error");
+		strictEqual(err.params.reason, "parseError");
 	});
 
 	// --- $ref collection ---

@@ -1,6 +1,6 @@
 import { strictEqual } from "node:assert";
 import { describe, test } from "node:test";
-import { isPrivateIP } from "./cli.js";
+import { isPrivateIP } from "../cli.js";
 
 describe("isPrivateIP", () => {
 	const privateCases = [
