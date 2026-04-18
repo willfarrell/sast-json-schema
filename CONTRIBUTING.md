@@ -11,6 +11,8 @@ npm install
 npm test
 ```
 
+The per-draft meta-schemas at the repo root (`2020-12.json`, `2019-09.json`, etc.) are generated from `src/$defs.json` + `src/<draft>.json` by `bin/build.js`. `npm test` runs `npm run build` first via the `pretest` hook, but if you invoke tests directly (e.g. `node --test ./cli.test.js`) after editing anything under `src/`, run `npm run build` manually so the built artifacts are up to date.
+
 ## Committing
 
 Ensure git commits meet the following FLOSS Best Practices:

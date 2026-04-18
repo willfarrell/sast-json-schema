@@ -779,7 +779,7 @@
         "valid": true
       },
       {
-        "description": "Should pass when pattern contains negative lookahead (?!...)",
+        "description": "Should fail when pattern contains negative lookahead (?!...)",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
@@ -787,10 +787,10 @@
           "pattern": "^(?!admin)[a-z]+$",
           "maxLength": 100
         },
-        "valid": true
+        "valid": false
       },
       {
-        "description": "Should pass when negative lookahead contains alternation",
+        "description": "Should fail when negative lookahead contains alternation",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
@@ -798,10 +798,10 @@
           "pattern": "^(?!admin|root)[a-z]+$",
           "maxLength": 100
         },
-        "valid": true
+        "valid": false
       },
       {
-        "description": "Should pass when negative lookbehind contains alternation",
+        "description": "Should fail when negative lookbehind contains alternation",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
@@ -809,10 +809,10 @@
           "pattern": "^[a-z]+(?<!admin|root)$",
           "maxLength": 100
         },
-        "valid": true
+        "valid": false
       },
       {
-        "description": "Should pass when pattern contains negative lookbehind (?<!...)",
+        "description": "Should fail when pattern contains negative lookbehind (?<!...)",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
@@ -820,7 +820,7 @@
           "pattern": "^[a-z]+(?<!admin)$",
           "maxLength": 100
         },
-        "valid": true
+        "valid": false
       },
       {
         "description": "Should fail when pattern contains bare alternation (breaks anchoring)",

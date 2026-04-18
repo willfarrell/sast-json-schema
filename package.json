@@ -4,7 +4,7 @@
 	"description": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
 	"type": "module",
 	"engines": {
-		"node": ">=22"
+		"node": ">=24"
 	},
 	"bin": {
 		"sast-json-schema": "./cli.js"
@@ -26,8 +26,6 @@
 		"2019-09.json",
 		"2020-12.json",
 		"src/$defs.json",
-		"lib/crawl.js",
-		"lib/ssrf.js",
 		"cli.js",
 		"SECURITY.md"
 	],

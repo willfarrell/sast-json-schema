@@ -48,11 +48,11 @@ test("fuzz: SAST-accepted schemas compile under strictTypes:true", () => {
 				}
 			},
 		),
-		{ numRuns: 100 },
+		{ numRuns: 1000 },
 	);
 });
 
-const runAcrossDrafts = (title, arbitrary, body, numRuns = 200) => {
+const runAcrossDrafts = (title, arbitrary, body, numRuns = 1000) => {
 	for (const [name, validate] of validators) {
 		test(`fuzz[${name}]: ${title}`, () => {
 			fc.assert(
@@ -100,7 +100,7 @@ test("fuzz: schemas valid across drafts remain valid regardless of $schema heade
 				}
 			},
 		),
-		{ numRuns: 100 },
+		{ numRuns: 1000 },
 	);
 });
 

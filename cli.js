@@ -1,20 +1,17 @@
 #!/usr/bin/env node
 // Copyright 2026 will Farrell, and sast-json-schema contributors.
 // SPDX-License-Identifier: MIT
-import { readFile, writeFile } from "node:fs/promises";
+import { lookup as dnsLookup } from "node:dns/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import Ajv from "ajv/dist/2020.js";
+import { isSafePattern } from "redos-detector";
 import schema201909 from "./2019-09.json" with { type: "json" };
 import schema202012 from "./2020-12.json" with { type: "json" };
 import schemaDraft04 from "./draft-04.json" with { type: "json" };
 import schemaDraft06 from "./draft-06.json" with { type: "json" };
 import schemaDraft07 from "./draft-07.json" with { type: "json" };
-import { crawlSchema, MAX_DEPTH } from "./lib/crawl.js";
-import { resolveSSRFRefs } from "./lib/ssrf.js";
-
-export { crawlSchema, MAX_DEPTH } from "./lib/crawl.js";
-export { isPrivateIP, resolveSSRFRefs } from "./lib/ssrf.js";
 
 const defaultOptions = {
 	strictTypes: false,
@@ -22,6 +19,9 @@ const defaultOptions = {
 };
 
 const DEFAULT_VERSION = "2020-12";
+
+export const DNS_TIMEOUT_MS = 5_000;
+export const DNS_CONCURRENCY = 10;
 
 // Pre-compiled SAST meta-schema validators, keyed by draft version. Compiled
 // once at module load so every sast() / analyze() call reuses the same
@@ -39,23 +39,26 @@ const builtSchemas = new Map(
 	]),
 );
 
-// Known $schema URLs mapped to their draft version.
+// Known $schema URLs mapped to their draft version. URLs are stored in
+// normalised form (no protocol, no trailing #) so callers can pass any
+// http/https variant with or without a fragment.
 const knownSchemaUrls = new Map([
-	["https://json-schema.org/draft/2020-12/schema", "2020-12"],
-	["https://json-schema.org/draft/2019-09/schema", "2019-09"],
-	["http://json-schema.org/draft-07/schema#", "draft-07"],
-	["http://json-schema.org/draft-07/schema", "draft-07"],
-	["http://json-schema.org/draft-06/schema#", "draft-06"],
-	["http://json-schema.org/draft-06/schema", "draft-06"],
-	["http://json-schema.org/draft-04/schema#", "draft-04"],
-	["http://json-schema.org/draft-04/schema", "draft-04"],
+	["json-schema.org/draft/2020-12/schema", "2020-12"],
+	["json-schema.org/draft/2019-09/schema", "2019-09"],
+	["json-schema.org/draft-07/schema", "draft-07"],
+	["json-schema.org/draft-06/schema", "draft-06"],
+	["json-schema.org/draft-04/schema", "draft-04"],
 ]);
 
 // Maps a user schema's $schema URL to the matching draft version.
 const schemaVersion = (url) => {
 	if (!url) return DEFAULT_VERSION;
-	return knownSchemaUrls.get(url);
+	const normalized = url.replace(/^https?:\/\//, "").replace(/#$/, "");
+	return knownSchemaUrls.get(normalized);
 };
+
+export const MAX_DEPTH = 32;
+export const MAX_SCHEMA_SIZE = 64 * 1024 * 1024; // 64 MiB
 
 // Returns the pre-compiled SAST validator for the draft declared by
 // `schema.$schema`. Defaults to 2020-12 when $schema is absent.
@@ -69,6 +72,385 @@ export const sast = (schema) => {
 };
 
 export default sast;
+
+// Checks whether a numeric schema's min/max bounds describe an impossible
+// range. Returns an AJV-style error object when they do, or null otherwise.
+const checkNumericRange = (current, path) => {
+	const hasMin =
+		Object.hasOwn(current, "minimum") &&
+		typeof current.minimum === "number" &&
+		Number.isFinite(current.minimum);
+	const hasExMin =
+		Object.hasOwn(current, "exclusiveMinimum") &&
+		typeof current.exclusiveMinimum === "number" &&
+		Number.isFinite(current.exclusiveMinimum);
+	const hasMax =
+		Object.hasOwn(current, "maximum") &&
+		typeof current.maximum === "number" &&
+		Number.isFinite(current.maximum);
+	const hasExMax =
+		Object.hasOwn(current, "exclusiveMaximum") &&
+		typeof current.exclusiveMaximum === "number" &&
+		Number.isFinite(current.exclusiveMaximum);
+
+	if (!(hasMin || hasExMin) || !(hasMax || hasExMax)) return null;
+
+	let effectiveMin;
+	let minIsExclusive = false;
+	if (hasMin && hasExMin) {
+		if (current.exclusiveMinimum >= current.minimum) {
+			effectiveMin = current.exclusiveMinimum;
+			minIsExclusive = true;
+		} else {
+			effectiveMin = current.minimum;
+		}
+	} else if (hasExMin) {
+		effectiveMin = current.exclusiveMinimum;
+		minIsExclusive = true;
+	} else {
+		effectiveMin = current.minimum;
+	}
+
+	let effectiveMax;
+	let maxIsExclusive = false;
+	if (hasMax && hasExMax) {
+		if (current.exclusiveMaximum <= current.maximum) {
+			effectiveMax = current.exclusiveMaximum;
+			maxIsExclusive = true;
+		} else {
+			effectiveMax = current.maximum;
+		}
+	} else if (hasExMax) {
+		effectiveMax = current.exclusiveMaximum;
+		maxIsExclusive = true;
+	} else {
+		effectiveMax = current.maximum;
+	}
+
+	const impossible =
+		minIsExclusive || maxIsExclusive
+			? !(effectiveMin < effectiveMax)
+			: effectiveMin > effectiveMax;
+
+	if (!impossible) return null;
+
+	const keyword = maxIsExclusive
+		? "exclusiveMaximum"
+		: minIsExclusive
+			? "exclusiveMinimum"
+			: "minimum";
+
+	return {
+		instancePath: path,
+		schemaPath: `#/${keyword}`,
+		keyword,
+		params: {
+			...(hasMin && { minimum: current.minimum }),
+			...(hasExMin && { exclusiveMinimum: current.exclusiveMinimum }),
+			...(hasMax && { maximum: current.maximum }),
+			...(hasExMax && { exclusiveMaximum: current.exclusiveMaximum }),
+		},
+		message: "numeric range is unsatisfiable",
+	};
+};
+
+// RFC 6901 JSON Pointer token escaping: ~ → ~0, / → ~1.
+// https://datatracker.ietf.org/doc/html/rfc6901#section-3
+const escapeJsonPointer = (token) =>
+	token.replace(/~/g, "~0").replace(/\//g, "~1");
+
+// Single-pass crawler that records: max depth, range/length inconsistencies,
+// ReDoS patterns, and remote $ref URLs (for later SSRF resolution).
+// Depth semantics: each object-valued key counts as one level, so a schema
+// `{properties: {a: {properties: {b: {...}}}}}` reaches depth 5 (root,
+// properties, a, properties, b). With MAX_DEPTH=32 this corresponds to roughly
+// 16 levels of real schema nesting.
+export const crawlSchema = (obj, maxDepth = MAX_DEPTH) => {
+	const result = { depth: 0, depthExceeded: false, errors: [], refs: [] };
+	if (typeof obj !== "object" || obj === null) return result;
+
+	const visited = new WeakSet();
+	visited.add(obj);
+	result.depth = 1;
+	const stack = [[obj, "", 1]];
+
+	while (stack.length > 0) {
+		const [current, path, currentDepth] = stack.pop();
+
+		const currentType = current.type;
+		const isType = (t) =>
+			currentType === t ||
+			(Array.isArray(currentType) && currentType.includes(t));
+
+		if (
+			isType("string") &&
+			Object.hasOwn(current, "minLength") &&
+			Object.hasOwn(current, "maxLength") &&
+			current.minLength > current.maxLength
+		) {
+			result.errors.push({
+				instancePath: path,
+				schemaPath: "#/minLength",
+				keyword: "minLength",
+				params: {
+					minLength: current.minLength,
+					maxLength: current.maxLength,
+				},
+				message: "minLength must be less than or equal to maxLength",
+			});
+		}
+
+		if (isType("integer") || isType("number")) {
+			const rangeError = checkNumericRange(current, path);
+			if (rangeError) result.errors.push(rangeError);
+		}
+
+		if (
+			isType("array") &&
+			Object.hasOwn(current, "minItems") &&
+			Object.hasOwn(current, "maxItems") &&
+			current.minItems > current.maxItems
+		) {
+			result.errors.push({
+				instancePath: path,
+				schemaPath: "#/minItems",
+				keyword: "minItems",
+				params: {
+					minItems: current.minItems,
+					maxItems: current.maxItems,
+				},
+				message: "minItems must be less than or equal to maxItems",
+			});
+		}
+
+		if (
+			isType("array") &&
+			Object.hasOwn(current, "minContains") &&
+			Object.hasOwn(current, "maxContains") &&
+			current.minContains > current.maxContains
+		) {
+			result.errors.push({
+				instancePath: path,
+				schemaPath: "#/minContains",
+				keyword: "minContains",
+				params: {
+					minContains: current.minContains,
+					maxContains: current.maxContains,
+				},
+				message: "minContains must be less than or equal to maxContains",
+			});
+		}
+
+		if (
+			isType("object") &&
+			Object.hasOwn(current, "minProperties") &&
+			Object.hasOwn(current, "maxProperties") &&
+			current.minProperties > current.maxProperties
+		) {
+			result.errors.push({
+				instancePath: path,
+				schemaPath: "#/minProperties",
+				keyword: "minProperties",
+				params: {
+					minProperties: current.minProperties,
+					maxProperties: current.maxProperties,
+				},
+				message: "minProperties must be less than or equal to maxProperties",
+			});
+		}
+
+		if (
+			Object.hasOwn(current, "pattern") &&
+			typeof current.pattern === "string"
+		) {
+			try {
+				const patternResult = isSafePattern(current.pattern);
+				if (!patternResult.safe) {
+					result.errors.push({
+						instancePath: `${path}/pattern`,
+						schemaPath: "#/redos",
+						keyword: "pattern",
+						params: { pattern: current.pattern },
+						message: "pattern is vulnerable to ReDoS",
+					});
+				}
+			} catch {
+				result.errors.push({
+					instancePath: `${path}/pattern`,
+					schemaPath: "#/redos",
+					keyword: "pattern",
+					params: { pattern: current.pattern },
+					message: "pattern could not be parsed for ReDoS analysis",
+				});
+			}
+		}
+
+		if (
+			Object.hasOwn(current, "$ref") &&
+			typeof current.$ref === "string" &&
+			!current.$ref.startsWith("#")
+		) {
+			try {
+				const url = new URL(current.$ref);
+				if (url.hostname) {
+					result.refs.push({
+						hostname: url.hostname,
+						ref: current.$ref,
+						path: `${path}/$ref`,
+					});
+				}
+			} catch {
+				// not a valid URL, skip
+			}
+		}
+
+		for (const key in current) {
+			if (Object.hasOwn(current, key)) {
+				const value = current[key];
+				if (
+					typeof value === "object" &&
+					value !== null &&
+					!visited.has(value)
+				) {
+					visited.add(value);
+					const newDepth = currentDepth + 1;
+					if (newDepth > result.depth) result.depth = newDepth;
+					if (result.depth > maxDepth) {
+						result.depthExceeded = true;
+						return result;
+					}
+					stack.push([value, `${path}/${escapeJsonPointer(key)}`, newDepth]);
+				}
+			}
+		}
+	}
+
+	return result;
+};
+
+// RFC 1918 + loopback + link-local + CGN + TEST-NETs + multicast + reserved.
+// Used to block $ref URLs whose hostname resolves to an internal/private IP.
+export const isPrivateIP = (ip) => {
+	const parts = ip.split(".").map(Number);
+	if (
+		parts.length === 4 &&
+		parts.every((p) => Number.isInteger(p) && p >= 0 && p <= 255)
+	) {
+		const [a, b] = parts;
+		if (a === 0) return true; // 0.0.0.0/8 "this" network
+		if (a === 10) return true; // 10.0.0.0/8 private
+		if (a === 127) return true; // 127.0.0.0/8 loopback
+		if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 CGN
+		if (a === 169 && b === 254) return true; // 169.254.0.0/16 link-local
+		if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12 private
+		if (a === 192 && b === 0 && parts[2] === 0) return true; // 192.0.0.0/24 IETF
+		if (a === 192 && b === 0 && parts[2] === 2) return true; // 192.0.2.0/24 TEST-NET-1
+		if (a === 192 && b === 168) return true; // 192.168.0.0/16 private
+		if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15 benchmark
+		if (a === 198 && b === 51 && parts[2] === 100) return true; // 198.51.100.0/24 TEST-NET-2
+		if (a === 203 && b === 0 && parts[2] === 113) return true; // 203.0.113.0/24 TEST-NET-3
+		if (a >= 224 && a <= 239) return true; // 224.0.0.0/4 multicast
+		if (a >= 240) return true; // 240.0.0.0/4 reserved + 255.255.255.255 broadcast
+	}
+
+	// Normalize IPv6: expand :: and remove leading zeros for consistent matching
+	const lower = ip.toLowerCase();
+	if (lower.includes(":")) {
+		// Strip IPv6 zone ID (e.g. %eth0) before further parsing
+		const zoneIdx = lower.indexOf("%");
+		const addr = zoneIdx !== -1 ? lower.slice(0, zoneIdx) : lower;
+
+		// Handle IPv4-mapped forms with dotted notation (e.g. ::ffff:127.0.0.1)
+		// before general expansion since the dotted part counts as 2 groups
+		const lastColon = addr.lastIndexOf(":");
+		const tail = addr.slice(lastColon + 1);
+		if (tail.includes(".")) {
+			// Recursively check the IPv4 portion
+			return isPrivateIP(tail);
+		}
+
+		// Expand :: notation to full 8-group form
+		let groups;
+		if (addr.includes("::")) {
+			const [left, right] = addr.split("::");
+			const leftGroups = left ? left.split(":") : [];
+			const rightGroups = right ? right.split(":") : [];
+			const missing = 8 - leftGroups.length - rightGroups.length;
+			groups = [...leftGroups, ...Array(missing).fill("0"), ...rightGroups].map(
+				(g) => g.replace(/^0+(?=.)/, ""),
+			);
+		} else {
+			groups = addr.split(":").map((g) => g.replace(/^0+(?=.)/, ""));
+		}
+		if (groups.length === 8) {
+			const normalized = groups.join(":");
+			if (normalized === "0:0:0:0:0:0:0:0" || normalized === "0:0:0:0:0:0:0:1")
+				return true;
+			if (groups[0].startsWith("fc") || groups[0].startsWith("fd")) return true; // unique local
+			if (groups[0].startsWith("fe80")) return true; // link-local
+			if (groups[0].startsWith("ff")) return true; // multicast
+			// IPv4-mapped with hex groups (e.g. 0:0:0:0:0:ffff:7f00:1)
+			if (normalized.startsWith("0:0:0:0:0:ffff:")) {
+				const hi = Number.parseInt(groups[6], 16);
+				const lo = Number.parseInt(groups[7], 16);
+				const mappedIP = `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+				return isPrivateIP(mappedIP);
+			}
+		}
+	}
+	return false;
+};
+
+const lookupHostname = async (hostname, entries, timeoutMs) => {
+	try {
+		const results = await dnsLookup(hostname, {
+			all: true,
+			signal: AbortSignal.timeout(timeoutMs),
+		});
+		const privateAddr = results.find((r) => isPrivateIP(r.address));
+		if (!privateAddr) return [];
+		return entries.map(({ ref, path }) => ({
+			instancePath: path,
+			schemaPath: "#/ssrf",
+			keyword: "ssrf",
+			params: { ref, hostname, resolvedIP: privateAddr.address },
+			message: `$ref hostname "${hostname}" resolves to private IP ${privateAddr.address}`,
+		}));
+	} catch {
+		return entries.map(({ ref, path }) => ({
+			instancePath: path,
+			schemaPath: "#/ssrf",
+			keyword: "ssrf",
+			params: { ref, hostname },
+			message: `$ref hostname "${hostname}" does not resolve`,
+		}));
+	}
+};
+
+export const resolveSSRFRefs = async (refs, options = {}) => {
+	const timeoutMs = options.dnsTimeoutMs ?? DNS_TIMEOUT_MS;
+	const concurrency = options.dnsConcurrency ?? DNS_CONCURRENCY;
+	const hostnameMap = new Map();
+	for (const entry of refs) {
+		if (!hostnameMap.has(entry.hostname)) {
+			hostnameMap.set(entry.hostname, []);
+		}
+		hostnameMap.get(entry.hostname).push(entry);
+	}
+
+	const results = [];
+	const batches = [...hostnameMap.entries()];
+	for (let i = 0; i < batches.length; i += concurrency) {
+		const batch = batches.slice(i, i + concurrency);
+		const batchResults = await Promise.all(
+			batch.map(([hostname, entries]) =>
+				lookupHostname(hostname, entries, timeoutMs),
+			),
+		);
+		results.push(...batchResults);
+	}
+	return results.flat();
+};
 
 const resolveInstancePath = (obj, pointer) => {
 	if (typeof obj !== "object" || obj === null) return undefined;
@@ -89,23 +471,23 @@ const resolveInstancePath = (obj, pointer) => {
 // Runs a full SAST analysis on `schema`. Returns an array of AJV-style error
 // objects. Never touches the filesystem, never prints, never exits the process.
 export const analyze = async (schema, options = {}) => {
-	if (
-		options.overrideMaxDepth != null &&
-		Number.isNaN(Number(options.overrideMaxDepth))
-	) {
-		throw new TypeError("overrideMaxDepth must be a number");
+	if (options.overrideMaxDepth != null) {
+		const n = Number(options.overrideMaxDepth);
+		if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+			throw new TypeError("overrideMaxDepth must be a non-negative integer");
+		}
 	}
-	if (
-		options.overrideMaxItems != null &&
-		Number.isNaN(Number(options.overrideMaxItems))
-	) {
-		throw new TypeError("overrideMaxItems must be a number");
+	if (options.overrideMaxItems != null) {
+		const n = Number(options.overrideMaxItems);
+		if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+			throw new TypeError("overrideMaxItems must be a non-negative integer");
+		}
 	}
-	if (
-		options.overrideMaxProperties != null &&
-		Number.isNaN(Number(options.overrideMaxProperties))
-	) {
-		throw new TypeError("overrideMaxProperties must be a number");
+	if (options.overrideMaxProperties != null) {
+		const n = Number(options.overrideMaxProperties);
+		if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+			throw new TypeError("overrideMaxProperties must be a non-negative integer");
+		}
 	}
 
 	const maxDepth =
@@ -133,8 +515,13 @@ export const analyze = async (schema, options = {}) => {
 	if (validate.errors) errors.push(...validate.errors);
 	errors.push(...crawl.errors);
 
-	const ssrfErrors = await resolveSSRFRefs(crawl.refs);
-	errors.push(...ssrfErrors);
+	if (!options.offline) {
+		const ssrfErrors = await resolveSSRFRefs(crawl.refs, {
+			dnsTimeoutMs: options.dnsTimeoutMs,
+			dnsConcurrency: options.dnsConcurrency,
+		});
+		errors.push(...ssrfErrors);
+	}
 
 	if (options.overrideMaxItems != null && errors.length) {
 		const limit = Number(options.overrideMaxItems);
@@ -172,29 +559,38 @@ export const analyze = async (schema, options = {}) => {
 };
 
 // --- CLI entrypoint ---
-if (process.argv[1] === import.meta.filename) {
-	const { values, positionals } = parseArgs({
-		allowPositionals: true,
-		options: {
-			output: { type: "string", short: "o" },
-			"override-max-items": { type: "string" },
-			"override-max-depth": { type: "string" },
-			"override-max-properties": { type: "string" },
-			ignore: { type: "string", multiple: true },
-			version: { type: "boolean", short: "v", default: false },
-			help: { type: "boolean", short: "h", default: false },
-		},
-	});
+if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
+	let values;
+	let positionals;
+	try {
+		({ values, positionals } = parseArgs({
+			allowPositionals: true,
+			options: {
+				"override-max-items": { type: "string" },
+				"override-max-depth": { type: "string" },
+				"override-max-properties": { type: "string" },
+				ignore: { type: "string", multiple: true },
+				offline: { type: "boolean", default: false },
+				format: { type: "string", default: "human" },
+				version: { type: "boolean", short: "v", default: false },
+				help: { type: "boolean", short: "h", default: false },
+			},
+		}));
+	} catch (err) {
+		console.error(`Error: ${err.message}`);
+		process.exit(2);
+	}
 
 	if (values.help) {
 		console.log(`Usage: sast-json-schema [options] <file>
 
 Options:
-  -o, --output <path>              Write issues to JSON file
   --override-max-items <n>         Override max items limit (default: 1024)
   --override-max-depth <n>         Override max depth limit (default: 32)
   --override-max-properties <n>    Override max properties limit (default: 1024)
   --ignore <instancePath>          Suppress errors by instancePath or instancePath:keyword (repeatable)
+  --offline                        Skip SSRF DNS resolution for remote $ref URLs
+  --format <human|json>            Output format (default: human)
   -v, --version                    Show version
   -h, --help                       Show this help`);
 		process.exit(0);
@@ -208,10 +604,17 @@ Options:
 		process.exit(0);
 	}
 
+	if (values.format !== "human" && values.format !== "json") {
+		console.error(
+			`Error: --format must be "human" or "json", got "${values.format}"`,
+		);
+		process.exit(2);
+	}
+
 	const input = positionals[0];
 	if (!input) {
 		console.error("Error: missing required argument <file>");
-		process.exit(1);
+		process.exit(2);
 	}
 
 	const filePath = resolve(input);
@@ -220,17 +623,23 @@ Options:
 		content = await readFile(filePath, "utf8");
 	} catch (err) {
 		console.error(`Error: cannot read file "${input}": ${err.message}`);
-		process.exit(1);
+		process.exit(2);
+	}
+	if (content.length > MAX_SCHEMA_SIZE) {
+		console.error(
+			`Error: schema file exceeds ${MAX_SCHEMA_SIZE} byte limit: "${input}"`,
+		);
+		process.exit(2);
 	}
 	let schema;
 	try {
 		schema = JSON.parse(content);
 	} catch (err) {
 		console.error(`Error: invalid JSON in "${input}": ${err.message}`);
-		process.exit(1);
+		process.exit(2);
 	}
 
-	const options = {};
+	const options = { offline: values.offline };
 	if (values["override-max-items"] != null)
 		options.overrideMaxItems = values["override-max-items"];
 	if (values["override-max-depth"] != null)
@@ -239,16 +648,25 @@ Options:
 		options.overrideMaxProperties = values["override-max-properties"];
 	if (values.ignore) options.ignore = values.ignore;
 
-	const errors = await analyze(schema, options);
+	let errors;
+	try {
+		errors = await analyze(schema, options);
+	} catch (err) {
+		console.error(`Error: ${err.message}`);
+		process.exit(2);
+	}
 
-	if (errors.length) {
-		if (values.output) {
-			await writeFile(values.output, JSON.stringify(errors, null, 2), "utf8");
-		} else {
-			console.log(input, "has issues", JSON.stringify(errors, null, 2));
+	if (values.format === "json") {
+		process.stdout.write(`${JSON.stringify(errors)}\n`);
+		if (errors.length) {
+			console.error(`${input} has ${errors.length} issue(s)`);
+			process.exit(1);
 		}
+	} else if (errors.length) {
+		console.log(`${input} has issues`);
+		console.log(JSON.stringify(errors, null, 2));
 		process.exit(1);
 	} else {
-		console.log(input, "has no issues");
+		console.log(`${input} has no issues`);
 	}
 }

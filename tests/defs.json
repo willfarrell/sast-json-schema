@@ -355,13 +355,13 @@
         "valid": true
       },
       {
-        "description": "Should pass when $ref local path contains dot segments (valid JSON Pointer key, not traversal)",
+        "description": "Should fail when $ref local path contains double-dot segments (defensive: block traversal-like patterns)",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
           "$ref": "#/../../../etc/passwd"
         },
-        "valid": true
+        "valid": false
       },
       {
         "description": "Should fail when $ref targets 172.31.x.x (SSRF RFC1918 upper range)",
@@ -1155,6 +1155,130 @@
           "$id": "test",
           "$recursiveAnchor": false,
           "type": "null"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "safeUrl edge cases",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $ref is a valid HTTPS URL",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example.com/schemas/user.json"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref URL contains path traversal (/../)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example.com/schemas/../secret.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL contains double-slash in path",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example.com//schemas/user.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL has double-dot in hostname",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://example..com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL hostname starts with hyphen",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://-example.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL targets localhost",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://localhost/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL targets 127.x private IP",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://127.0.0.1/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL targets 10.x private IP",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://10.0.0.1/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref URL targets 192.168.x private IP",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://192.168.1.1/schema.json"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "safeLocalRef edge cases",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $ref is a normal local JSON Pointer",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "properties": {
+            "a": { "$ref": "#/$defs/name" }
+          },
+          "$defs": {
+            "name": { "type": "string", "maxLength": 100, "pattern": "^[a-z]+$" }
+          },
+          "required": ["a"],
+          "unevaluatedProperties": false,
+          "maxProperties": 5
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when local $ref contains path traversal (..)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "#/$defs/../secret"
         },
         "valid": false
       }

@@ -32,6 +32,14 @@
 - Ensure `arrays` have defined properties and maxLength.
 - Ensure `object` have defined properties and maxProperties when needed.
 
+## Installation
+
+Requires **Node.js >=24**.
+
+```bash
+npm install sast-json-schema
+```
+
 ## How to run
 
 ### Manually
@@ -56,7 +64,7 @@ if (!isSchemaSecure(schema)) {
 }
 ```
 
-Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. Each meta-schema is identified by a `urn:sast-json-schema:<draft>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
+Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<draft>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
 
 ### CLI
 
@@ -65,11 +73,22 @@ npx sast-json-schema path/to/schema.json
 ```
 
 Options:
-- `-o, --output <path>` — Write issues to JSON file
 - `--override-max-items <n>` — Override max items limit (default: 1024)
 - `--override-max-depth <n>` — Override max depth limit (default: 32)
 - `--override-max-properties <n>` — Override max properties limit (default: 1024)
-- `--ignore <instancePath>` — Suppress errors by instancePath or instancePath:keyword (repeatable)
+- `--ignore <instancePath>` — Suppress errors by instancePath or instancePath:keyword (repeatable). Paths use [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901) JSON Pointer encoding (`~` → `~0`, `/` → `~1`)
+- `--offline` — Skip SSRF DNS resolution for remote `$ref` URLs (useful in airgapped CI)
+- `--format <human|json>` — Output format. `json` emits a JSON array of error objects on stdout; `human` is the default
+- `-v, --version` — Show version
+- `-h, --help` — Show this help
+
+#### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0`  | No issues found |
+| `1`  | Schema has security issues |
+| `2`  | Usage/tool error (bad args, unreadable file, invalid JSON, unsupported `$schema`) |
 
 Also available via [`ajv-cmd`](https://github.com/willfarrell/ajv-cmd):
 
@@ -123,6 +142,37 @@ The following requirements should be considered when writing JSON Schemas used f
 - **`contentMediaType` does not flag XSS-risky media types.** The meta-schema validates that `contentMediaType` follows IANA format ([RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)) but does not warn about types whose content can execute scripts when rendered, such as `text/html`, `application/xhtml+xml`, or `image/svg+xml`. If your application renders content based on this annotation, ensure it is sanitized to prevent XSS.
 - **`$ref: "#"` (self-reference) is rejected.** The meta-schema requires `$ref` values to have at least one character after `#`. Bare self-references (`$ref: "#"`) are blocked to prevent infinite recursion in validators. If you need a self-referencing schema, use a named `$defs` entry and reference it explicitly.
 - **`format: "regex"` does not validate regex safety.** A schema using `format: "regex"` validates that input strings are syntactically valid regular expressions, but the meta-schema does not ensure those regex strings are safe from ReDoS. If your application compiles user-provided regex strings, use runtime ReDoS checking on the input. i.e. JavaScript: `redos-detector`.
+- **SSRF detection requires DNS and network access.** `analyze()` / the CLI perform a DNS lookup (default 5s timeout, 10 concurrent hostnames) for every non-local `$ref`. In airgapped environments every remote `$ref` will be reported as "does not resolve" — pass `--offline` (or `options.offline = true`) to skip the lookup entirely, or tune `options.dnsTimeoutMs` / `options.dnsConcurrency` for the library API.
+- **Union-type `const` / `enum` restricted to primitives.** When `type` is an array (e.g. `["string", "null"]`), `const` and `enum` values are constrained to primitive types (`string`, `number`, `integer`, `boolean`, `null`) to prevent type-confusion bypasses via complex structured values.
+- **`dependencies` keyword is rejected in every draft.** The draft-04-era `dependencies` keyword conflates "require these property names" with "apply this subschema" and is hard to reason about securely. Use `required` + `dependentRequired` / `dependentSchemas` (draft 2019-09+) where available. Draft-04 schemas that declare `dependencies` are rejected by design.
+
+## Supported keywords per draft
+
+All meta-schemas reject keywords not listed in their respective JSON Schema spec (e.g. draft-04 rejects `const` because it was introduced in draft-06). Keywords that ARE in a given spec but are rejected here on security grounds are flagged below.
+
+| Keyword                | draft-04 | draft-06 | draft-07 | 2019-09 | 2020-12 | Notes |
+|------------------------|:-:|:-:|:-:|:-:|:-:|---|
+| `type`, `enum`, `not`  | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `allOf`/`anyOf`/`oneOf`| ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `$ref`                 | ✓ | ✓ | ✓ | ✓ | ✓ | Restricted to local `#…` or HTTPS; SSRF-checked |
+| `$id` / `id`           | ✓ | ✓ | ✓ | ✓ | ✓ | HTTPS URL, URN, or plain name |
+| `definitions`          | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `$defs`                | — | — | — | ✓ | ✓ | |
+| `title`, `description`, `default` | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `const`                | — | ✓ | ✓ | ✓ | ✓ | Type-locked to declared `type` |
+| `contains`             | — | ✓ | ✓ | ✓ | ✓ | Requires `maxContains` + `uniqueItems` |
+| `propertyNames`        | — | ✓ | ✓ | ✓ | ✓ | |
+| `if`/`then`/`else`     | — | — | ✓ | ✓ | ✓ | |
+| `contentMediaType`, `contentEncoding` | — | — | ✓ | ✓ | ✓ | Allow-listed per RFC 6838 / RFC-standard |
+| `contentSchema`        | — | — | — | ✓ | ✓ | |
+| `readOnly` / `writeOnly` | — | **✗** | ✓ | ✓ | ✓ | Rejected in draft-06 (annotation-only, misleading for strictness); accepted but ignored later |
+| `dependencies`         | **✗** | **✗** | **✗** | — | — | Rejected; use `dependentRequired` / `dependentSchemas` (2019-09+) or refactor |
+| `dependentRequired`    | — | — | — | ✓ | ✓ | |
+| `dependentSchemas`     | — | — | — | ✓ | ✓ | |
+| `prefixItems`          | — | — | — | — | ✓ | |
+| `unevaluatedProperties`/`unevaluatedItems` | — | — | — | ✓ | ✓ | Required for object/array strictness |
+
+Legend: ✓ supported · **✗** rejected on security grounds · — not in spec for that draft.
 
 ## Sources
 

@@ -192,6 +192,18 @@
 				}
 			},
 			{
+				"$comment": "Reject negative lookahead: (?!...)",
+				"not": {
+					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?!"
+				}
+			},
+			{
+				"$comment": "Reject negative lookbehind: (?<!...)",
+				"not": {
+					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?<!"
+				}
+			},
+			{
 				"$comment": "Reject overlapping quantifiers: identical adjacent atoms with unbounded quantifiers cause O(n²) backtracking (e.g. [a-z]+[a-z]+, \\d+\\d+, a+a+)",
 				"not": {
 					"pattern": "(\\[[^\\]]+\\]|\\\\.|.)[+*]\\1[+*]"
@@ -232,6 +244,7 @@
 	"safeLocalRef": {
 		"type": "string",
 		"pattern": "^#[-a-zA-Z0-9_$/.]+$",
+		"not": { "pattern": "\\.\\." },
 		"maxLength": 1024
 	},
 	"safeUrn": {
@@ -294,6 +307,12 @@
 				"$comment": "Reject path traversal sequences",
 				"not": {
 					"pattern": "/\\.\\."
+				}
+			},
+			{
+				"$comment": "Reject double-slash in URL path (normalization bypass)",
+				"not": {
+					"pattern": "^https://[^/]+//"
 				}
 			}
 		],
@@ -729,7 +748,7 @@
 		"$ref": "#/$defs/safePropertyNameArray"
 	},
 	"properties.dependentRequired": {
-		"type": "object",
+		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
 			"$ref": "#/$defs/safePropertyNameArray"
 		}
