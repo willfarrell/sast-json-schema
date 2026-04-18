@@ -89,16 +89,37 @@ test("sast should detect draft-04 from https $schema URL", () => {
 // --- schemaVersion edge cases ---
 
 describe("schemaVersion edge cases", () => {
-	test("should detect draft from protocol-relative URL", () => {
+	test("should detect draft-04 from protocol-relative URL", () => {
+		const validate = sast({
+			$schema: "//json-schema.org/draft-04/schema",
+		});
+		ok(typeof validate === "function");
+	});
+
+	test("should detect draft-06 from protocol-relative URL", () => {
+		const validate = sast({
+			$schema: "//json-schema.org/draft-06/schema",
+		});
+		ok(typeof validate === "function");
+	});
+
+	test("should detect draft-07 from protocol-relative URL", () => {
 		const validate = sast({
 			$schema: "//json-schema.org/draft-07/schema",
 		});
 		ok(typeof validate === "function");
 	});
 
-	test("should detect 2019-09 from $schema URL", () => {
+	test("should detect 2019-09 from protocol-relative URL", () => {
 		const validate = sast({
-			$schema: "https://json-schema.org/draft/2019-09/schema",
+			$schema: "//json-schema.org/draft/2019-09/schema",
+		});
+		ok(typeof validate === "function");
+	});
+
+	test("should detect 2020-12 from protocol-relative URL", () => {
+		const validate = sast({
+			$schema: "//json-schema.org/draft/2020-12/schema",
 		});
 		ok(typeof validate === "function");
 	});

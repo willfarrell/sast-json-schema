@@ -55,6 +55,15 @@
         "valid": true
       },
       {
+        "description": "Should pass when schema uses $ref alone (no type required)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      },
+      {
         "description": "Should fail when $schema declares 2019-09",
         "data": {
           "$schema": "https://json-schema.org/draft/2019-09/schema",

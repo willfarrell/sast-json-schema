@@ -276,14 +276,10 @@
 		},
 		"id": false,
 		"$defs": {
-			"additionalProperties": {
-				"$ref": "#/$defs/schemaRules"
-			}
+			"$ref": "#/$defs/properties.definitions"
 		},
 		"definitions": {
-			"additionalProperties": {
-				"$ref": "#/$defs/schemaRules"
-			}
+			"$ref": "#/$defs/properties.$defs"
 		}
 	},
 	"required": ["$schema", "$id"]

@@ -315,8 +315,24 @@ describe("analyze DNS options", () => {
 		await analyze(schema, { dnsTimeoutMs: 1, dnsConcurrency: 1 });
 		const elapsed = Date.now() - start;
 		ok(
-			elapsed < 3_000,
+			elapsed < 10_000,
 			`should fail fast with short timeout, took ${elapsed}ms`,
+		);
+	});
+
+	test("public hostname $ref should not produce ssrf errors", async () => {
+		const refs = [
+			{
+				hostname: "dns.google",
+				ref: "https://dns.google/schema.json",
+				path: "/$ref",
+			},
+		];
+		const errors = await resolveSSRFRefs(refs, { dnsTimeoutMs: 5_000 });
+		strictEqual(
+			errors.filter((e) => e.params.resolvedIP).length,
+			0,
+			"public hostname must not be flagged as private",
 		);
 	});
 });

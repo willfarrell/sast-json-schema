@@ -81,6 +81,15 @@
         "valid": false
       },
       {
+        "description": "Should pass when schema uses $ref alone (no type required)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "#/$defs/name"
+        },
+        "valid": true
+      },
+      {
         "description": "Should fail when schema uses dependencies (banned by policy)",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",

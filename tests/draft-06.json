@@ -37,6 +37,15 @@
         "valid": true
       },
       {
+        "description": "Should pass when schema uses $ref alone (no type required)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "$ref": "#/definitions/name"
+        },
+        "valid": true
+      },
+      {
         "description": "Should fail when $schema declares draft-07",
         "data": {
           "$schema": "https://json-schema.org/draft-07/schema",

@@ -223,9 +223,7 @@
 		"id": false,
 		"$defs": false,
 		"definitions": {
-			"additionalProperties": {
-				"$ref": "#/$defs/schemaRules"
-			}
+			"$ref": "#/$defs/properties.$defs"
 		}
 	},
 	"required": ["$schema", "$id"]

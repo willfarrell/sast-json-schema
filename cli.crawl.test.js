@@ -147,6 +147,47 @@ describe("crawlSchema", () => {
 		ok(!r.errors.some((e) => e.keyword === "minProperties"));
 	});
 
+	// --- range consistency: both inclusive and exclusive bounds ---
+	test("should use minimum when exclusiveMinimum < minimum", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: 10,
+			exclusiveMinimum: 3,
+			maximum: 5,
+		});
+		ok(r.errors.some((e) => e.keyword === "minimum"));
+	});
+
+	test("should use maximum when exclusiveMaximum > maximum", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: 50,
+			maximum: 10,
+			exclusiveMaximum: 95,
+		});
+		ok(r.errors.some((e) => e.keyword === "minimum"));
+	});
+
+	test("should not flag when exclusiveMinimum < minimum and range is valid", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: 5,
+			exclusiveMinimum: 2,
+			maximum: 100,
+		});
+		strictEqual(r.errors.length, 0);
+	});
+
+	test("should not flag when exclusiveMaximum > maximum and range is valid", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: 0,
+			maximum: 50,
+			exclusiveMaximum: 95,
+		});
+		strictEqual(r.errors.length, 0);
+	});
+
 	// --- range consistency: NaN/Infinity edge cases ---
 	test("should ignore NaN minimum", () => {
 		const r = crawlSchema({ type: "integer", minimum: NaN, maximum: 5 });

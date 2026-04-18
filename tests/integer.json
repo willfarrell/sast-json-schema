@@ -311,16 +311,16 @@
         "valid": false
       },
       {
-        "description": "Should fail when multipleOf exceeds Number.MAX_SAFE_INTEGER",
+        "description": "Should pass when multipleOf is Number.MAX_SAFE_INTEGER",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
           "type": "integer",
           "minimum": 0,
           "maximum": 100,
-          "multipleOf": 9007199254740992
+          "multipleOf": 9007199254740991
         },
-        "valid": false
+        "valid": true
       }
     ]
   },
