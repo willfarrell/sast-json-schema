@@ -8,6 +8,8 @@
       {
         "description": "Should pass",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": [
             "object",
             "null"
@@ -22,6 +24,8 @@
       {
         "description": "Should fail",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": [
             "object",
             "null"
@@ -40,6 +44,8 @@
       {
         "description": "Should pass when additionalProperties is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "additionalProperties": {
             "type": "integer",
@@ -55,6 +61,8 @@
       {
         "description": "Should pass when additionalProperties is set to false",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "additionalProperties": false,
           "maxProperties": 0,
@@ -66,6 +74,8 @@
       {
         "description": "Should fail when additionalProperties is set to true",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "additionalProperties": true,
           "unevaluatedProperties": false,
@@ -76,6 +86,8 @@
       {
         "description": "Should fail when additionalProperties is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "required": []
@@ -85,6 +97,8 @@
       {
         "description": "Should fail when additionalProperties is set without maxProperties",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "additionalProperties": {
             "type": "integer",
@@ -107,6 +121,8 @@
       {
         "description": "Should pass when unevaluatedProperties is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {},
@@ -118,6 +134,8 @@
       {
         "description": "Should fail when unevaluatedProperties is set to true",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": true,
           "properties": {},
@@ -128,6 +146,8 @@
       {
         "description": "Should fail when unevaluatedProperties is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {},
           "required": []
@@ -145,6 +165,8 @@
       {
         "description": "Should pass when properties is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {},
@@ -156,6 +178,8 @@
       {
         "description": "Should fail when properties is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "required": []
@@ -165,6 +189,8 @@
       {
         "description": "Should fail when properties is set without maxProperties",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {
@@ -192,6 +218,8 @@
       {
         "description": "Should pass when required is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {},
@@ -203,6 +231,8 @@
       {
         "description": "Should fail when required is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {}
@@ -212,6 +242,8 @@
       {
         "description": "Should fail when required item exceeds maxLength (4096)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {},
@@ -225,6 +257,8 @@
       {
         "description": "Should pass when required items are within limits",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {
@@ -254,6 +288,8 @@
       {
         "description": "Should pass when patternProperties is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "patternProperties": {
@@ -271,6 +307,8 @@
       {
         "description": "Should fail when patternProperties is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "maxProperties": 1,
@@ -281,6 +319,8 @@
       {
         "description": "Should fail when patternProperties key is missing leading ^",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "patternProperties": {
@@ -298,6 +338,8 @@
       {
         "description": "Should fail when patternProperties key is missing trailing $",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "patternProperties": {
@@ -315,6 +357,8 @@
       {
         "description": "Should fail when patternProperties key uses empty negated character class [^]",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "patternProperties": {
@@ -340,6 +384,8 @@
       {
         "description": "Should pass when propertyNames is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "propertyNames": {
@@ -355,6 +401,8 @@
       {
         "description": "Should fail when propertyNames is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "maxProperties": 1,
@@ -373,6 +421,8 @@
       {
         "description": "Should pass when maxProperties is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "propertyNames": {
@@ -388,6 +438,8 @@
       {
         "description": "Should fail when maxProperties is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "propertyNames": {
@@ -410,6 +462,8 @@
       {
         "description": "Should pass when properties inner schemas are secure",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "name": {
@@ -432,6 +486,8 @@
       {
         "description": "Should fail when properties inner schema is insecure (missing constraints)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "name": {
@@ -456,6 +512,8 @@
       {
         "description": "Should pass when additionalProperties inner schema is secure",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "additionalProperties": {
             "type": "integer",
@@ -471,6 +529,8 @@
       {
         "description": "Should fail when additionalProperties inner schema is insecure (missing constraints)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "additionalProperties": {
             "type": "string"
@@ -491,6 +551,8 @@
       {
         "description": "Should pass when patternProperties inner schema is secure",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "patternProperties": {
@@ -508,6 +570,8 @@
       {
         "description": "Should fail when patternProperties inner schema is insecure (missing constraints)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "patternProperties": {
@@ -531,6 +595,8 @@
       {
         "description": "Should pass when propertyNames inner schema is secure",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "propertyNames": {
@@ -546,6 +612,8 @@
       {
         "description": "Should fail when propertyNames inner schema is insecure (missing constraints)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "propertyNames": {
@@ -567,6 +635,8 @@
       {
         "description": "Should fail when `dependencies` is used with a schema value (use dependentSchemas instead)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -595,6 +665,8 @@
       {
         "description": "Should fail when `dependencies` is used with an array value (use dependentRequired instead)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -632,6 +704,8 @@
       {
         "description": "Should pass when dependentSchemas value is a secure schema",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -660,6 +734,8 @@
       {
         "description": "Should fail when dependentSchemas value is an insecure schema",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -682,32 +758,44 @@
       {
         "description": "Should fail when dependentSchemas value is boolean true (accepts everything)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
-            "a": { "type": "boolean" }
+            "a": {
+              "type": "boolean"
+            }
           },
           "dependentSchemas": {
             "a": true
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
-          "required": ["a"]
+          "required": [
+            "a"
+          ]
         },
         "valid": false
       },
       {
         "description": "Should fail when dependentSchemas value is empty object (no type)",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
-            "a": { "type": "boolean" }
+            "a": {
+              "type": "boolean"
+            }
           },
           "dependentSchemas": {
             "a": {}
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
-          "required": ["a"]
+          "required": [
+            "a"
+          ]
         },
         "valid": false
       }
@@ -722,6 +810,8 @@
       {
         "description": "Should pass when contentSchema is a secure schema",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "string",
           "contentSchema": {
             "type": "object",
@@ -739,6 +829,8 @@
       {
         "description": "Should fail when contentSchema is an insecure schema",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "string",
           "contentSchema": {
             "type": "string"
@@ -760,6 +852,8 @@
       {
         "description": "Should pass when dependentRequired values are valid string arrays",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -770,7 +864,9 @@
             }
           },
           "dependentRequired": {
-            "a": ["b"]
+            "a": [
+              "b"
+            ]
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
@@ -781,6 +877,8 @@
       {
         "description": "Should fail when dependentRequired array contains non-string values",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -788,7 +886,10 @@
             }
           },
           "dependentRequired": {
-            "a": [123, null]
+            "a": [
+              123,
+              null
+            ]
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
@@ -807,6 +908,8 @@
       {
         "description": "Should pass when minProperties is a valid safeCount",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -827,6 +930,8 @@
       {
         "description": "Should fail when minProperties is below 0",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -853,34 +958,46 @@
       {
         "description": "Should fail when required contains empty string",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {
             "": {
               "type": "string",
-              "enum": ["x"],
+              "enum": [
+                "x"
+              ],
               "maxLength": 1
             }
           },
           "maxProperties": 1,
-          "required": [""]
+          "required": [
+            ""
+          ]
         },
         "valid": false
       },
       {
         "description": "Should pass when required contains non-empty string",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {
             "name": {
               "type": "string",
-              "enum": ["a"],
+              "enum": [
+                "a"
+              ],
               "maxLength": 256
             }
           },
           "maxProperties": 10,
-          "required": ["name"]
+          "required": [
+            "name"
+          ]
         },
         "valid": true
       }
@@ -895,6 +1012,8 @@
       {
         "description": "Should fail when dependentRequired value contains empty string",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "object",
           "properties": {
             "a": {
@@ -905,7 +1024,9 @@
             }
           },
           "dependentRequired": {
-            "a": [""]
+            "a": [
+              ""
+            ]
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,

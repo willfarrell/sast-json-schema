@@ -1,7 +1,7 @@
 import test from "node:test";
 import Ajv from "ajv/dist/2020.js";
 import fc from "fast-check";
-import schema from "./index.json" with { type: "json" };
+import schema from "./2020-12.json" with { type: "json" };
 
 const ajv = new Ajv({ strictTypes: false });
 const validate = ajv.compile(schema);

@@ -7,12 +7,20 @@
 		"node": ">=24"
 	},
 	"engineStrict": true,
-	"main": "index.json",
 	"exports": {
-		".": "./index.json"
+		".": "./2020-12.json",
+		"./2020-12": "./2020-12.json",
+		"./2019-09": "./2019-09.json",
+		"./draft-07": "./draft-07.json",
+		"./draft-06": "./draft-06.json",
+		"./draft-04": "./draft-04.json"
 	},
 	"files": [
-		"index.json"
+		"draft-04.json",
+		"draft-06.json",
+		"draft-07.json",
+		"2019-09.json",
+		"2020-12.json"
 	],
 	"publishConfig": {
 		"access": "public"
@@ -22,9 +30,12 @@
 		"git:pre-commit": "npm run git:lint-staged && npm run git:test-staged",
 		"git:commit-msg": "commitlint --config commitlint.config.cjs --edit",
 		"git:lint-staged": "npm run test:lint",
-		"git:unit-staged": "node --test",
+		"git:unit-staged": "npm run test:unit",
 		"git:test-staged": "npm run git:unit-staged",
+		"build": "node bin/build.js",
+		"prepublishOnly": "npm run build",
 		"lint": "biome check --write --no-errors-on-unmatched",
+		"pretest": "npm run build",
 		"test": "npm run test:lint && npm run test:unit && npm run test:sast && npm run test:perf && npm run test:dast",
 		"test:lint": "biome check --staged --no-errors-on-unmatched",
 		"test:unit": "node --test ./*.test.js",

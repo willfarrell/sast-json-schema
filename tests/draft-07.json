@@ -1,0 +1,139 @@
+[
+  {
+    "description": "draft-07 base validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/draft-07.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass minimal secure draft-07 schema",
+        "data": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$id": "test",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "maxProperties": 10,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass draft-07 schema with if/then/else",
+        "data": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$id": "test",
+          "type": "string",
+          "enum": [
+            "a",
+            "b"
+          ],
+          "maxLength": 8,
+          "if": {
+            "type": "string",
+            "const": "a",
+            "maxLength": 8
+          },
+          "then": {
+            "type": "string",
+            "const": "a",
+            "maxLength": 8
+          },
+          "else": {
+            "type": "string",
+            "const": "b",
+            "maxLength": 8
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $schema declares 2019-09",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "$id": "test",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses $defs (2019-09+)",
+        "data": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$id": "test",
+          "$defs": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses $anchor (2019-09+)",
+        "data": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$id": "test",
+          "$anchor": "name",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses unevaluatedProperties (2019-09+)",
+        "data": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$id": "test",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "unevaluatedProperties": false,
+          "maxProperties": 10,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when schema uses prefixItems (2020-12)",
+        "data": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "string",
+              "maxLength": 10,
+              "pattern": "^[a-z]+$"
+            }
+          ],
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "valid": false
+      }
+    ]
+  }
+]

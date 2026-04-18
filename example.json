@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/example.json",
   "definitions": {
     "allowed": { "type": "integer", "minimum": 0, "maximum": 1 },

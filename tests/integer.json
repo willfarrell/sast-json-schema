@@ -8,15 +8,28 @@
       {
         "description": "Should pass",
         "data": {
-          "type": ["integer", "null"],
-          "enum": [-9007199254740991, 9007199254740991]
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            -9007199254740991,
+            9007199254740991
+          ]
         },
         "valid": true
       },
       {
         "description": "Should fail",
         "data": {
-          "type": ["integer", "null"]
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "valid": false
       }
@@ -31,6 +44,8 @@
       {
         "description": "Should pass when const is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "const": 42
         },
@@ -39,6 +54,8 @@
       {
         "description": "Should fail when const type does not match declared type",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "const": "not-a-number"
         },
@@ -55,22 +72,34 @@
       {
         "description": "Should pass when enum is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
-          "enum": [-9007199254740991, 9007199254740991]
+          "enum": [
+            -9007199254740991,
+            9007199254740991
+          ]
         },
         "valid": true
       },
       {
         "description": "Should fail when enum values do not match declared type",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
-          "enum": ["not-a-number", true]
+          "enum": [
+            "not-a-number",
+            true
+          ]
         },
         "valid": false
       },
       {
         "description": "Should fail when enum is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer"
         },
         "valid": false
@@ -86,6 +115,8 @@
       {
         "description": "Should pass when minimum is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": -9007199254740991,
           "maximum": 9007199254740991
@@ -95,6 +126,8 @@
       {
         "description": "Should fail when minimum is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "maximum": 0
         },
@@ -103,6 +136,8 @@
       {
         "description": "Should fail when minimum is < Number.MIN_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": -9007199254740992,
           "maximum": 0
@@ -112,6 +147,8 @@
       {
         "description": "Should fail when minimum is > Number.MAX_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": 9007199254740992,
           "maximum": 0
@@ -129,6 +166,8 @@
       {
         "description": "Should pass when maximum is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": -9007199254740991,
           "maximum": 9007199254740991
@@ -138,6 +177,8 @@
       {
         "description": "Should fail when maximum is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": 0
         },
@@ -146,6 +187,8 @@
       {
         "description": "Should fail when maximum is < Number.MIN_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "maximum": -9007199254740992,
           "minimum": 0
@@ -155,6 +198,8 @@
       {
         "description": "Should fail when maximum is > Number.MAX_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "maximum": 9007199254740992,
           "minimum": 0
@@ -172,6 +217,8 @@
       {
         "description": "Should pass when exclusiveMinimum is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "exclusiveMinimum": -9007199254740991,
           "exclusiveMaximum": 9007199254740991
@@ -181,6 +228,8 @@
       {
         "description": "Should fail when minimum is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "maximum": 0
         },
@@ -189,6 +238,8 @@
       {
         "description": "Should fail when exclusiveMinimum is < Number.MIN_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "exclusiveMinimum": -9007199254740992,
           "exclusiveMaximum": 0
@@ -198,6 +249,8 @@
       {
         "description": "Should fail when exclusiveMinimum is > Number.MAX_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "exclusiveMinimum": 9007199254740992,
           "exclusiveMaximum": 0
@@ -215,6 +268,8 @@
       {
         "description": "Should pass when multipleOf is positive",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": 0,
           "maximum": 100,
@@ -225,6 +280,8 @@
       {
         "description": "Should fail when multipleOf is zero",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": 0,
           "maximum": 100,
@@ -235,6 +292,8 @@
       {
         "description": "Should fail when multipleOf is negative",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": 0,
           "maximum": 100,
@@ -245,6 +304,8 @@
       {
         "description": "Should fail when multipleOf is used without type",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "multipleOf": 5
         },
         "valid": false
@@ -252,6 +313,8 @@
       {
         "description": "Should fail when multipleOf exceeds Number.MAX_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "minimum": 0,
           "maximum": 100,
@@ -270,6 +333,8 @@
       {
         "description": "Should pass when exclusiveMaximum is set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "exclusiveMinimum": -9007199254740991,
           "exclusiveMaximum": 9007199254740991
@@ -279,6 +344,8 @@
       {
         "description": "Should fail when exclusiveMaximum is not set",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "exclusiveMinimum": 0
         },
@@ -287,6 +354,8 @@
       {
         "description": "Should fail when exclusiveMaximum is < Number.MIN_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "exclusiveMaximum": -9007199254740992,
           "exclusiveMinimum": 0
@@ -296,6 +365,8 @@
       {
         "description": "Should fail when exclusiveMaximum is > Number.MAX_SAFE_INTEGER",
         "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
           "type": "integer",
           "exclusiveMaximum": 9007199254740992,
           "exclusiveMinimum": 0
