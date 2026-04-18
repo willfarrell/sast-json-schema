@@ -68,26 +68,31 @@
 	},
 	"safeCount": {
 		"description": "[0, Number.MAX_SAFE_INTEGER]",
+		"type": "integer",
 		"minimum": 0,
 		"maximum": 9007199254740991
 	},
 	"safeMultipleOf": {
-		"description": "(0, Number.MAX_SAFE_INTEGER]",
+		"description": "(0, Number.MAX_VALUE]",
+		"type": "number",
 		"exclusiveMinimum": 0,
-		"maximum": 9007199254740991
+		"maximum": 1e308
 	},
 	"safeInteger": {
 		"description": "[Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]",
+		"type": "integer",
 		"minimum": -9007199254740991,
 		"maximum": 9007199254740991
 	},
 	"safeNumber": {
 		"description": "[-Number.MAX_VALUE, Number.MAX_VALUE], rounded down",
+		"type": "number",
 		"minimum": -1e308,
 		"maximum": 1e308
 	},
 	"safePattern": {
 		"$comment": "Use allowlist charset ranges ie ^[\\p{L}\\p{N}\\p{P}\\p{S} \\r\\n]+$.",
+		"type": "string",
 		"allOf": [
 			{
 				"$comment": "Max pattern length",
