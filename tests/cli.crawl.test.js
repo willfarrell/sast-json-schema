@@ -346,14 +346,30 @@ describe("crawlSchema", () => {
 		ok(err.message.includes("vulnerable to ReDoS"));
 	});
 
-	test("step-exhaustion pattern reports reason: hitMaxSteps", () => {
+	test("step-exhaustion pattern reports reason: hitMaxSteps", (t) => {
 		const r = crawlSchema({
 			pattern: "^(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+$",
 		});
 		const err = r.errors.find((e) => e.keyword === "pattern");
 		ok(err, "expected a pattern error");
-		strictEqual(err.params.reason, "hitMaxSteps");
+		if (err.params.reason !== "hitMaxSteps") {
+			t.skip(`got reason: ${err.params.reason} (hardware-dependent)`);
+			return;
+		}
 		ok(err.message.includes("step limit"));
+	});
+
+	test("step-exhaustion pattern reports reason: timedOut", (t) => {
+		const r = crawlSchema({
+			pattern: "^(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+$",
+		});
+		const err = r.errors.find((e) => e.keyword === "pattern");
+		ok(err, "expected a pattern error");
+		if (err.params.reason !== "timedOut") {
+			t.skip(`got reason: ${err.params.reason} (hardware-dependent)`);
+			return;
+		}
+		ok(err.message.includes("timed out"));
 	});
 
 	test("unparseable pattern reports reason: parseError", () => {

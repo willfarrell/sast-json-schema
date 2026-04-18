@@ -13,7 +13,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    cooldown-period: 15
+    cooldown:
+      default-days: 15
     groups:
       dev-dependencies:
         dependency-type: "development"
