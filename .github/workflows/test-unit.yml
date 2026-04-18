@@ -33,4 +33,4 @@ jobs:
           npm run build --if-present
       - name: Unit tests
         run: |
-          node --test --experimental-test-coverage ./*.test.js
+          npm run test:unit
