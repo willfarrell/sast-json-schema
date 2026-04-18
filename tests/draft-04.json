@@ -2,7 +2,7 @@
   {
     "description": "draft-04 base validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/draft-04.json"
+      "$ref": "urn:willfarrell:sast-json-schema:draft-04"
     },
     "tests": [
       {
@@ -171,6 +171,38 @@
           "maximum": 100
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when `id` is missing entirely (required)",
+        "data": {
+          "$schema": "http://json-schema.org/draft-04/schema#",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when `id` URL contains a fragment (safeIdUrl rejects #)",
+        "data": {
+          "$schema": "http://json-schema.org/draft-04/schema#",
+          "id": "https://example.com/schemas/name#frag",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when `id` is a URN",
+        "data": {
+          "$schema": "http://json-schema.org/draft-04/schema#",
+          "id": "urn:example:test",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z]+$"
+        },
+        "valid": true
       }
     ]
   }

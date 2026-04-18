@@ -3,7 +3,7 @@
     "description": "ajv-formats regex patterns tested against safePattern",
     "$comment": "Source: https://github.com/ajv-validator/ajv-formats/blob/master/src/formats.ts. Tests whether ajv-formats internal patterns would pass safePattern if used as a pattern keyword value. Many fail because safePattern is intentionally stricter than general regex — it blocks unescaped dots, negated classes, lookaheads, and unbounded group repeats (+/*).",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {

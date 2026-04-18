@@ -2,7 +2,7 @@
   {
     "description": "type=[array,null]",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -42,7 +42,7 @@
   {
     "description": "type=array with items",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -79,7 +79,7 @@
   {
     "description": "type=array with uniqueItems",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -171,7 +171,7 @@
   {
     "description": "type=array with maxItems",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -230,7 +230,7 @@
   {
     "description": "type=array with unevaluatedItems",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -322,7 +322,7 @@
   {
     "description": "type=array with contains",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -377,7 +377,7 @@
   {
     "description": "type=array with maxContains",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -437,7 +437,7 @@
   {
     "description": "type=array with prefixItems recursive validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -489,7 +489,7 @@
   {
     "description": "type=array with items recursive validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -532,7 +532,7 @@
   {
     "description": "type=array with contains recursive validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -575,7 +575,7 @@
   {
     "description": "type=array with additionalItems recursive validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -631,7 +631,7 @@
   {
     "description": "type=array with minItems",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -675,7 +675,7 @@
   {
     "description": "type=array with minContains",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -738,7 +738,7 @@
   {
     "description": "type=array with prefixItems and items together (tuple with catch-all)",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {
@@ -770,7 +770,7 @@
   {
     "description": "type=array with items and contains together",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
     "tests": [
       {

@@ -11,6 +11,12 @@
 		"maxItems": 1024,
 		"uniqueItems": true
 	},
+	"safeArrayLimits": {
+		"$comment": "Like safeArrayItemsLimits but without uniqueItems — for schema arrays (allOf/anyOf/oneOf/prefixItems) where deep-equal subschemas are not an injection risk and enforcing uniqueness creates odd invariants.",
+		"type": "array",
+		"minItems": 0,
+		"maxItems": 1024
+	},
 	"safeObjectPropertiesLimits": {
 		"type": "object",
 		"minProperties": 0,
@@ -212,24 +218,15 @@
 				}
 			},
 			{
-				"$comment": "Reject bare | before any group at top level (breaks anchoring). Use (?:...) for alternation.",
+				"$comment": "Reject top-level | after ^ anchor (breaks anchoring). Allows balanced depth-1 groups between ^ and |. Use (?:...) to wrap alternation.",
 				"not": {
-					"pattern": "^\\^[^()]*\\|"
+					"pattern": "^\\^([^()]|\\([^()]*\\))*\\|"
 				}
 			},
 			{
-				"$comment": "Reject bare | after last group at top level (breaks anchoring)",
+				"$comment": "Reject top-level | before $ anchor (breaks anchoring). Allows balanced depth-1 groups between | and $.",
 				"not": {
-					"pattern": "\\|[^()]*\\$$"
-				}
-			},
-			{
-				"$comment": "If alternation | is used, all | must be inside balanced groups. Escaped chars (\\x) are treated as atoms, not group delimiters. Supports up to 5 levels of group nesting.",
-				"if": {
-					"pattern": "\\|"
-				},
-				"then": {
-					"pattern": "^\\^(\\\\.|[^()|\\\\]|\\(([^()]|\\(([^()]|\\(([^()]|\\(([^()]|\\([^()]*\\))*\\))*\\))*\\))*\\))*\\$$"
+					"pattern": "\\|([^()]|\\([^()]*\\))*\\$$"
 				}
 			}
 		]
@@ -238,6 +235,12 @@
 		"type": "string",
 		"pattern": "^#[-a-zA-Z0-9_$/.]+$",
 		"maxLength": 1024
+	},
+	"safeUrn": {
+		"$comment": "RFC 8141 URN. NID: 2-32 chars, alphanumeric with internal hyphens. NSS: conservative allowlist ([A-Za-z0-9._:-]+) to limit attack surface; rejects percent-encoding, r/q/f components, and reserved delimiters that could bypass downstream parsers.",
+		"type": "string",
+		"maxLength": 1024,
+		"pattern": "^urn:[A-Za-z0-9][-A-Za-z0-9]{0,30}[A-Za-z0-9]:[A-Za-z0-9._:-]+$"
 	},
 	"safeSchemaUrl": {
 		"$comment": "Like safeUrl but also rejects query strings. Schema references should not need query parameters.",
@@ -266,11 +269,11 @@
 		]
 	},
 	"safeUrl": {
-		"$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection. Port numbers are implicitly blocked (: not in hostname charset), only default HTTPS port 443 is reachable.",
+		"$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection. Explicit ports are rejected entirely; only the implicit default HTTPS port 443 is reachable — strip `:443` before validation if your source includes it.",
 		"type": "string",
 		"allOf": [
 			{
-				"pattern": "^https://[-a-zA-Z0-9.]+\\.[a-z]+(/[-a-zA-Z0-9._/?&#=~+]*)?$"
+				"pattern": "^https://[-a-zA-Z0-9.]+\\.[a-zA-Z]+(/[-a-zA-Z0-9._/?&#=~+]*)?$"
 			},
 			{
 				"not": {
@@ -301,7 +304,7 @@
 	"schemaArray": {
 		"allOf": [
 			{
-				"$ref": "#/$defs/safeArrayItemsLimits"
+				"$ref": "#/$defs/safeArrayLimits"
 			},
 			{
 				"type": "array",
@@ -589,6 +592,7 @@
 		}
 	},
 	"properties.$defs": {
+		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
@@ -611,6 +615,7 @@
 		]
 	},
 	"properties.definitions": {
+		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
@@ -619,16 +624,19 @@
 		"$ref": "#/$defs/schemaRules"
 	},
 	"properties.dependentSchemas": {
+		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
 	},
 	"properties.patternProperties": {
+		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
 	},
 	"properties.properties": {
+		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
@@ -1029,6 +1037,9 @@
 						"$ref": "#/$defs/safeIdUrl"
 					},
 					{
+						"$ref": "#/$defs/safeUrn"
+					},
+					{
 						"type": "string",
 						"maxLength": 1024,
 						"pattern": "^[a-zA-Z0-9_-]+$"
@@ -1132,12 +1143,6 @@
 				"type": "string",
 				"maxLength": 4096
 			}
-		}
-	},
-	"dependentSchemas.$vocabulary": {
-		"$comment": "$vocabulary can disable validation vocabularies, making type/minimum/maximum/etc. no-ops. Block it entirely.",
-		"properties": {
-			"$vocabulary": false
 		}
 	},
 	"dependentSchemas.enum": {

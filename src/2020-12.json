@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json",
+	"$id": "urn:willfarrell:sast-json-schema:2020-12",
 	"title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
 	"description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
 	"$defs": {
@@ -75,7 +75,8 @@
 				},
 				"dependentRequired": {
 					"$ref": "#/$defs/properties.dependentRequired"
-				}
+				},
+				"$vocabulary": false
 			},
 			"dependentRequired": {
 				"properties": ["required", "maxProperties"]
@@ -183,9 +184,6 @@
 				"$comment": {
 					"$ref": "#/$defs/dependentSchemas.$comment"
 				},
-				"$vocabulary": {
-					"$ref": "#/$defs/dependentSchemas.$vocabulary"
-				},
 				"enum": {
 					"$ref": "#/$defs/dependentSchemas.enum"
 				},
@@ -265,6 +263,9 @@
 			"oneOf": [
 				{
 					"$ref": "#/$defs/safeIdUrl"
+				},
+				{
+					"$ref": "#/$defs/safeUrn"
 				},
 				{
 					"type": "string",

@@ -7,7 +7,6 @@
 			}
 		}
 	},
-	"ignoreFile": ".gitignore",
 	"ignore": [
 		".github/**/*",
 		".husky/**/*",
@@ -20,11 +19,6 @@
 		"**/*.perf.js",
 		"**/*.test.js",
 		"**/*.json",
-		"draft-04.json",
-		"draft-06.json",
-		"draft-07.json",
-		"2019-09.json",
-		"2020-12.json",
 		"**/*.md",
 		"**/*.yml",
 		".DS_Store"

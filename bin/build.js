@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Copyright 2026 will Farrell, and sast-json-schema contributors.
 // SPDX-License-Identifier: MIT
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const defsLib = JSON.parse(readFileSync(`${root}/src/$defs.json`, "utf8"));
 const drafts = ["draft-04", "draft-06", "draft-07", "2019-09", "2020-12"];
+const outputs = [];
 const REF_PREFIX = "#/$defs/";
 
 const collectRefs = (node, acc) => {
@@ -26,12 +28,7 @@ const collectRefs = (node, acc) => {
 };
 
 for (const draft of drafts) {
-	let src;
-	try {
-		src = readFileSync(`${root}/src/${draft}.json`, "utf8");
-	} catch {
-		continue;
-	}
+	const src = readFileSync(`${root}/src/${draft}.json`, "utf8");
 	const manifest = JSON.parse(src);
 	const authored =
 		manifest.$defs && typeof manifest.$defs === "object"
@@ -60,11 +57,15 @@ for (const draft of drafts) {
 		finalDefs[name] = authored[name] ?? defsLib[name];
 	}
 	manifest.$defs = finalDefs;
-	writeFileSync(
-		`${root}/${draft}.json`,
-		`${JSON.stringify(manifest, null, 2)}\n`,
-	);
+	const outPath = `${root}/${draft}.json`;
+	writeFileSync(outPath, `${JSON.stringify(manifest, null, "\t")}\n`);
+	outputs.push(outPath);
 	console.log(
 		`built ${draft}.json (${Object.keys(finalDefs).length} defs, ${Object.keys(authored).length} local)`,
 	);
 }
+
+execFileSync("npx", ["biome", "format", "--write", ...outputs], {
+	cwd: root,
+	stdio: "inherit",
+});

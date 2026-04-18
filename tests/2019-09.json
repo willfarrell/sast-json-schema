@@ -2,7 +2,7 @@
   {
     "description": "2019-09 draft-specific keywords",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/2019-09.json"
+      "$ref": "urn:willfarrell:sast-json-schema:2019-09"
     },
     "tests": [
       {

@@ -2,7 +2,7 @@
   {
     "description": "draft-06 base validation",
     "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/draft-06.json"
+      "$ref": "urn:willfarrell:sast-json-schema:draft-06"
     },
     "tests": [
       {

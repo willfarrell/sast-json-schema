@@ -38,17 +38,43 @@
 
 ```javascript
 import Ajv from "ajv/dist/2020.js"
-import sastSchema from "sast-json-schema/index.json" with { type: "json" }
+import sastSchema from "sast-json-schema" with { type: "json" }
+import schema from "path/to/schema.json" with { type: "json" }
 
-const ajv = new Ajv({strictTypes: false})
-const isSchemaSecure = ajv.compile(sastSchema)
-isSchemaSecure(schema)
+// Your schema should compile under strictTypes:true.
+const userAjv = new Ajv({ strictTypes: true })
+if (!userAjv.validateSchema(schema)) {
+  console.error(userAjv.errors)
+}
+
+// The meta-schema itself uses strictTypes:false because it validates
+// subschemas that may legally be `false` (boolean-schema form).
+const sastAjv = new Ajv({ strictTypes: false })
+const isSchemaSecure = sastAjv.compile(sastSchema)
+if (!isSchemaSecure(schema)) {
+  console.error(isSchemaSecure.errors)
+}
 ```
 
-### cli
-Using [`ajv-cmd`](https://github.com/willfarrell/ajv-cmd)
+Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. Each meta-schema is identified by a `urn:sast-json-schema:<draft>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
+
+### CLI
+
 ```bash
-ajv sast path/to/schema.json
+npx sast-json-schema path/to/schema.json
+```
+
+Options:
+- `-o, --output <path>` — Write issues to JSON file
+- `--override-max-items <n>` — Override max items limit (default: 1024)
+- `--override-max-depth <n>` — Override max depth limit (default: 32)
+- `--override-max-properties <n>` — Override max properties limit (default: 1024)
+- `--ignore <instancePath>` — Suppress errors by instancePath or instancePath:keyword (repeatable)
+
+Also available via [`ajv-cmd`](https://github.com/willfarrell/ajv-cmd):
+
+```bash
+ajv sast --fail path/to/schema.json
 ```
 
 ## OWASP ASVS 5.0.0 (2026-03)
@@ -86,13 +112,16 @@ The following requirements should be considered when writing JSON Schemas used f
 
 ## Known Limitations
 
-- **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default). Enforced in `ajv-cmd`, see `--override-max-depth`.
-- **`enum` size bounded to 1024 items.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits. Can be overridden in `ajv-cmd`, see `--override-max-items`.
-- **`properties` size bounded to 1024 items.** Large `properties` objects could cause memory/performance issues. Keep properties small and consider application-level limits. Can be overridden in `ajv-cmd`, see `--override-max-properties`.
-- **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced in `ajv-cmd`.
-- **`safePattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Alternation must be inside balanced groups (up to 5 levels of nesting). It cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection. Additional enforcement in `ajv-cmd`.
-- **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref` to `#` (local) or `https://` URLs and blocks private IP ranges (dotted-decimal, hex `0x`, and decimal representations), but DNS-based bypasses (domains resolving to internal IPs) cannot be detected at the schema level. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended. Additional enforcement in `ajv-cmd`.
+- **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default). Enforced by the CLI, see `--override-max-depth`.
+- **`enum` size bounded to 1024 items.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits. Can be overridden via the CLI, see `--override-max-items`.
+- **`properties` size bounded to 1024 items.** Large `properties` objects could cause memory/performance issues. Keep properties small and consider application-level limits. Can be overridden via the CLI, see `--override-max-properties`.
+- **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced by the CLI.
+- **`safePattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Bare alternation at the top level (`^a|b$`) is rejected, but alternation across sibling groups (`^(a)|(b)$`) is not detected at the meta-schema level — it is enforced by the CLI. The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection.
+- **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref` to `#` (local) or `https://` URLs and blocks private IP ranges (dotted-decimal, hex `0x`, and decimal representations), but DNS-based bypasses (domains resolving to internal IPs) cannot be detected at the schema level. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended. Enforced by the CLI.
+- **`safeUrl` hostname constraints.** Only HTTPS URLs are allowed. Explicit ports are rejected entirely. The TLD may be upper-case or lower-case; the rest of the hostname is matched case-sensitively on the ASCII-label charset. Internationalized domain names (IDN / punycode) are not specifically handled and should be converted to ASCII labels.
+- **Plain-name `$id` / `id` values** must match `^[a-zA-Z0-9_-]+$` with a maximum length of 1024. Non-ASCII identifiers, dots, slashes, and other RFC 3986 path characters are not permitted in the plain-name form — use a full URL or URN if you need those.
 - **`contentMediaType` does not flag XSS-risky media types.** The meta-schema validates that `contentMediaType` follows IANA format (RFC 6838) but does not warn about types whose content can execute scripts when rendered, such as `text/html`, `application/xhtml+xml`, or `image/svg+xml`. If your application renders content based on this annotation, ensure it is sanitized to prevent XSS.
+- **`$ref: "#"` (self-reference) is rejected.** The meta-schema requires `$ref` values to have at least one character after `#`. Bare self-references (`$ref: "#"`) are blocked to prevent infinite recursion in validators. If you need a self-referencing schema, use a named `$defs` entry and reference it explicitly.
 - **`format: "regex"` does not validate regex safety.** A schema using `format: "regex"` validates that input strings are syntactically valid regular expressions, but the meta-schema does not ensure those regex strings are safe from ReDoS. If your application compiles user-provided regex strings, use runtime ReDoS checking on the input. i.e. JavaScript: `redos-detector`.
 - **Draft-07 `dependencies` keyword is rejected.** Use `dependentRequired` (array form) or `dependentSchemas` (schema form) instead. Only JSON Schema drafts 2019-09 and 2020-12 are supported.
 
