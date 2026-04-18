@@ -42,7 +42,7 @@ test("sast validate should detect issues in insecure schema", () => {
 });
 
 test("sast default export should be sast function", async () => {
-	const mod = await import("./cli.js");
+	const mod = await import("../cli.js");
 	strictEqual(mod.default, mod.sast);
 });
 

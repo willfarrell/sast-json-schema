@@ -10,7 +10,7 @@
 	"ignore": [
 		".github/**/*",
 		".husky/**/*",
-		"fixtures/*",
+		"tests/fixtures/*",
 		"commitlint.config.cjs",
 		"LICENSE",
 		".license.template",

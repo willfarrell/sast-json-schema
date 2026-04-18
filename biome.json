@@ -7,7 +7,7 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!**/tests/**/*.json"]
+		"includes": ["**", "!**/tests/fixtures/**/*.json"]
 	},
 	"formatter": {
 		"enabled": true,
