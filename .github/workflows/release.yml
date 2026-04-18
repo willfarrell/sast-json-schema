@@ -117,8 +117,8 @@ jobs:
       - name: npm publish (next)
         if: ${{ needs.release.outputs.prerelease == 'true' }}
         run: |
-          npm publish ${{ needs.release.outputs.tag }}/*.tgz --tag next --provenance --access public
+          find . -name '*.tgz' -exec npm publish --tag next --provenance --access public {} \;
       - name: npm publish (latest)
         if: ${{ needs.release.outputs.prerelease == 'false' }}
         run: |
-          npm publish ${{ needs.release.outputs.tag }}/*.tgz --tag latest --provenance --access public
+          find . -name '*.tgz' -exec npm publish --tag latest --provenance --access public {} \;
