@@ -646,9 +646,17 @@
         "valid": true
       },
       {
-        "description": "Should pass when $schema is older draft URI",
+        "description": "Should fail when $schema is draft-07 (unsupported)",
         "data": {
           "$schema": "https://json-schema.org/draft-07/schema",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $schema is draft 2019-09",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
           "type": "null"
         },
         "valid": true
@@ -797,6 +805,160 @@
           "$vocabulary": {
             "https://json-schema.org/draft/2020-12/vocab/core": true
           },
+          "type": "null"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$ref URL double-dot hostname prevention",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $ref URL contains double-dot in hostname",
+        "data": {
+          "$ref": "https://a..b.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref URL has single dots in hostname (normal domain)",
+        "data": {
+          "$ref": "https://schemas.example.com/schema.json"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "$ref URL hostname hyphen validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should fail when hostname starts with a hyphen (invalid DNS)",
+        "data": {
+          "$ref": "https://-example.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when hostname label ends with a hyphen before dot (invalid DNS)",
+        "data": {
+          "$ref": "https://example-.com/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when hostname contains hyphens in valid positions",
+        "data": {
+          "$ref": "https://my-schemas.example-site.com/schema.json"
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "$recursiveRef validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $recursiveRef is a local reference",
+        "data": {
+          "$recursiveRef": "#/definitions/name",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $recursiveRef is an https URL",
+        "data": {
+          "$recursiveRef": "https://example.com/schema.json",
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $recursiveRef is a root self-reference",
+        "data": {
+          "$recursiveRef": "#"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveRef uses http: scheme",
+        "data": {
+          "$recursiveRef": "http://evil.com/schema",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveRef targets localhost (SSRF)",
+        "data": {
+          "$recursiveRef": "https://localhost/admin",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveRef targets hex IP (SSRF bypass)",
+        "data": {
+          "$recursiveRef": "https://0x7f000001/secret",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveRef URL contains query string",
+        "data": {
+          "$recursiveRef": "https://example.com/schema.json?version=2",
+          "type": "null"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "$recursiveAnchor validation",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $recursiveAnchor is true",
+        "data": {
+          "$recursiveAnchor": true,
+          "type": "null"
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $recursiveAnchor is a string (must be boolean)",
+        "data": {
+          "$recursiveAnchor": "my-anchor",
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveAnchor is a number",
+        "data": {
+          "$recursiveAnchor": 1,
+          "type": "null"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $recursiveAnchor is false (no-op, enforce intentionality)",
+        "data": {
+          "$recursiveAnchor": false,
           "type": "null"
         },
         "valid": false

@@ -37,8 +37,11 @@
 ### Manually
 
 ```javascript
-ajv = new Ajv({strictTypes: false})
-const isSchemaSecure = ajv.compile(require("sast-json-schema/index.json"))
+import Ajv from "ajv/dist/2020.js"
+import sastSchema from "sast-json-schema/index.json" with { type: "json" }
+
+const ajv = new Ajv({strictTypes: false})
+const isSchemaSecure = ajv.compile(sastSchema)
 isSchemaSecure(schema)
 ```
 
@@ -87,10 +90,11 @@ The following requirements should be considered when writing JSON Schemas used f
 - **`enum` size bounded to 1024 items.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits. Can be overridden in `ajv-cmd`, see `--override-max-items`.
 - **`properties` size bounded to 1024 items.** Large `properties` objects could cause memory/performance issues. Keep properties small and consider application-level limits. Can be overridden in `ajv-cmd`, see `--override-max-properties`.
 - **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced in `ajv-cmd`.
-- **`safePattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). It cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection. Additional enforcement in `ajv-cmd`.
+- **`safePattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Alternation must be inside balanced groups (up to 5 levels of nesting). It cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection. Additional enforcement in `ajv-cmd`.
 - **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref` to `#` (local) or `https://` URLs and blocks private IP ranges (dotted-decimal, hex `0x`, and decimal representations), but DNS-based bypasses (domains resolving to internal IPs) cannot be detected at the schema level. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended. Additional enforcement in `ajv-cmd`.
 - **`contentMediaType` does not flag XSS-risky media types.** The meta-schema validates that `contentMediaType` follows IANA format (RFC 6838) but does not warn about types whose content can execute scripts when rendered, such as `text/html`, `application/xhtml+xml`, or `image/svg+xml`. If your application renders content based on this annotation, ensure it is sanitized to prevent XSS.
 - **`format: "regex"` does not validate regex safety.** A schema using `format: "regex"` validates that input strings are syntactically valid regular expressions, but the meta-schema does not ensure those regex strings are safe from ReDoS. If your application compiles user-provided regex strings, use runtime ReDoS checking on the input. i.e. JavaScript: `redos-detector`.
+- **Draft-07 `dependencies` keyword is rejected.** Use `dependentRequired` (array form) or `dependentSchemas` (schema form) instead. Only JSON Schema drafts 2019-09 and 2020-12 are supported.
 
 ## Sources
 

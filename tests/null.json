@@ -13,5 +13,61 @@
         "valid": true
       }
     ]
+  },
+  {
+    "description": "type=null with enum type consistency",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when enum contains only null",
+        "data": {
+          "type": "null",
+          "enum": [null]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when enum contains non-null value (type confusion)",
+        "data": {
+          "type": "null",
+          "enum": [null, 42]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when enum contains string instead of null",
+        "data": {
+          "type": "null",
+          "enum": [null, "sneaky"]
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "type=null with const type consistency",
+    "schema": {
+      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
+    },
+    "tests": [
+      {
+        "description": "Should pass when const is null",
+        "data": {
+          "type": "null",
+          "const": null
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when const is not null",
+        "data": {
+          "type": "null",
+          "const": "not-null"
+        },
+        "valid": false
+      }
+    ]
   }
 ]

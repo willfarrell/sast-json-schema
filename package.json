@@ -8,6 +8,9 @@
 	},
 	"engineStrict": true,
 	"main": "index.json",
+	"exports": {
+		".": "./index.json"
+	},
 	"files": [
 		"index.json"
 	],
@@ -22,10 +25,9 @@
 		"git:unit-staged": "node --test",
 		"git:test-staged": "npm run git:unit-staged",
 		"lint": "biome check --write --no-errors-on-unmatched",
-		"test": "npm run test:lint && npm run test:unit && npm run test:types && npm run test:sast && npm run test:perf && npm run test:dast",
+		"test": "npm run test:lint && npm run test:unit && npm run test:sast && npm run test:perf && npm run test:dast",
 		"test:lint": "biome check --staged --no-errors-on-unmatched",
 		"test:unit": "node --test ./*.test.js",
-		"test:types": "which tstyche > /dev/null 2>&1 && tstyche || echo 'tstyche not found, skipping type tests'",
 		"test:perf": "node --test --test-concurrency=1 ./*.perf.js",
 		"test:dast": "npm run test:dast:fuzz",
 		"test:dast:fuzz": "node --test ./*.fuzz.js",

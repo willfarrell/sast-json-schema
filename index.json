@@ -3,8 +3,7 @@
   "$id": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json",
   "title": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
   "description": "If a JSON AnySchema fails validation against this meta-schema, it may be unsafe to validate untrusted data",
-  "$comment": "Uses `dependencies` (draft-07) instead of `dependentSchemas`/`dependentRequired` (2019-09+) for backward compatibility.",
-  "definitions": {
+  "$defs": {
     "safeAnchor":{
       "$comment": "https://json-schema.org/draft/2020-12/json-schema-core#section-8.2.2",
       "type": "string",
@@ -24,9 +23,9 @@
     },
     "safeValueSizeLimits": {
       "allOf": [
-        { "if": { "type": "string" }, "then": { "$ref": "#/definitions/safeStringLengthLimits" } },
-        { "if": { "type": "array" }, "then": { "$ref": "#/definitions/safeArrayItemsLimits" } },
-        { "if": { "type": "object" }, "then": { "$ref": "#/definitions/safeObjectPropertiesLimits" } }
+        { "if": { "type": "string" }, "then": { "$ref": "#/$defs/safeStringLengthLimits" } },
+        { "if": { "type": "array" }, "then": { "$ref": "#/$defs/safeArrayItemsLimits" } },
+        { "if": { "type": "object" }, "then": { "$ref": "#/$defs/safeObjectPropertiesLimits" } }
       ]
     },
     "safeStringLengthLimits":{
@@ -41,8 +40,8 @@
     },
     "safePropertyNameArray": {
       "type": "array",
-      "items": { "type": "string", "$ref": "#/definitions/safePropertyName" },
-      "$ref": "#/definitions/safeArrayItemsLimits"
+      "items": { "type": "string", "$ref": "#/$defs/safePropertyName" },
+      "$ref": "#/$defs/safeArrayItemsLimits"
     },
     "safeCount": {
       "description": "[0, Number.MAX_SAFE_INTEGER]",
@@ -84,8 +83,8 @@
           "not": { "pattern": "^(\\\\.|\\[([^\\\\\\]]|\\\\.)*\\]|[^.\\[\\\\])*\\." }
         },
         {
-          "$comment": "Reject broad character class escapes: \\S (non-whitespace), \\W (non-word), \\D (non-digit), \\C (any byte), \\P (negated unicode property), \\B (non-word boundary)",
-          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\[SWDCPB]" }
+          "$comment": "Reject broad character class escapes: \\S (non-whitespace), \\W (non-word), \\D (non-digit), \\C (any byte), \\P (negated unicode property), \\B (non-word boundary), \\v (vertical tab), \\f (form feed)",
+          "not": { "pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\[SWDCPBvf]" }
         },
         {
           "$comment": "Reject named backreference: \\k",
@@ -164,9 +163,9 @@
           "not": { "pattern": "\\|[^()]*\\$$" }
         },
         {
-          "$comment": "If alternation | is used, all | must be inside balanced groups. Escaped chars (\\x) are treated as atoms, not group delimiters. Supports up to 3 levels of group nesting.",
+          "$comment": "If alternation | is used, all | must be inside balanced groups. Escaped chars (\\x) are treated as atoms, not group delimiters. Supports up to 5 levels of group nesting.",
           "if": { "pattern": "\\|" },
-          "then": { "pattern": "^\\^(\\\\.|[^()|\\\\]|\\(([^()]|\\(([^()]|\\([^()]*\\))*\\))*\\))*\\$$" }
+          "then": { "pattern": "^\\^(\\\\.|[^()|\\\\]|\\(([^()]|\\(([^()]|\\(([^()]|\\(([^()]|\\([^()]*\\))*\\))*\\))*\\))*\\))*\\$$" }
         }
       ]
     },
@@ -178,30 +177,32 @@
     "safeSchemaUrl": {
       "$comment": "Like safeUrl but also rejects query strings. Schema references should not need query parameters.",
       "allOf": [
-        { "$ref": "#/definitions/safeUrl" },
+        { "$ref": "#/$defs/safeUrl" },
         { "not": { "pattern": "\\?" } }
       ]
     },
     "safeIdUrl": {
       "$comment": "Like safeUrl but rejects fragments. JSON Schema spec section 8.2.1: $id MUST NOT contain a non-empty fragment.",
       "allOf": [
-        { "$ref": "#/definitions/safeUrl" },
+        { "$ref": "#/$defs/safeUrl" },
         { "not": { "pattern": "#" } }
       ]
     },
     "safeUrl":{
-      "$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection.",
+      "$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection. Port numbers are implicitly blocked (: not in hostname charset), only default HTTPS port 443 is reachable.",
       "type": "string",
       "allOf": [
         { "pattern": "^https://[-a-zA-Z0-9.]+\\.[a-z]+(/[-a-zA-Z0-9._/?&#=~+]*)?$" },
         { "not": { "pattern": "^https://(localhost|0[xX][0-9a-fA-F]|[0-9]+\\.[0-9]+\\.[0-9]|[0-9]{5,}|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])" } },
+        { "$comment": "Reject double-dot in hostname (invalid DNS, potential normalization bypass)", "not": { "pattern": "^https://[-a-zA-Z0-9.]*\\.\\." } },
+        { "$comment": "Reject leading hyphen or hyphen before dot in hostname (RFC 952/1123)", "not": { "pattern": "^https://(-|[-a-zA-Z0-9.]*-\\.)"}},
         { "$comment": "Reject path traversal sequences", "not": { "pattern": "/\\.\\." } }
       ],
       "maxLength": 1024
     },
     "schemaArray": {
       "allOf": [
-        { "$ref": "#/definitions/safeArrayItemsLimits" },
+        { "$ref": "#/$defs/safeArrayItemsLimits" },
         {
           "type": "array",
           "minItems": 1,
@@ -283,7 +284,7 @@
       "required": ["type"]
     },
     "constIsString": {
-      "if": { "$ref": "#/definitions/typeOfString" },
+      "if": { "$ref": "#/$defs/typeOfString" },
       "then": {
         "properties": {
           "const": { "type": "string" },
@@ -292,7 +293,7 @@
       }
     },
     "constIsInteger": {
-      "if": { "$ref": "#/definitions/typeOfInteger" },
+      "if": { "$ref": "#/$defs/typeOfInteger" },
       "then": {
         "properties": {
           "const": { "type": "integer" },
@@ -301,7 +302,7 @@
       }
     },
     "constIsNumber": {
-      "if": { "$ref": "#/definitions/typeOfNumber" },
+      "if": { "$ref": "#/$defs/typeOfNumber" },
       "then": {
         "properties": {
           "const": { "type": "number" },
@@ -310,7 +311,7 @@
       }
     },
     "constIsBoolean": {
-      "if": { "$ref": "#/definitions/typeOfBoolean" },
+      "if": { "$ref": "#/$defs/typeOfBoolean" },
       "then": {
         "properties": {
           "const": { "type": "boolean" },
@@ -319,26 +320,29 @@
       }
     },
     "constIsNull": {
-      "if": { "$ref": "#/definitions/typeOfNull" },
+      "if": { "$ref": "#/$defs/typeOfNull" },
       "then": {
         "properties": {
-          "const": { "type": "null" }
+          "const": { "type": "null" },
+          "enum": { "items": { "type": "null" } }
         }
       }
     },
     "constIsArray": {
-      "if": { "$ref": "#/definitions/typeOfArray" },
+      "if": { "$ref": "#/$defs/typeOfArray" },
       "then": {
         "properties": {
-          "const": { "type": "array" }
+          "const": { "type": "array" },
+          "enum": { "items": { "type": "array" } }
         }
       }
     },
     "constIsObject": {
-      "if": { "$ref": "#/definitions/typeOfObject" },
+      "if": { "$ref": "#/$defs/typeOfObject" },
       "then": {
         "properties": {
-          "const": { "type": "object" }
+          "const": { "type": "object" },
+          "enum": { "items": { "type": "object" } }
         }
       }
     },
@@ -366,20 +370,13 @@
     "$defs": {
       "additionalProperties": { "$ref": "#" }
     },
-    "additionalItems": { "$ref": "#" },
+    "additionalItems": { "$comment": "Deprecated in 2020-12. Use prefixItems + items instead.", "$ref": "#" },
     "additionalProperties": { "$ref": "#" },
-    "dependencies": {
-      "additionalProperties": {
-        "anyOf": [
-          { "$ref": "#/definitions/safePropertyNameArray" },
-          { "$ref": "#" }
-        ]
-      }
-    },
+    "dependencies": false,
     "items": {
-      "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/schemaArray" }]
+      "anyOf": [{ "$ref": "#" }, { "$ref": "#/$defs/schemaArray" }]
     },
-    "prefixItems": { "$ref": "#/definitions/schemaArray" },
+    "prefixItems": { "$ref": "#/$defs/schemaArray" },
     "definitions": {
       "additionalProperties": { "$ref": "#" }
     },
@@ -396,9 +393,9 @@
     "if": { "$ref": "#" },
     "then": { "$ref": "#" },
     "else": { "$ref": "#" },
-    "allOf": { "$ref": "#/definitions/schemaArray" },
-    "anyOf": { "$ref": "#/definitions/schemaArray" },
-    "oneOf": { "$ref": "#/definitions/schemaArray" },
+    "allOf": { "$ref": "#/$defs/schemaArray" },
+    "anyOf": { "$ref": "#/$defs/schemaArray" },
+    "oneOf": { "$ref": "#/$defs/schemaArray" },
     "type": {
       "oneOf": [
         { "enum": ["string", "integer", "number", "boolean", "null", "array", "object"] },
@@ -420,20 +417,23 @@
     "not": { "$ref": "#" },
     "contains": { "$ref": "#" },
     "propertyNames": { "$ref": "#" },
-    "const": { "$ref": "#/definitions/safeValueSizeLimits" },
-    "default": { "$ref": "#/definitions/safeValueSizeLimits" },
+    "const": { "$ref": "#/$defs/safeValueSizeLimits" },
+    "default": { "$ref": "#/$defs/safeValueSizeLimits" },
     "examples": {
       "type": "array",
-      "$ref": "#/definitions/safeArrayItemsLimits",
-      "items": { "$ref": "#/definitions/safeValueSizeLimits" }
+      "$ref": "#/$defs/safeArrayItemsLimits",
+      "items": { "$ref": "#/$defs/safeValueSizeLimits" }
     },
-    "required": { "$ref": "#/definitions/safePropertyNameArray" },
+    "required": { "$ref": "#/$defs/safePropertyNameArray" },
     "dependentRequired": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/definitions/safePropertyNameArray" }
+      "additionalProperties": { "$ref": "#/$defs/safePropertyNameArray" }
     }
   },
-  "dependencies": {
+  "dependentRequired": {
+    "properties": ["required", "maxProperties"]
+  },
+  "dependentSchemas": {
     "contains": {
       "required": ["maxContains", "maxItems", "uniqueItems", "unevaluatedItems"],
       "properties": {
@@ -455,7 +455,7 @@
     "additionalProperties": {
       "required": ["maxProperties"],
       "properties": {
-        "type": { "$ref": "#/definitions/typeObject" },
+        "type": { "$ref": "#/$defs/typeObject" },
         "additionalProperties": {
           "oneOf": [
             {
@@ -471,7 +471,7 @@
     },
     "unevaluatedProperties": {
       "properties": {
-        "type": { "$ref": "#/definitions/typeObject" },
+        "type": { "$ref": "#/$defs/typeObject" },
         "unevaluatedProperties": {
           "const": false
         }
@@ -479,7 +479,7 @@
     },
     "unevaluatedItems": {
       "properties": {
-        "type": { "$ref": "#/definitions/typeArray" },
+        "type": { "$ref": "#/$defs/typeArray" },
         "unevaluatedItems": {
           "const": false
         }
@@ -489,14 +489,14 @@
       "oneOf": [
         {
           "properties": {
-            "type": { "$ref": "#/definitions/typeInteger" },
-            "maximum": { "$ref": "#/definitions/safeInteger" }
+            "type": { "$ref": "#/$defs/typeInteger" },
+            "maximum": { "$ref": "#/$defs/safeInteger" }
           }
         },
         {
           "properties": {
-            "type": { "$ref": "#/definitions/typeNumber" },
-            "maximum": { "$ref": "#/definitions/safeNumber" }
+            "type": { "$ref": "#/$defs/typeNumber" },
+            "maximum": { "$ref": "#/$defs/safeNumber" }
           }
         }
       ]
@@ -505,14 +505,14 @@
       "oneOf": [
         {
           "properties": {
-            "type": { "$ref": "#/definitions/typeInteger" },
-            "exclusiveMaximum": { "$ref": "#/definitions/safeInteger" }
+            "type": { "$ref": "#/$defs/typeInteger" },
+            "exclusiveMaximum": { "$ref": "#/$defs/safeInteger" }
           }
         },
         {
           "properties": {
-            "type": { "$ref": "#/definitions/typeNumber" },
-            "exclusiveMaximum": { "$ref": "#/definitions/safeNumber" }
+            "type": { "$ref": "#/$defs/typeNumber" },
+            "exclusiveMaximum": { "$ref": "#/$defs/safeNumber" }
           }
         }
       ]
@@ -521,14 +521,14 @@
       "oneOf": [
         {
           "properties": {
-            "type": { "$ref": "#/definitions/typeInteger" },
-            "minimum": { "$ref": "#/definitions/safeInteger" }
+            "type": { "$ref": "#/$defs/typeInteger" },
+            "minimum": { "$ref": "#/$defs/safeInteger" }
           }
         },
         {
           "properties": {
-            "type": { "$ref": "#/definitions/typeNumber" },
-            "minimum": { "$ref": "#/definitions/safeNumber" }
+            "type": { "$ref": "#/$defs/typeNumber" },
+            "minimum": { "$ref": "#/$defs/safeNumber" }
           }
         }
       ]
@@ -537,83 +537,84 @@
       "oneOf": [
         {
           "properties": {
-            "type": { "$ref": "#/definitions/typeInteger" },
-            "exclusiveMinimum": { "$ref": "#/definitions/safeInteger" }
+            "type": { "$ref": "#/$defs/typeInteger" },
+            "exclusiveMinimum": { "$ref": "#/$defs/safeInteger" }
           }
         },
         {
           "properties": {
-            "type": { "$ref": "#/definitions/typeNumber" },
+            "type": { "$ref": "#/$defs/typeNumber" },
             "exclusiveMinimum": {
-              "$ref": "#/definitions/safeNumber"
+              "$ref": "#/$defs/safeNumber"
             }
           }
         }
       ]
     },
     "minContains": {
+      "required": ["contains"],
       "properties": {
-        "type": { "$ref": "#/definitions/typeArray" },
-        "minContains": { "$ref": "#/definitions/safeCount" }
+        "type": { "$ref": "#/$defs/typeArray" },
+        "minContains": { "$ref": "#/$defs/safeCount" }
       }
     },
     "maxContains": {
+      "required": ["contains"],
       "properties": {
-        "type": { "$ref": "#/definitions/typeArray" },
-        "maxContains": { "$ref": "#/definitions/safeCount" }
+        "type": { "$ref": "#/$defs/typeArray" },
+        "maxContains": { "$ref": "#/$defs/safeCount" }
       }
     },
     "minItems": {
       "properties": {
-        "type": { "$ref": "#/definitions/typeArray" },
-        "minItems": { "$ref": "#/definitions/safeCount" }
+        "type": { "$ref": "#/$defs/typeArray" },
+        "minItems": { "$ref": "#/$defs/safeCount" }
       }
     },
     "maxItems": {
       "properties": {
-        "type": { "$ref": "#/definitions/typeArray" },
-        "maxItems": { "$ref": "#/definitions/safeCount" }
+        "type": { "$ref": "#/$defs/typeArray" },
+        "maxItems": { "$ref": "#/$defs/safeCount" }
       }
     },
     "minLength": {
       "properties": {
-        "type": { "$ref": "#/definitions/typeString" },
-        "minLength": { "$ref": "#/definitions/safeCount" }
+        "type": { "$ref": "#/$defs/typeString" },
+        "minLength": { "$ref": "#/$defs/safeCount" }
       }
     },
     "maxLength": {
       "properties": {
-        "type": { "$ref": "#/definitions/typeString" },
-        "maxLength": { "$ref": "#/definitions/safeCount" }
+        "type": { "$ref": "#/$defs/typeString" },
+        "maxLength": { "$ref": "#/$defs/safeCount" }
       }
     },
     "minProperties": {
       "properties": {
-        "type": { "$ref": "#/definitions/typeObject" },
-        "minProperties": { "$ref": "#/definitions/safeCount" }
+        "type": { "$ref": "#/$defs/typeObject" },
+        "minProperties": { "$ref": "#/$defs/safeCount" }
       }
     },
     "maxProperties": {
       "properties": {
-        "type": { "$ref": "#/definitions/typeObject" },
-        "maxProperties": { "$ref": "#/definitions/safeCount" }
+        "type": { "$ref": "#/$defs/typeObject" },
+        "maxProperties": { "$ref": "#/$defs/safeCount" }
       }
     },
     "pattern": {
       "properties": {
         "pattern": {
-          "$ref": "#/definitions/safePattern"
+          "$ref": "#/$defs/safePattern"
         }
       },
       "required": ["maxLength"]
     },
-    "properties": ["required", "maxProperties"],
     "patternProperties": {
       "required": ["maxProperties"],
       "properties": {
         "patternProperties": {
           "propertyNames": {
-            "$ref": "#/definitions/safePattern"
+            "$ref": "#/$defs/safePattern"
           }
         }
       }
@@ -629,9 +630,9 @@
     "multipleOf": {
       "required": ["type"],
       "properties": {
-        "type": { "$ref": "#/definitions/typeIntegerOrNumber" },
+        "type": { "$ref": "#/$defs/typeIntegerOrNumber" },
         "multipleOf": {
-          "$ref": "#/definitions/safeMultipleOf"
+          "$ref": "#/$defs/safeMultipleOf"
         }
       }
     },
@@ -640,8 +641,8 @@
       "properties": {
         "$ref": {
           "oneOf": [
-            { "$ref": "#/definitions/safeSchemaUrl" },
-            { "$ref": "#/definitions/safeLocalRef" }
+            { "$ref": "#/$defs/safeSchemaUrl" },
+            { "$ref": "#/$defs/safeLocalRef" }
           ]
         }
       }
@@ -650,7 +651,7 @@
       "properties": {
         "$id": {
           "oneOf": [
-            { "$ref": "#/definitions/safeIdUrl" },
+            { "$ref": "#/$defs/safeIdUrl" },
             { "type": "string", "maxLength": 1024, "pattern": "^[a-zA-Z0-9_-]+$" }
           ]
         }
@@ -659,7 +660,7 @@
     "$anchor": {
       "properties": {
         "$anchor": {
-          "$ref": "#/definitions/safeAnchor"
+          "$ref": "#/$defs/safeAnchor"
         }
       }
     },
@@ -667,8 +668,8 @@
       "properties": {
         "$dynamicRef": {
           "oneOf": [
-            { "$ref": "#/definitions/safeSchemaUrl" },
-            { "$ref": "#/definitions/safeLocalRef" }
+            { "$ref": "#/$defs/safeSchemaUrl" },
+            { "$ref": "#/$defs/safeLocalRef" }
           ]
         }
       }
@@ -676,12 +677,31 @@
     "$dynamicAnchor": {
       "properties": {
         "$dynamicAnchor": {
-          "$ref": "#/definitions/safeAnchor"
+          "$ref": "#/$defs/safeAnchor"
+        }
+      }
+    },
+    "$recursiveRef": {
+      "$comment": "2019-09 predecessor of $dynamicRef. Same SSRF protections apply.",
+      "properties": {
+        "$recursiveRef": {
+          "oneOf": [
+            { "$ref": "#/$defs/safeSchemaUrl" },
+            { "$ref": "#/$defs/safeLocalRef" }
+          ]
+        }
+      }
+    },
+    "$recursiveAnchor": {
+      "$comment": "2019-09 predecessor of $dynamicAnchor. Must be true per spec (false is default/no-op).",
+      "properties": {
+        "$recursiveAnchor": {
+          "const": true
         }
       }
     },
     "contentMediaType": {
-      "$comment": "Media types must follow IANA registry format (RFC 6838). Source: https://www.iana.org/assignments/media-types/media-types.xhtml",
+      "$comment": "Media types must follow IANA registry format (RFC 6838). Source: https://www.iana.org/assignments/media-types/media-types.xhtml. Note: Does not denylist XSS-risky types (text/html, application/xhtml+xml, image/svg+xml). If your application renders content based on this annotation, ensure it is sanitized.",
       "properties": {
         "contentMediaType": {
           "type": "string",
@@ -734,8 +754,7 @@
         "$schema": {
           "enum": [
             "https://json-schema.org/draft/2020-12/schema",
-            "https://json-schema.org/draft/2019-09/schema",
-            "https://json-schema.org/draft-07/schema"
+            "https://json-schema.org/draft/2019-09/schema"
           ]
         }
       }
@@ -746,88 +765,73 @@
           "properties": {
             "enum": {
               "allOf": [
-                { "$ref": "#/definitions/safeArrayItemsLimits" },
-                { "items": { "$ref": "#/definitions/safeValueSizeLimits" } }
+                { "$ref": "#/$defs/safeArrayItemsLimits" },
+                { "items": { "$ref": "#/$defs/safeValueSizeLimits" } }
               ]
             }
           }
         },
-        { "$ref": "#/definitions/constIsString" },
-        { "$ref": "#/definitions/constIsInteger" },
-        { "$ref": "#/definitions/constIsNumber" },
-        { "$ref": "#/definitions/constIsBoolean" },
-        { "$ref": "#/definitions/constIsUnionType" }
+        { "$ref": "#/$defs/constIsString" },
+        { "$ref": "#/$defs/constIsInteger" },
+        { "$ref": "#/$defs/constIsNumber" },
+        { "$ref": "#/$defs/constIsBoolean" },
+        { "$ref": "#/$defs/constIsNull" },
+        { "$ref": "#/$defs/constIsArray" },
+        { "$ref": "#/$defs/constIsObject" },
+        { "$ref": "#/$defs/constIsUnionType" }
       ]
     },
     "format": {
       "required": ["maxLength"],
       "properties": {
         "format": {
-          "anyOf":[
-            {
-              "$comment":"https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.7.3",
-              "enum": [
-                "date-time",
-                "date",
-                "time",
-                "duration",
-                "email",
-                "idn-email",
-                "hostname",
-                "idn-hostname",
-                "ipv4",
-                "ipv6",
-                "url",
-                "url-reference",
-                "uri",
-                "uri-reference",
-                "uri-template",
-                "iri",
-                "iri-reference",
-                "uuid",
-                "json-pointer",
-                "relative-json-pointer",
-                "regex"
-              ]
-            },
-            {
-              "$comment":"https://ajv.js.org/packages/ajv-formats.html",
-              "enum":[
-                "iso-time",
-                "iso-date-time",
-                "byte",
-                "int32",
-                "int64",
-                "float",
-                "double"
-              ]
-            }
+          "$comment":"https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.7.3",
+          "enum": [
+            "date-time",
+            "date",
+            "time",
+            "duration",
+            "email",
+            "idn-email",
+            "hostname",
+            "idn-hostname",
+            "ipv4",
+            "ipv6",
+            "uri",
+            "uri-reference",
+            "uri-template",
+            "iri",
+            "iri-reference",
+            "uuid",
+            "json-pointer",
+            "relative-json-pointer",
+            "regex"
           ]
         }
       }
     },
     "const": {
       "allOf": [
-        { "$ref": "#/definitions/constIsString" },
-        { "$ref": "#/definitions/constIsInteger" },
-        { "$ref": "#/definitions/constIsNumber" },
-        { "$ref": "#/definitions/constIsBoolean" },
-        { "$ref": "#/definitions/constIsNull" },
-        { "$ref": "#/definitions/constIsArray" },
-        { "$ref": "#/definitions/constIsObject" },
-        { "$ref": "#/definitions/constIsUnionType" }
+        { "$ref": "#/$defs/constIsString" },
+        { "$ref": "#/$defs/constIsInteger" },
+        { "$ref": "#/$defs/constIsNumber" },
+        { "$ref": "#/$defs/constIsBoolean" },
+        { "$ref": "#/$defs/constIsNull" },
+        { "$ref": "#/$defs/constIsArray" },
+        { "$ref": "#/$defs/constIsObject" },
+        { "$ref": "#/$defs/constIsUnionType" }
       ]
     },
     "default": {
       "$comment": "Ensure default value type matches declared type to prevent injection via application-populated defaults",
       "allOf": [
-        { "if": { "$ref": "#/definitions/typeOfString" }, "then": { "properties": { "default": { "type": "string" } } } },
-        { "if": { "$ref": "#/definitions/typeOfInteger" }, "then": { "properties": { "default": { "type": "integer" } } } },
-        { "if": { "$ref": "#/definitions/typeOfNumber" }, "then": { "properties": { "default": { "type": "number" } } } },
-        { "if": { "$ref": "#/definitions/typeOfBoolean" }, "then": { "properties": { "default": { "type": "boolean" } } } },
-        { "if": { "$ref": "#/definitions/typeOfNull" }, "then": { "properties": { "default": { "type": "null" } } } },
-        { "if": { "$ref": "#/definitions/typeOfArray" }, "then": { "properties": { "default": { "type": "array" } } } },
-        { "if": { "$ref": "#/definitions/typeOfObject" }, "then": { "properties": { "default": { "type": "object" } } } },
+        { "if": { "$ref": "#/$defs/typeOfString" }, "then": { "properties": { "default": { "type": "string" } } } },
+        { "if": { "$ref": "#/$defs/typeOfInteger" }, "then": { "properties": { "default": { "type": "integer" } } } },
+        { "if": { "$ref": "#/$defs/typeOfNumber" }, "then": { "properties": { "default": { "type": "number" } } } },
+        { "if": { "$ref": "#/$defs/typeOfBoolean" }, "then": { "properties": { "default": { "type": "boolean" } } } },
+        { "if": { "$ref": "#/$defs/typeOfNull" }, "then": { "properties": { "default": { "type": "null" } } } },
+        { "if": { "$ref": "#/$defs/typeOfArray" }, "then": { "properties": { "default": { "type": "array" } } } },
+        { "if": { "$ref": "#/$defs/typeOfObject" }, "then": { "properties": { "default": { "type": "object" } } } },
         {
           "$comment": "When type is a union, default must match a type in the array. For each type category, if NOT in the union, reject defaults of that type.",
           "if": { "properties": { "type": { "type": "array" } }, "required": ["type", "default"] },
@@ -869,7 +873,7 @@
           "if": {
             "properties": {
               "type": {
-                "$ref": "#/definitions/typeArray"
+                "$ref": "#/$defs/typeArray"
               }
             },
             "required": ["type"]
@@ -891,7 +895,7 @@
           "if": {
             "properties": {
               "type": {
-                "$ref": "#/definitions/typeIntegerOrNumber"
+                "$ref": "#/$defs/typeIntegerOrNumber"
               }
             },
             "required": ["type"]
@@ -925,7 +929,7 @@
           "if": {
             "properties": {
               "type": {
-                "$ref": "#/definitions/typeString"
+                "$ref": "#/$defs/typeString"
               }
             },
             "required": ["type"]
@@ -953,7 +957,7 @@
           "if": {
             "properties": {
               "type": {
-                "$ref": "#/definitions/typeObject"
+                "$ref": "#/$defs/typeObject"
               }
             },
             "required": ["type"]

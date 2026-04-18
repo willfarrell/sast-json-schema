@@ -559,13 +559,13 @@
     ]
   },
   {
-    "description": "type=object with dependencies schema form recursive validation",
+    "description": "type=object rejects draft-07 `dependencies` keyword",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
     },
     "tests": [
       {
-        "description": "Should pass when dependency value is a secure schema",
+        "description": "Should fail when `dependencies` is used with a schema value (use dependentSchemas instead)",
         "data": {
           "type": "object",
           "properties": {
@@ -590,10 +590,10 @@
           "maxProperties": 10,
           "required": []
         },
-        "valid": true
+        "valid": false
       },
       {
-        "description": "Should pass when dependency value is an array (not recursively validated)",
+        "description": "Should fail when `dependencies` is used with an array value (use dependentRequired instead)",
         "data": {
           "type": "object",
           "properties": {
@@ -617,28 +617,6 @@
           },
           "unevaluatedProperties": false,
           "maxProperties": 10,
-          "required": []
-        },
-        "valid": true
-      },
-      {
-        "description": "Should fail when dependency value is an insecure schema (missing constraints)",
-        "data": {
-          "type": "object",
-          "properties": {
-            "a": {
-              "type": "string",
-              "enum": [
-                "x"
-              ]
-            }
-          },
-          "dependencies": {
-            "a": {
-              "type": "string"
-            }
-          },
-          "unevaluatedProperties": false,
           "required": []
         },
         "valid": false
@@ -700,6 +678,38 @@
           "required": []
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when dependentSchemas value is boolean true (accepts everything)",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": { "type": "boolean" }
+          },
+          "dependentSchemas": {
+            "a": true
+          },
+          "unevaluatedProperties": false,
+          "maxProperties": 10,
+          "required": ["a"]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when dependentSchemas value is empty object (no type)",
+        "data": {
+          "type": "object",
+          "properties": {
+            "a": { "type": "boolean" }
+          },
+          "dependentSchemas": {
+            "a": {}
+          },
+          "unevaluatedProperties": false,
+          "maxProperties": 10,
+          "required": ["a"]
+        },
+        "valid": false
       }
     ]
   },
@@ -721,7 +731,7 @@
             "required": []
           },
           "contentMediaType": "application/json",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -734,7 +744,7 @@
             "type": "string"
           },
           "contentMediaType": "application/json",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": false
@@ -873,35 +883,6 @@
           "required": ["name"]
         },
         "valid": true
-      }
-    ]
-  },
-  {
-    "description": "type=object with empty string in dependencies array",
-    "schema": {
-      "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
-    },
-    "tests": [
-      {
-        "description": "Should fail when dependencies array contains empty string",
-        "data": {
-          "type": "object",
-          "properties": {
-            "a": {
-              "type": "boolean"
-            },
-            "": {
-              "type": "boolean"
-            }
-          },
-          "dependencies": {
-            "a": [""]
-          },
-          "unevaluatedProperties": false,
-          "maxProperties": 10,
-          "required": ["a"]
-        },
-        "valid": false
       }
     ]
   },

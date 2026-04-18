@@ -281,6 +281,18 @@
           "unevaluatedItems": false
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when maxContains is set without contains",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "maxContains": 5,
+          "maxItems": 10,
+          "unevaluatedItems": false
+        },
+        "valid": false
       }
     ]
   },
@@ -471,6 +483,18 @@
           "uniqueItems": true,
           "minContains": -1,
           "maxContains": 5,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when minContains is set without contains",
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true,
+          "minContains": 1,
+          "maxItems": 10,
           "unevaluatedItems": false
         },
         "valid": false

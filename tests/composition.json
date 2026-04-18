@@ -373,16 +373,16 @@
     ]
   },
   {
-    "description": "dependencies array value validation",
+    "description": "dependentRequired array value validation",
     "schema": {
       "$ref": "https://raw.githubusercontent.com/willfarrell/sast-json-schema/main/index.json"
     },
     "tests": [
       {
-        "description": "Should pass when dependency value is a valid string array",
+        "description": "Should pass when dependentRequired value is a valid string array",
         "data": {
           "type": "object",
-          "dependencies": {
+          "dependentRequired": {
             "a": ["b", "c"]
           },
           "properties": {
@@ -397,11 +397,44 @@
         "valid": true
       },
       {
-        "description": "Should fail when dependency array contains non-string values",
+        "description": "Should fail when dependentRequired array contains non-string values",
+        "data": {
+          "type": "object",
+          "dependentRequired": {
+            "a": [123, null, true]
+          },
+          "properties": {
+            "a": { "type": "boolean" }
+          },
+          "required": ["a"],
+          "maxProperties": 10,
+          "unevaluatedProperties": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when `dependencies` keyword is used (deprecated draft-07 form)",
         "data": {
           "type": "object",
           "dependencies": {
-            "a": [123, null, true]
+            "a": ["b"]
+          },
+          "properties": {
+            "a": { "type": "boolean" },
+            "b": { "type": "boolean" }
+          },
+          "required": ["a"],
+          "maxProperties": 10,
+          "unevaluatedProperties": false
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when dependentRequired array contains empty string (invalid property name)",
+        "data": {
+          "type": "object",
+          "dependentRequired": {
+            "a": [""]
           },
           "properties": {
             "a": { "type": "boolean" }

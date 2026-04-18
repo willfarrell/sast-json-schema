@@ -117,3 +117,165 @@ test("fuzz: completely random objects should not crash validator", () => {
 		{ numRuns: 1000 },
 	);
 });
+
+test("fuzz: $ref values should not throw", () => {
+	fc.assert(
+		fc.property(
+			fc.oneof(
+				// Valid local refs
+				fc
+					.string({ minLength: 1, maxLength: 50 })
+					.map((s) => `#/definitions/${s.replace(/[^a-zA-Z0-9_$/.+-]/g, "x")}`),
+				// Valid HTTPS URLs
+				fc
+					.string({ minLength: 1, maxLength: 30 })
+					.map(
+						(s) => `https://example.com/${s.replace(/[^a-zA-Z0-9_/-]/g, "x")}`,
+					),
+				// Invalid values: http, file, bare strings
+				fc.constantFrom(
+					"http://example.com/schema",
+					"file:///etc/passwd",
+					"http://",
+					"ftp://example.com",
+					"//example.com/schema",
+					"",
+					"not-a-ref",
+					"javascript:alert(1)",
+					"data:text/html,<script>",
+					"https://127.0.0.1/schema",
+					"https://localhost/schema",
+					"#",
+					"#/",
+				),
+				// Completely random strings
+				fc.string({ minLength: 0, maxLength: 100 }),
+			),
+			(refValue) => {
+				validate({ $ref: refValue });
+			},
+		),
+		{ numRuns: 1000 },
+	);
+});
+
+test("fuzz: pattern values should not throw", () => {
+	fc.assert(
+		fc.property(
+			fc.oneof(
+				// Safe anchored patterns
+				fc.constantFrom(
+					"^[a-z]+$",
+					"^[0-9]+$",
+					"^[\\p{L}]+$",
+					"^[a-zA-Z0-9_-]+$",
+					"^[\\p{L}\\p{N}]+$",
+				),
+				// Patterns with special chars
+				fc.constantFrom(
+					"^(a|b|c)+$",
+					"^(?:foo|bar)$",
+					"^[a-z]{1,10}$",
+					".+",
+					"(a+)+",
+					"^[^a-z]+$",
+					"^a*b*$",
+					"(?=abc)",
+					"\\S+",
+					"\\1",
+				),
+				// Patterns with nested groups
+				fc.constantFrom(
+					"^((?:a|b){1,3}){1,5}$",
+					"^((a)(b)(c))$",
+					"^(a(b(c)))$",
+				),
+				// Random strings as patterns
+				fc.string({ minLength: 0, maxLength: 100 }),
+			),
+			(patternValue) => {
+				validate({
+					type: "string",
+					pattern: patternValue,
+					maxLength: 100,
+				});
+			},
+		),
+		{ numRuns: 1000 },
+	);
+});
+
+test("fuzz: format values should not throw", () => {
+	fc.assert(
+		fc.property(
+			fc.oneof(
+				// Valid formats from the allowlist
+				fc.constantFrom(
+					"date-time",
+					"date",
+					"time",
+					"duration",
+					"email",
+					"idn-email",
+					"hostname",
+					"idn-hostname",
+					"ipv4",
+					"ipv6",
+					"uri",
+					"uri-reference",
+					"uri-template",
+					"iri",
+					"iri-reference",
+					"uuid",
+					"json-pointer",
+					"relative-json-pointer",
+					"regex",
+				),
+				// Random strings as format values
+				fc.string({ minLength: 0, maxLength: 50 }),
+			),
+			(formatValue) => {
+				validate({
+					type: "string",
+					format: formatValue,
+					maxLength: 100,
+				});
+			},
+		),
+		{ numRuns: 1000 },
+	);
+});
+
+test("fuzz: additionalProperties values should not throw", () => {
+	fc.assert(
+		fc.property(
+			fc.oneof(
+				// false (common secure pattern)
+				fc.constant(false),
+				// Object with type (allowed by schema)
+				fc.record({
+					type: fc.constantFrom("string", "integer", "number", "boolean"),
+				}),
+				// Random values
+				fc.constant(true),
+				fc.constant(null),
+				fc.string({ minLength: 0, maxLength: 20 }),
+				fc.integer({ min: -100, max: 100 }),
+				fc.anything(),
+			),
+			(additionalPropsValue) => {
+				validate({
+					type: "object",
+					properties: {
+						name: { type: "string", maxLength: 100, pattern: "^[a-z]+$" },
+					},
+					required: ["name"],
+					unevaluatedProperties: false,
+					maxProperties: 10,
+					additionalProperties: additionalPropsValue,
+				});
+			},
+		),
+		{ numRuns: 1000 },
+	);
+});

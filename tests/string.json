@@ -179,13 +179,31 @@
         "valid": false
       },
       {
-        "description": "Should pass when format is set to iso-date-time",
+        "description": "Should fail when format is iso-date-time (vendor-specific, use date-time instead)",
         "data": {
           "type": "string",
           "format": "iso-date-time",
           "maxLength": 64
         },
-        "valid": true
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is byte (vendor-specific, not in JSON Schema spec)",
+        "data": {
+          "type": "string",
+          "format": "byte",
+          "maxLength": 1024
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is int32 (vendor-specific, not in JSON Schema spec)",
+        "data": {
+          "type": "string",
+          "format": "int32",
+          "maxLength": 100
+        },
+        "valid": false
       },
       {
         "description": "Should fail when format is unknown",
@@ -193,6 +211,24 @@
           "type": "string",
           "format": "nonsense",
           "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is url (non-standard, use uri instead)",
+        "data": {
+          "type": "string",
+          "format": "url",
+          "maxLength": 2048
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is url-reference (non-standard, use uri-reference instead)",
+        "data": {
+          "type": "string",
+          "format": "url-reference",
+          "maxLength": 2048
         },
         "valid": false
       }
@@ -438,6 +474,24 @@
         "valid": false
       },
       {
+        "description": "Should fail when pattern contains `\\v` (vertical tab, control char U+000B)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\v]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when pattern contains `\\f` (form feed, control char U+000C)",
+        "data": {
+          "type": "string",
+          "pattern": "^[a-z\\f]+$",
+          "maxLength": 100
+        },
+        "valid": false
+      },
+      {
         "description": "Should fail when pattern contains `\\C` char",
         "data": {
           "type": "string",
@@ -676,6 +730,24 @@
         "data": {
           "type": "string",
           "pattern": "^(?:(?:(?:a|b)|c)|d)$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when alternation is inside depth-4 nested groups",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a|(?:b|(?:c|(?:d|e))))$",
+          "maxLength": 100
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when alternation is inside depth-5 nested groups",
+        "data": {
+          "type": "string",
+          "pattern": "^(?:a|(?:b|(?:c|(?:d|(?:e|f)))))$",
           "maxLength": 100
         },
         "valid": true
@@ -1075,7 +1147,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "application/json",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -1085,7 +1157,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "text/html",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -1095,7 +1167,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "application/vnd.api+json",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -1105,7 +1177,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "foo/bar",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": false
@@ -1115,7 +1187,7 @@
         "data": {
           "type": "string",
           "contentMediaType": "application",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": false
@@ -1133,7 +1205,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "base64",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -1143,7 +1215,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "base32",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -1153,7 +1225,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "base16",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -1163,7 +1235,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "quoted-printable",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -1173,7 +1245,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "7bit",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": false
@@ -1183,7 +1255,7 @@
         "data": {
           "type": "string",
           "contentEncoding": "nonsense",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": false
@@ -1613,7 +1685,7 @@
           "type": "string",
           "contentSchema": { "type": "string", "enum": ["a"], "maxLength": 100 },
           "contentMediaType": "application/json",
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": true
@@ -1623,7 +1695,7 @@
         "data": {
           "type": "string",
           "contentSchema": { "type": "string", "enum": ["a"], "maxLength": 100 },
-          "format": "byte",
+          "format": "regex",
           "maxLength": 1024
         },
         "valid": false
