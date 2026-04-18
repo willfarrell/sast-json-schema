@@ -380,3 +380,62 @@ describe("resolveSSRFRefs", () => {
 		strictEqual(errors.length, 2);
 	});
 });
+
+// --- resolveInstancePath (via analyze overrides) ---
+
+describe("resolveInstancePath via overrides", () => {
+	test("overrideMaxItems resolves nested enum path", async () => {
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "test",
+			type: "object",
+			properties: {
+				status: {
+					type: "string",
+					maxLength: 50,
+					enum: Array.from({ length: 2000 }, (_, i) => `s${i}`),
+				},
+			},
+			required: ["status"],
+			unevaluatedProperties: false,
+			maxProperties: 5,
+		};
+		const errors = await analyze(schema, {
+			overrideMaxItems: 2000,
+			offline: true,
+		});
+		ok(!errors.some((e) => e.keyword === "maxItems"));
+	});
+
+	test("overrideMaxDepth 0 rejects schemas with nested objects", async () => {
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "test",
+			type: "object",
+			properties: {
+				a: { type: "string", maxLength: 10, pattern: "^[a-z]+$" },
+			},
+			required: ["a"],
+			unevaluatedProperties: false,
+			maxProperties: 5,
+		};
+		const errors = await analyze(schema, { overrideMaxDepth: 0 });
+		ok(errors.some((e) => e.keyword === "depth"));
+		strictEqual(errors[0].params.limit, 0);
+	});
+
+	test("overrideMaxItems keeps error when override is below actual count", async () => {
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "test",
+			type: "string",
+			maxLength: 100,
+			enum: Array.from({ length: 2000 }, (_, i) => `v${i}`),
+		};
+		const errors = await analyze(schema, {
+			overrideMaxItems: 1500,
+			offline: true,
+		});
+		ok(errors.some((e) => e.keyword === "maxItems"));
+	});
+});

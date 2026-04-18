@@ -123,4 +123,102 @@ describe("cli.", () => {
 		strictEqual(r.code, 0);
 		ok(r.stdout.includes("has no issues"));
 	});
+
+	test("--override-max-depth with non-integer exits 2", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+				maxLength: 10,
+				pattern: "^[a-z]+$",
+			}),
+		);
+		const r = await runCli(["--offline", "--override-max-depth", "3.5", path]);
+		strictEqual(r.code, 2);
+		ok(r.stderr.includes("non-negative integer"));
+	});
+
+	test("--override-max-depth with negative value exits 2", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+				maxLength: 10,
+				pattern: "^[a-z]+$",
+			}),
+		);
+		const r = await runCli(["--offline", "--override-max-depth", "-1", path]);
+		strictEqual(r.code, 2);
+	});
+
+	test("--override-max-depth 0 reports depth error", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "object",
+				properties: {
+					a: { type: "string", maxLength: 10, pattern: "^[a-z]+$" },
+				},
+				required: ["a"],
+				unevaluatedProperties: false,
+				maxProperties: 5,
+			}),
+		);
+		const r = await runCli(["--offline", "--override-max-depth", "0", path]);
+		strictEqual(r.code, 1);
+	});
+
+	test("--ignore can be repeated to suppress multiple paths", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				type: "object",
+				properties: {
+					a: { type: "string", maxLength: 10, pattern: "[a-z]+\\w+" },
+					b: { type: "string", maxLength: 10, pattern: "[a-z]+\\w+" },
+				},
+				required: ["a", "b"],
+				maxProperties: 10,
+				unevaluatedProperties: false,
+			}),
+		);
+		const r = await runCli([
+			"--offline",
+			"--format",
+			"json",
+			"--ignore",
+			"/properties/a/pattern",
+			"--ignore",
+			"/properties/b/pattern",
+			path,
+		]);
+		const errors = JSON.parse(r.stdout);
+		ok(!errors.some((e) => e.instancePath.includes("/pattern")));
+	});
 });

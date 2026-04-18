@@ -598,11 +598,11 @@
 		"then": {
 			"properties": {
 				"const": {
-					"type": ["string", "number", "integer", "boolean", "null"]
+					"type": ["string", "number", "boolean", "null"]
 				},
 				"enum": {
 					"items": {
-						"type": ["string", "number", "integer", "boolean", "null"]
+						"type": ["string", "number", "boolean", "null"]
 					}
 				}
 			}

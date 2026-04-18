@@ -8,7 +8,7 @@
       {
         "description": "Should pass minimal secure draft-06 schema",
         "data": {
-          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$schema": "https://json-schema.org/draft-06/schema",
           "$id": "test",
           "type": "object",
           "required": [
@@ -28,7 +28,7 @@
       {
         "description": "Should pass draft-06 schema with const",
         "data": {
-          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$schema": "https://json-schema.org/draft-06/schema",
           "$id": "test",
           "type": "string",
           "const": "a",
@@ -39,7 +39,7 @@
       {
         "description": "Should fail when $schema declares draft-07",
         "data": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$schema": "https://json-schema.org/draft-07/schema",
           "$id": "test",
           "type": "string",
           "maxLength": 64,
@@ -50,7 +50,7 @@
       {
         "description": "Should fail when schema uses $comment (draft-07+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$schema": "https://json-schema.org/draft-06/schema",
           "$id": "test",
           "$comment": "note",
           "type": "string",
@@ -62,7 +62,7 @@
       {
         "description": "Should fail when schema uses if/then/else (draft-07+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$schema": "https://json-schema.org/draft-06/schema",
           "$id": "test",
           "type": "string",
           "enum": [
@@ -91,7 +91,7 @@
       {
         "description": "Should fail when schema uses contentMediaType (draft-07+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$schema": "https://json-schema.org/draft-06/schema",
           "$id": "test",
           "type": "string",
           "maxLength": 64,
@@ -103,7 +103,7 @@
       {
         "description": "Should fail when schema uses $defs (2019-09+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$schema": "https://json-schema.org/draft-06/schema",
           "$id": "test",
           "$defs": {
             "name": {

@@ -53,12 +53,18 @@ const knownSchemaUrls = new Map([
 // Maps a user schema's $schema URL to the matching draft version.
 const schemaVersion = (url) => {
 	if (!url) return DEFAULT_VERSION;
-	const normalized = url.replace(/^https?:\/\//, "").replace(/#$/, "");
+	const normalized = url.replace(/^(?:https?:)?\/\//, "").replace(/#$/, "");
 	return knownSchemaUrls.get(normalized);
 };
 
 export const MAX_DEPTH = 32;
 export const MAX_SCHEMA_SIZE = 64 * 1024 * 1024; // 64 MiB
+
+// AJV schema paths used by override filters. Verified by regression tests
+// in cli.analyze.test.js to match what AJV actually emits.
+const SCHEMA_PATH_MAX_ITEMS = "#/$defs/safeArrayItemsLimits/maxItems";
+const SCHEMA_PATH_MAX_PROPERTIES =
+	"#/$defs/safeObjectPropertiesLimits/maxProperties";
 
 // Returns the pre-compiled SAST validator for the draft declared by
 // `schema.$schema`. Defaults to 2020-12 when $schema is absent.
@@ -486,7 +492,9 @@ export const analyze = async (schema, options = {}) => {
 	if (options.overrideMaxProperties != null) {
 		const n = Number(options.overrideMaxProperties);
 		if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
-			throw new TypeError("overrideMaxProperties must be a non-negative integer");
+			throw new TypeError(
+				"overrideMaxProperties must be a non-negative integer",
+			);
 		}
 	}
 
@@ -526,7 +534,7 @@ export const analyze = async (schema, options = {}) => {
 	if (options.overrideMaxItems != null && errors.length) {
 		const limit = Number(options.overrideMaxItems);
 		errors = errors.filter((err) => {
-			if (err.schemaPath === "#/$defs/safeArrayItemsLimits/maxItems") {
+			if (err.schemaPath === SCHEMA_PATH_MAX_ITEMS) {
 				const arr = resolveInstancePath(schema, err.instancePath);
 				return !Array.isArray(arr) || arr.length > limit;
 			}
@@ -536,9 +544,7 @@ export const analyze = async (schema, options = {}) => {
 	if (options.overrideMaxProperties != null && errors.length) {
 		const limit = Number(options.overrideMaxProperties);
 		errors = errors.filter((err) => {
-			if (
-				err.schemaPath === "#/$defs/safeObjectPropertiesLimits/maxProperties"
-			) {
+			if (err.schemaPath === SCHEMA_PATH_MAX_PROPERTIES) {
 				const obj = resolveInstancePath(schema, err.instancePath);
 				if (typeof obj !== "object" || obj === null) return true;
 				return Object.keys(obj).length > limit;

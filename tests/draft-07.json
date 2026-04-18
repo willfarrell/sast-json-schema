@@ -8,7 +8,7 @@
       {
         "description": "Should pass minimal secure draft-07 schema",
         "data": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$schema": "https://json-schema.org/draft-07/schema",
           "$id": "test",
           "type": "object",
           "required": [
@@ -28,7 +28,7 @@
       {
         "description": "Should pass draft-07 schema with if/then/else",
         "data": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$schema": "https://json-schema.org/draft-07/schema",
           "$id": "test",
           "type": "string",
           "enum": [
@@ -68,7 +68,7 @@
       {
         "description": "Should fail when schema uses $defs (2019-09+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$schema": "https://json-schema.org/draft-07/schema",
           "$id": "test",
           "$defs": {
             "name": {
@@ -86,7 +86,7 @@
       {
         "description": "Should fail when schema uses $anchor (2019-09+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$schema": "https://json-schema.org/draft-07/schema",
           "$id": "test",
           "$anchor": "name",
           "type": "string",
@@ -98,7 +98,7 @@
       {
         "description": "Should fail when schema uses unevaluatedProperties (2019-09+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$schema": "https://json-schema.org/draft-07/schema",
           "$id": "test",
           "type": "object",
           "required": [
@@ -119,7 +119,7 @@
       {
         "description": "Should fail when schema uses prefixItems (2020-12)",
         "data": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
+          "$schema": "https://json-schema.org/draft-07/schema",
           "$id": "test",
           "type": "array",
           "prefixItems": [

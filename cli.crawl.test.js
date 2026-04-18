@@ -313,4 +313,73 @@ describe("crawlSchema", () => {
 		const r = crawlSchema({ $ref: "file:///etc/passwd" });
 		strictEqual(r.refs.length, 0);
 	});
+
+	// --- $ref URL edge cases ---
+	test("should collect $ref with IPv6 literal host", () => {
+		const r = crawlSchema({ $ref: "https://[::1]/schema.json" });
+		strictEqual(r.refs.length, 1);
+		// URL.hostname preserves brackets for IPv6 literals
+		strictEqual(r.refs[0].hostname, "[::1]");
+	});
+
+	test("should collect $ref hostname ignoring credentials", () => {
+		const r = crawlSchema({
+			$ref: "https://user:pass@example.com/schema.json",
+		});
+		strictEqual(r.refs.length, 1);
+		strictEqual(r.refs[0].hostname, "example.com");
+	});
+
+	test("should collect $ref hostname ignoring query string", () => {
+		const r = crawlSchema({
+			$ref: "https://example.com/schema.json?v=1",
+		});
+		strictEqual(r.refs.length, 1);
+		strictEqual(r.refs[0].hostname, "example.com");
+	});
+
+	test("should collect $ref with port in URL", () => {
+		const r = crawlSchema({
+			$ref: "https://example.com:8443/schema.json",
+		});
+		strictEqual(r.refs.length, 1);
+		strictEqual(r.refs[0].hostname, "example.com");
+	});
+
+	// --- numeric boundary values ---
+	test("should catch MAX_SAFE_INTEGER minimum > zero maximum", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: Number.MAX_SAFE_INTEGER,
+			maximum: 0,
+		});
+		ok(r.errors.some((e) => e.keyword === "minimum"));
+	});
+
+	test("should allow minimum === maximum at MAX_SAFE_INTEGER", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: Number.MAX_SAFE_INTEGER,
+			maximum: Number.MAX_SAFE_INTEGER,
+		});
+		strictEqual(r.errors.length, 0);
+	});
+
+	test("should catch exclusiveMinimum === maximum at MAX_SAFE_INTEGER", () => {
+		const r = crawlSchema({
+			type: "number",
+			exclusiveMinimum: Number.MAX_SAFE_INTEGER,
+			maximum: Number.MAX_SAFE_INTEGER,
+		});
+		ok(r.errors.some((e) => e.keyword === "exclusiveMinimum"));
+	});
+
+	test("should treat -0 and +0 as equal for min/max", () => {
+		const r = crawlSchema({
+			type: "number",
+			minimum: -0,
+			maximum: +0,
+		});
+		strictEqual(r.errors.length, 0);
+	});
 });

@@ -7,7 +7,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const defsLib = JSON.parse(readFileSync(`${root}/src/$defs.json`, "utf8"));
+let defsLib;
+try {
+	defsLib = JSON.parse(readFileSync(`${root}/src/$defs.json`, "utf8"));
+} catch (err) {
+	console.error(`Error loading src/$defs.json: ${err.message}`);
+	process.exit(1);
+}
 const drafts = ["draft-04", "draft-06", "draft-07", "2019-09", "2020-12"];
 const outputs = [];
 const REF_PREFIX = "#/$defs/";
@@ -28,10 +34,19 @@ const collectRefs = (node, acc) => {
 };
 
 for (const draft of drafts) {
-	const src = readFileSync(`${root}/src/${draft}.json`, "utf8");
-	const manifest = JSON.parse(src);
+	let src;
+	let manifest;
+	try {
+		src = readFileSync(`${root}/src/${draft}.json`, "utf8");
+		manifest = JSON.parse(src);
+	} catch (err) {
+		console.error(`Error loading src/${draft}.json: ${err.message}`);
+		process.exit(1);
+	}
 	const authored =
-		manifest.$defs && typeof manifest.$defs === "object"
+		manifest.$defs &&
+		typeof manifest.$defs === "object" &&
+		!Array.isArray(manifest.$defs)
 			? { ...manifest.$defs }
 			: {};
 

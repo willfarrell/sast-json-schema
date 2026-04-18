@@ -203,7 +203,7 @@
 	"$ref": "#/$defs/schemaBase",
 	"properties": {
 		"$schema": {
-			"const": "http://json-schema.org/draft-06/schema#"
+			"const": "https://json-schema.org/draft-06/schema"
 		},
 		"$id": {
 			"oneOf": [

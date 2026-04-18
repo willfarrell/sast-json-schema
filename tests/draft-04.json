@@ -8,7 +8,7 @@
       {
         "description": "Should pass minimal secure draft-04 schema",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "object",
           "required": [
@@ -28,7 +28,7 @@
       {
         "description": "Should pass draft-04 schema with legacy `id` identifier",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "https://example.com/schemas/name",
           "type": "string",
           "maxLength": 64,
@@ -39,7 +39,7 @@
       {
         "description": "Should pass integer schema with boolean exclusiveMinimum",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "integer",
           "minimum": 0,
@@ -51,7 +51,7 @@
       {
         "description": "Should pass draft-04 schema with definitions",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "definitions": {
             "name": {
@@ -69,7 +69,7 @@
       {
         "description": "Should fail when $schema declares draft-06",
         "data": {
-          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$schema": "https://json-schema.org/draft-06/schema",
           "id": "test",
           "type": "string",
           "maxLength": 64,
@@ -80,7 +80,7 @@
       {
         "description": "Should fail when schema uses $id (draft-06+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "$id": "https://example.com/schemas/name",
           "type": "string",
@@ -92,7 +92,7 @@
       {
         "description": "Should fail when schema uses const (draft-06+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "string",
           "const": "a",
@@ -103,7 +103,7 @@
       {
         "description": "Should fail when schema uses contains (draft-06+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "array",
           "items": {
@@ -124,7 +124,7 @@
       {
         "description": "Should fail when schema uses propertyNames (draft-06+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "object",
           "required": [
@@ -149,7 +149,7 @@
       {
         "description": "Should fail when schema uses examples (draft-06+)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "string",
           "maxLength": 64,
@@ -163,7 +163,7 @@
       {
         "description": "Should fail when exclusiveMinimum is numeric (draft-04 requires boolean)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "integer",
           "minimum": 0,
@@ -175,7 +175,7 @@
       {
         "description": "Should fail when `id` is missing entirely (required)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "type": "string",
           "maxLength": 64,
           "pattern": "^[a-z]+$"
@@ -185,7 +185,7 @@
       {
         "description": "Should fail when `id` URL contains a fragment (safeIdUrl rejects #)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "https://example.com/schemas/name#frag",
           "type": "string",
           "maxLength": 64,
@@ -196,7 +196,7 @@
       {
         "description": "Should pass when `id` is a URN",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "urn:example:test",
           "type": "string",
           "maxLength": 64,

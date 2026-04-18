@@ -333,7 +333,7 @@
 	"$ref": "#/$defs/schemaBase",
 	"properties": {
 		"$schema": {
-			"const": "http://json-schema.org/draft-04/schema#"
+			"const": "https://json-schema.org/draft-04/schema"
 		},
 		"$id": false,
 		"id": {

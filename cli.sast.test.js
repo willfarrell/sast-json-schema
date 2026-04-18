@@ -1,6 +1,5 @@
 import { ok, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
-import schema202012 from "./2020-12.json" with { type: "json" };
 import sast, { analyze, MAX_SCHEMA_SIZE } from "./cli.js";
 
 test("sast should return a validate function", () => {
@@ -85,6 +84,56 @@ test("sast should detect draft-04 from https $schema URL", () => {
 		$schema: "https://json-schema.org/draft-04/schema#",
 	});
 	ok(typeof validate === "function");
+});
+
+// --- schemaVersion edge cases ---
+
+describe("schemaVersion edge cases", () => {
+	test("should detect draft from protocol-relative URL", () => {
+		const validate = sast({
+			$schema: "//json-schema.org/draft-07/schema",
+		});
+		ok(typeof validate === "function");
+	});
+
+	test("should detect 2019-09 from $schema URL", () => {
+		const validate = sast({
+			$schema: "https://json-schema.org/draft/2019-09/schema",
+		});
+		ok(typeof validate === "function");
+	});
+
+	test("should throw for ftp protocol $schema", () => {
+		let threw = false;
+		try {
+			sast({ $schema: "ftp://json-schema.org/draft/2020-12/schema" });
+		} catch {
+			threw = true;
+		}
+		ok(threw);
+	});
+
+	test("should throw for $schema with extra path segments", () => {
+		let threw = false;
+		try {
+			sast({
+				$schema: "https://json-schema.org/draft/2020-12/schema/extra",
+			});
+		} catch {
+			threw = true;
+		}
+		ok(threw);
+	});
+
+	test("should throw for $schema with multiple trailing hashes", () => {
+		let threw = false;
+		try {
+			sast({ $schema: "https://json-schema.org/draft-07/schema##" });
+		} catch {
+			threw = true;
+		}
+		ok(threw);
+	});
 });
 
 // --- sast() accept/reject consistent with analyze() ---
