@@ -12,7 +12,9 @@
 				"additionalProperties": {
 					"$ref": "#/$defs/properties.additionalProperties"
 				},
-				"dependencies": false,
+				"dependencies": {
+					"$ref": "#/$defs/properties.dependencies"
+				},
 				"items": {
 					"$ref": "#/$defs/properties.items"
 				},

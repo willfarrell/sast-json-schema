@@ -752,6 +752,20 @@
 	"properties.required": {
 		"$ref": "#/$defs/safePropertyNameArray"
 	},
+	"properties.dependencies": {
+		"$comment": "Pre-2019-09 keyword that accepts either an array of property names (dependentRequired-equivalent) or a subschema (dependentSchemas-equivalent). Each entry is dispatched to the matching validator.",
+		"$ref": "#/$defs/safeObjectPropertiesLimits",
+		"additionalProperties": {
+			"oneOf": [
+				{
+					"$ref": "#/$defs/safePropertyNameArray"
+				},
+				{
+					"$ref": "#/$defs/schemaRules"
+				}
+			]
+		}
+	},
 	"properties.dependentRequired": {
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
