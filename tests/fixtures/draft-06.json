@@ -126,6 +126,108 @@
           "pattern": "^[a-z]+$"
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when `dependencies` uses the array form (draft-06 has no dependentRequired)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            },
+            "b": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "required": [],
+          "maxProperties": 10,
+          "dependencies": {
+            "a": ["b"]
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when `dependencies` uses the subschema form (draft-06 has no dependentSchemas)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "required": [],
+          "maxProperties": 10,
+          "dependencies": {
+            "a": {
+              "type": "object",
+              "properties": {
+                "b": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[a-z]+$"
+                }
+              },
+              "required": [],
+              "maxProperties": 10
+            }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when `dependencies` array form contains an empty property name (safePropertyName minLength)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "required": [],
+          "maxProperties": 10,
+          "dependencies": {
+            "a": [""]
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when `dependencies` subschema form violates schemaRules (unbounded string)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "required": [],
+          "maxProperties": 10,
+          "dependencies": {
+            "a": {
+              "type": "string"
+            }
+          }
+        },
+        "valid": false
       }
     ]
   }

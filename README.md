@@ -28,9 +28,11 @@
 
 - Ensure strictness of interpretation.
 - Ensure `integer` or `number` are within a safe range.
-- Ensure `string` have defined allowed values and length.
-- Ensure `arrays` have defined properties and maxLength.
+- Ensure `string` have defined allowed values and maxLength.
+- Ensure `arrays` have defined properties and maxItems.
 - Ensure `object` have defined properties and maxProperties when needed.
+- Ensure `pattern` follow safe RegExp usage.
+- Ensure `$id` and `$refs` resolve safely.
 
 ## Installation
 
@@ -64,7 +66,7 @@ if (!isSchemaSecure(schema)) {
 }
 ```
 
-Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<draft>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
+Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<spec>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
 
 ### CLI
 
@@ -73,8 +75,8 @@ npx sast-json-schema path/to/schema.json
 ```
 
 Options:
-- `--override-max-items <n>` — Override max items limit (default: 1024)
 - `--override-max-depth <n>` — Override max depth limit (default: 32)
+- `--override-max-items <n>` — Override max items limit (default: 1024)
 - `--override-max-properties <n>` — Override max properties limit (default: 1024)
 - `--ignore <instancePath>` — Suppress errors by instancePath or instancePath:keyword (repeatable). Paths use [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901) JSON Pointer encoding (`~` → `~0`, `/` → `~1`)
 - `--offline` — Skip SSRF DNS resolution for remote `$ref` URLs (useful in airgapped CI)
@@ -95,6 +97,47 @@ Also available via [`ajv-cmd`](https://github.com/willfarrell/ajv-cmd):
 ```bash
 ajv sast --fail path/to/schema.json
 ```
+
+## Known Limitations
+
+- **`$ref: "#"` (self-reference) is rejected.** The meta-schema requires `$ref` values to have at least one character after `#`. Bare self-references (`$ref: "#"`) are blocked to prevent infinite recursion in validators. If you need a self-referencing schema, use a named `$defs` entry and reference it explicitly.
+- **`contentMediaType` does not flag XSS-risky media types.** The meta-schema validates that `contentMediaType` follows IANA format ([RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)) but does not warn about types whose content can execute scripts when rendered, such as `text/html`, `application/xhtml+xml`, or `image/svg+xml`. If your application renders content based on this annotation, ensure it is sanitized to prevent XSS.
+- **`format: "regex"` does not validate regex safety.** A schema using `format: "regex"` validates that input strings are syntactically valid regular expressions, but the meta-schema does not ensure those regex strings are safe from ReDoS. If your application compiles user-provided regex strings, use runtime ReDoS checking on the input. i.e. JavaScript: `redos-detector`.
+
+### Meta-schema only
+
+- **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default). Enforced by the CLI, see `--override-max-depth`.
+- **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced by the CLI.
+- **`pattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Bare alternation at the top level (`^a|b$`) is rejected, but alternation across sibling groups (`^(a)|(b)$`) is not detected at the meta-schema level — it is enforced by the CLI. The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection.
+- **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref` to `#` (local) or `https://` URLs and blocks private IP ranges (dotted-decimal, hex `0x`, and decimal representations), but DNS-based bypasses (domains resolving to internal IPs) cannot be detected at the schema level. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended. Enforced by the CLI.
+
+## Supported keywords per draft
+
+All meta-schemas reject keywords not listed in their respective JSON Schema spec (e.g. draft-04 rejects `const` because it was introduced in draft-06). Keywords that ARE in a given spec but are rejected here on security grounds are flagged below.
+
+| Keyword                | draft-04 | draft-06 | draft-07 | 2019-09 | 2020-12 | Notes |
+|------------------------|:-:|:-:|:-:|:-:|:-:|---|
+| `type`, `enum`, `not`  | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `allOf`/`anyOf`/`oneOf`| ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `$ref`                 | ✓ | ✓ | ✓ | ✓ | ✓ | Restricted to local `#…` or HTTPS; SSRF-checked |
+| `$id` / `id`           | ✓ | ✓ | ✓ | ✓ | ✓ | HTTPS URL, URN, or plain name |
+| `definitions`          | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `$defs`                | — | — | — | ✓ | ✓ | |
+| `title`, `description`, `default` | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `const`                | — | ✓ | ✓ | ✓ | ✓ | Type-locked to declared `type` |
+| `contains`             | — | ✓ | ✓ | ✓ | ✓ | Requires `maxContains` + `uniqueItems` |
+| `propertyNames`        | — | ✓ | ✓ | ✓ | ✓ | |
+| `if`/`then`/`else`     | — | — | ✓ | ✓ | ✓ | |
+| `contentMediaType`, `contentEncoding` | — | — | ✓ | ✓ | ✓ | Allow-listed per RFC 6838 / RFC-standard |
+| `contentSchema`        | — | — | — | ✓ | ✓ | |
+| `readOnly` / `writeOnly` | — | **✗** | ✓ | ✓ | ✓ | Rejected in draft-06 (annotation-only, misleading for strictness); accepted but ignored later |
+| `dependencies`         | ✓ | ✓ | ✓ | — | — | Array or subschema form; removed in 2019-09+, prefer `dependentRequired` / `dependentSchemas` |
+| `dependentRequired`    | — | — | — | ✓ | ✓ | |
+| `dependentSchemas`     | — | — | — | ✓ | ✓ | |
+| `prefixItems`          | — | — | — | — | ✓ | |
+| `unevaluatedProperties`/`unevaluatedItems` | — | — | — | ✓ | ✓ | Required for object/array strictness |
+
+Legend: ✓ supported · **✗** rejected on security grounds · — not in spec for that draft.
 
 ## OWASP ASVS 5.0.0 (2026-03)
 
@@ -128,51 +171,6 @@ The following requirements should be considered when writing JSON Schemas used f
 - **15.3.3:** Verify that the application has countermeasures to protect against mass assignment attacks by limiting allowed fields per controller and action, e.g., it is not possible to insert or update a field value when it was not intended to be part of that action.
 - **15.3.5:** Verify that the application explicitly ensures that variables are of the correct type and performs strict equality and comparator operations to avoid type juggling or type confusion vulnerabilities.
 - **15.3.7:** Verify that the application has defenses against HTTP parameter pollution attacks, particularly if the application framework makes no distinction about the source of request parameters (query string, body parameters, cookies, or header fields).
-
-## Known Limitations
-
-- **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default). Enforced by the CLI, see `--override-max-depth`.
-- **`enum` size bounded to 1024 items.** Large `enum` arrays could cause memory/performance issues. Keep enums small and consider application-level limits. Can be overridden via the CLI, see `--override-max-items`.
-- **`properties` size bounded to 1024 items.** Large `properties` objects could cause memory/performance issues. Keep properties small and consider application-level limits. Can be overridden via the CLI, see `--override-max-properties`.
-- **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced by the CLI.
-- **`safePattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Bare alternation at the top level (`^a|b$`) is rejected, but alternation across sibling groups (`^(a)|(b)$`) is not detected at the meta-schema level — it is enforced by the CLI. The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection.
-- **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref` to `#` (local) or `https://` URLs and blocks private IP ranges (dotted-decimal, hex `0x`, and decimal representations), but DNS-based bypasses (domains resolving to internal IPs) cannot be detected at the schema level. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended. Enforced by the CLI.
-- **`safeUrl` hostname constraints.** Only HTTPS URLs are allowed. Explicit ports are rejected entirely. The TLD may be upper-case or lower-case; the rest of the hostname is matched case-sensitively on the ASCII-label charset. Internationalized domain names (IDN / punycode) are not specifically handled and should be converted to ASCII labels.
-- **Plain-name `$id` / `id` values** must match `^[a-zA-Z0-9_-]+$` with a maximum length of 1024. Non-ASCII identifiers, dots, slashes, and other [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) path characters are not permitted in the plain-name form — use a full URL or URN if you need those.
-- **`contentMediaType` does not flag XSS-risky media types.** The meta-schema validates that `contentMediaType` follows IANA format ([RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)) but does not warn about types whose content can execute scripts when rendered, such as `text/html`, `application/xhtml+xml`, or `image/svg+xml`. If your application renders content based on this annotation, ensure it is sanitized to prevent XSS.
-- **`$ref: "#"` (self-reference) is rejected.** The meta-schema requires `$ref` values to have at least one character after `#`. Bare self-references (`$ref: "#"`) are blocked to prevent infinite recursion in validators. If you need a self-referencing schema, use a named `$defs` entry and reference it explicitly.
-- **`format: "regex"` does not validate regex safety.** A schema using `format: "regex"` validates that input strings are syntactically valid regular expressions, but the meta-schema does not ensure those regex strings are safe from ReDoS. If your application compiles user-provided regex strings, use runtime ReDoS checking on the input. i.e. JavaScript: `redos-detector`.
-- **SSRF detection requires DNS and network access.** `analyze()` / the CLI perform a DNS lookup (default 5s timeout, 10 concurrent hostnames) for every non-local `$ref`. In airgapped environments every remote `$ref` will be reported as "does not resolve" — pass `--offline` (or `options.offline = true`) to skip the lookup entirely, or tune `options.dnsTimeoutMs` / `options.dnsConcurrency` for the library API.
-- **Union-type `const` / `enum` restricted to primitives.** When `type` is an array (e.g. `["string", "null"]`), `const` and `enum` values are constrained to primitive types (`string`, `number`, `integer`, `boolean`, `null`) to prevent type-confusion bypasses via complex structured values.
-- **`dependencies` keyword is rejected in every draft.** The draft-04-era `dependencies` keyword conflates "require these property names" with "apply this subschema" and is hard to reason about securely. Use `required` + `dependentRequired` / `dependentSchemas` (draft 2019-09+) where available. Draft-04 schemas that declare `dependencies` are rejected by design.
-
-## Supported keywords per draft
-
-All meta-schemas reject keywords not listed in their respective JSON Schema spec (e.g. draft-04 rejects `const` because it was introduced in draft-06). Keywords that ARE in a given spec but are rejected here on security grounds are flagged below.
-
-| Keyword                | draft-04 | draft-06 | draft-07 | 2019-09 | 2020-12 | Notes |
-|------------------------|:-:|:-:|:-:|:-:|:-:|---|
-| `type`, `enum`, `not`  | ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `allOf`/`anyOf`/`oneOf`| ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `$ref`                 | ✓ | ✓ | ✓ | ✓ | ✓ | Restricted to local `#…` or HTTPS; SSRF-checked |
-| `$id` / `id`           | ✓ | ✓ | ✓ | ✓ | ✓ | HTTPS URL, URN, or plain name |
-| `definitions`          | ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `$defs`                | — | — | — | ✓ | ✓ | |
-| `title`, `description`, `default` | ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `const`                | — | ✓ | ✓ | ✓ | ✓ | Type-locked to declared `type` |
-| `contains`             | — | ✓ | ✓ | ✓ | ✓ | Requires `maxContains` + `uniqueItems` |
-| `propertyNames`        | — | ✓ | ✓ | ✓ | ✓ | |
-| `if`/`then`/`else`     | — | — | ✓ | ✓ | ✓ | |
-| `contentMediaType`, `contentEncoding` | — | — | ✓ | ✓ | ✓ | Allow-listed per RFC 6838 / RFC-standard |
-| `contentSchema`        | — | — | — | ✓ | ✓ | |
-| `readOnly` / `writeOnly` | — | **✗** | ✓ | ✓ | ✓ | Rejected in draft-06 (annotation-only, misleading for strictness); accepted but ignored later |
-| `dependencies`         | **✗** | **✗** | **✗** | — | — | Rejected; use `dependentRequired` / `dependentSchemas` (2019-09+) or refactor |
-| `dependentRequired`    | — | — | — | ✓ | ✓ | |
-| `dependentSchemas`     | — | — | — | ✓ | ✓ | |
-| `prefixItems`          | — | — | — | — | ✓ | |
-| `unevaluatedProperties`/`unevaluatedItems` | — | — | — | ✓ | ✓ | Required for object/array strictness |
-
-Legend: ✓ supported · **✗** rejected on security grounds · — not in spec for that draft.
 
 ## Sources
 
