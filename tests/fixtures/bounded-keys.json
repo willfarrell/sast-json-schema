@@ -1,0 +1,220 @@
+[
+  {
+    "description": "propertyNames must declare type=string + safe pattern + maxLength",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should fail when propertyNames has only type",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string"
+          },
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["name"]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when propertyNames missing maxLength",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z]+$"
+          },
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["name"]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when propertyNames missing pattern",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["name"]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when propertyNames sets type+pattern+maxLength",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "maxLength": 64
+          },
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["name"]
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "patternProperties must be paired with propertyNames",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should fail when patternProperties is set without propertyNames",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "patternProperties": {
+            "^[a-z]+$": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when patternProperties is paired with propertyNames",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "patternProperties": {
+            "^[a-z]+$": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "maxLength": 64
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "additionalProperties: <typed> must be paired with propertyNames",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should fail when additionalProperties is typed without propertyNames",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when additionalProperties is typed and paired with propertyNames",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "maxLength": 64
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when additionalProperties: false (no propertyNames needed)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["name"]
+        },
+        "valid": true
+      }
+    ]
+  }
+]

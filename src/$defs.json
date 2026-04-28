@@ -56,7 +56,7 @@
 		"maxLength": 4096
 	},
 	"safePropertyName": {
-		"$comment": "Reject property names with prototype semantics in V8 (__proto__, constructor, prototype) to mitigate prototype pollution in downstream validators that copy keys onto plain objects.",
+		"$comment": "Universal baseline denylist: __proto__/constructor/prototype are dangerous in every language entry exposed by --lang (js/py/rb/rs/java/cs/php), so they are rejected at the meta-schema layer for direct consumers. Language-specific extensions (e.g. __class__ for py, @type for java, $type for cs) are enforced additively at the cli.js analyze() layer via --lang. patternProperties keys are NOT denied here — see properties.patternProperties.",
 		"type": "string",
 		"minLength": 1,
 		"maxLength": 1024,
@@ -665,7 +665,6 @@
 		}
 	},
 	"properties.patternProperties": {
-		"$comment": "Prototype-pollution-prone names (__proto__, constructor, prototype) cannot be reliably denied at the meta-schema layer because patternProperties keys are regex strings — any literal denylist is trivially bypassed (^_{2}proto_{2}$, ^.{9}$, ^[a-z_]{9}$). Detection runs at the cli.js crawlSchema layer, which compiles each key and tests it against the denylisted names.",
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
@@ -817,6 +816,7 @@
 		}
 	},
 	"dependentSchemas.additionalProperties": {
+		"$comment": "When additionalProperties is a typed schema (i.e. not the literal `false`), require a sibling propertyNames so the schema author has explicitly bounded the keyspace shape (length + pattern via the existing string-strictness rule). additionalProperties: false alone is unaffected.",
 		"required": ["maxProperties"],
 		"properties": {
 			"type": {
@@ -833,6 +833,17 @@
 					}
 				]
 			}
+		},
+		"if": {
+			"properties": {
+				"additionalProperties": {
+					"type": "object"
+				}
+			},
+			"required": ["additionalProperties"]
+		},
+		"then": {
+			"required": ["propertyNames"]
 		}
 	},
 	"dependentSchemas.unevaluatedProperties": {
@@ -1042,7 +1053,8 @@
 		"required": ["maxLength"]
 	},
 	"dependentSchemas.patternProperties": {
-		"required": ["maxProperties"],
+		"$comment": "Require a sibling propertyNames so the schema author has explicitly bounded the keyspace shape (length + charset via the existing string-strictness rule). Without it, patternProperties silently admits whatever its regex matches, which can be infinite.",
+		"required": ["maxProperties", "propertyNames"],
 		"properties": {
 			"patternProperties": {
 				"propertyNames": {

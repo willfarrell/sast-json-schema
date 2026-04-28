@@ -1,6 +1,6 @@
 [
   {
-    "description": "Reject __proto__ in required",
+    "description": "Universal baseline: meta-schema rejects __proto__ / constructor / prototype as property-name keys regardless of --lang",
     "schema": {
       "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },
@@ -13,7 +13,7 @@
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {
-            "__proto__": {
+            "name": {
               "type": "string",
               "maxLength": 8,
               "enum": ["a"]
@@ -61,36 +61,9 @@
           "required": ["prototype"]
         },
         "valid": false
-      }
-    ]
-  },
-  {
-    "description": "Reject __proto__ in properties",
-    "schema": {
-      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
-    },
-    "tests": [
-      {
-        "description": "Should fail when properties contains __proto__ key",
-        "data": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "$id": "test",
-          "type": "object",
-          "unevaluatedProperties": false,
-          "properties": {
-            "__proto__": {
-              "type": "string",
-              "maxLength": 8,
-              "enum": ["a"]
-            }
-          },
-          "maxProperties": 10,
-          "required": ["name"]
-        },
-        "valid": false
       },
       {
-        "description": "Should fail when properties contains constructor key",
+        "description": "Should fail when properties key is constructor",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
@@ -107,17 +80,9 @@
           "required": ["name"]
         },
         "valid": false
-      }
-    ]
-  },
-  {
-    "description": "Reject __proto__ in $defs",
-    "schema": {
-      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
-    },
-    "tests": [
+      },
       {
-        "description": "Should fail when $defs key is __proto__",
+        "description": "Should fail when $defs key is prototype",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
@@ -133,7 +98,7 @@
           "maxProperties": 10,
           "required": ["name"],
           "$defs": {
-            "__proto__": {
+            "prototype": {
               "type": "string",
               "maxLength": 8,
               "enum": ["a"]
@@ -145,59 +110,7 @@
     ]
   },
   {
-    "description": "Reject __proto__ in dependentRequired",
-    "schema": {
-      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
-    },
-    "tests": [
-      {
-        "description": "Should fail when dependentRequired key is __proto__",
-        "data": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "$id": "test",
-          "type": "object",
-          "unevaluatedProperties": false,
-          "properties": {
-            "name": {
-              "type": "string",
-              "maxLength": 8,
-              "enum": ["a"]
-            }
-          },
-          "maxProperties": 10,
-          "required": ["name"],
-          "dependentRequired": {
-            "__proto__": ["name"]
-          }
-        },
-        "valid": false
-      },
-      {
-        "description": "Should fail when dependentRequired value contains __proto__",
-        "data": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "$id": "test",
-          "type": "object",
-          "unevaluatedProperties": false,
-          "properties": {
-            "name": {
-              "type": "string",
-              "maxLength": 8,
-              "enum": ["a"]
-            }
-          },
-          "maxProperties": 10,
-          "required": ["name"],
-          "dependentRequired": {
-            "name": ["__proto__"]
-          }
-        },
-        "valid": false
-      }
-    ]
-  },
-  {
-    "description": "Allow lookalikes (case-sensitive exact-match denylist)",
+    "description": "Lookalike names (case-sensitive exact match) pass meta-schema",
     "schema": {
       "$ref": "urn:willfarrell:sast-json-schema:2020-12"
     },

@@ -52,6 +52,11 @@
             "minimum": 0,
             "maximum": 1
           },
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "maxLength": 64
+          },
           "maxProperties": 10,
           "unevaluatedProperties": false,
           "required": []
@@ -299,6 +304,11 @@
               "maximum": 1
             }
           },
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]+$",
+            "maxLength": 64
+          },
           "maxProperties": 1,
           "required": []
         },
@@ -520,6 +530,11 @@
             "minimum": 0,
             "maximum": 1
           },
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "maxLength": 64
+          },
           "maxProperties": 10,
           "unevaluatedProperties": false,
           "required": []
@@ -561,6 +576,11 @@
               "minimum": 0,
               "maximum": 1
             }
+          },
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[\\p{L}]+$",
+            "maxLength": 64
           },
           "maxProperties": 1,
           "required": []
