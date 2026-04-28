@@ -4,6 +4,7 @@
 import { lookup as dnsLookup } from "node:dns/promises";
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import Ajv from "ajv/dist/2020.js";
 import { isSafePattern } from "redos-detector";
@@ -67,35 +68,35 @@ export const REDOS_TIMEOUT_MS = 1_000;
 
 // Property names that act as deserialization / type-confusion vectors in
 // each downstream language ecosystem. Selected at the analyze() / CLI layer
-// via the `lang` option (default: "default" — union of every named lang,
+// via the `lang` option (default: "default", the union of every named lang,
 // because JSON specs typically flow through multiple language toolchains
 // and the safe default is to catch them all). Set --lang explicitly to
 // narrow scope when you control the consumer environment.
 //
-// "default"— union of every named language entry below. Most paranoid baseline.
-// "js"     — V8 prototype-pollution: __proto__, constructor, prototype.
-// "py"     — js + Python introspection / pickle gadget keys.
-// "rb"     — js + Ruby reflection / JSON.load(create_additions: true).
-// "rs"     — js baseline (Rust serde itself is type-safe, but specs often
+// "default": union of every named language entry below. Most paranoid baseline.
+// "js":      V8 prototype-pollution: __proto__, constructor, prototype.
+// "py":      js + Python introspection / pickle gadget keys.
+// "rb":      js + Ruby reflection / JSON.load(create_additions: true).
+// "rs":      js baseline (Rust serde itself is type-safe, but specs often
 //            pass through JS tooling that is not).
-// "java"   — js + Jackson/Fastjson polymorphic deserialization markers.
-// "kotlin" — alias of java (JVM/Jackson).
-// "clojure"— alias of java (JVM/Cheshire).
-// "cs"     — js + .NET JSON deserialization markers. Covers C#, VB.NET,
-//            ASP.NET, and ASPX — they all share the same serializer stack
-//            (Json.NET $type, DataContractJsonSerializer __type, OData @odata.type).
-// "vb"     — alias of cs (.NET stack).
-// "fsharp" — alias of cs (.NET stack).
-// "php"    — js + PHP magic methods invoked during object hydration
+// "java":    js + Jackson/Fastjson polymorphic deserialization markers.
+// "kotlin":  alias of java (JVM/Jackson).
+// "clojure": alias of java (JVM/Cheshire).
+// "cs":      js + .NET JSON deserialization markers. Covers C#, VB.NET,
+//            ASP.NET, and ASPX (they all share the same serializer stack:
+//            Json.NET $type, DataContractJsonSerializer __type, OData @odata.type).
+// "vb":      alias of cs (.NET stack).
+// "fsharp":  alias of cs (.NET stack).
+// "php":     js + PHP magic methods invoked during object hydration
 //            (Symfony Serializer / JMS Serializer / unserialize gadget chains).
-// "objc"   — js + Objective-C runtime keys: isa, class, superclass,
+// "objc":    js + Objective-C runtime keys: isa, class, superclass,
 //            description, init, _cmd (KVC + performSelector: vectors).
-// "swift"  — alias of objc (Obj-C runtime exposure via interop; pure Codable
+// "swift":   alias of objc (Obj-C runtime exposure via interop; pure Codable
 //            is type-safe but mixed projects share the same surface).
-// "ex"     — js + Elixir/BEAM struct-identifier keys: __struct__,
+// "ex":      js + Elixir/BEAM struct-identifier keys: __struct__,
 //            __exception__, __protocol__ (auto-recognized when JSON is
 //            decoded with :keys => :atoms and hydrated into a struct).
-// "lua"    — js + Lua metamethod names (__index, __newindex, __call,
+// "lua":     js + Lua metamethod names (__index, __newindex, __call,
 //            __metatable, __tostring, __gc, __close, etc.) for libraries
 //            that auto-bind metatables onto JSON-decoded tables.
 //
@@ -254,7 +255,7 @@ const resolveDangerousNames = (lang) => {
 	const list = DANGEROUS_NAMES_BY_LANG[lang];
 	if (!list) {
 		throw new TypeError(
-			`unknown lang "${lang}" — expected one of: ${Object.keys(DANGEROUS_NAMES_BY_LANG).join(", ")}`,
+			`unknown lang "${lang}", expected one of: ${Object.keys(DANGEROUS_NAMES_BY_LANG).join(", ")}`,
 		);
 	}
 	return list;
@@ -594,7 +595,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 							});
 						}
 					} catch {
-						// unparseable regex — meta-schema safePattern rejects it
+						// unparseable regex; meta-schema safePattern rejects it
 					}
 				}
 			}
@@ -879,6 +880,77 @@ export const analyze = async (schema, options = {}) => {
 	return errors;
 };
 
+// Maps the analyze() error array to SARIF 2.1.0. Designed for GitHub
+// code-scanning, SonarQube, and other security pipelines that consume SARIF.
+// instancePath is encoded as logicalLocations.fullyQualifiedName (JSON Pointer)
+// since SARIF doesn't natively model JSON-pointer regions.
+export const formatSarif = (errors, inputPath) => {
+	const inputUri = pathToFileURL(resolve(inputPath)).href;
+	const ruleMap = new Map();
+	for (const err of errors) {
+		const ruleId = err.schemaPath
+			? err.schemaPath.replace(/^#\//, "").split("/")[0] || err.keyword
+			: (err.keyword ?? "unknown");
+		if (!ruleMap.has(ruleId)) {
+			ruleMap.set(ruleId, {
+				id: ruleId,
+				name: ruleId,
+				shortDescription: { text: ruleId },
+				fullDescription: { text: err.message ?? ruleId },
+				defaultConfiguration: { level: "error" },
+			});
+		}
+	}
+	return {
+		$schema:
+			"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/Schemata/sarif-schema-2.1.0.json",
+		version: "2.1.0",
+		runs: [
+			{
+				tool: {
+					driver: {
+						name: "sast-json-schema",
+						informationUri:
+							"https://github.com/willfarrell/sast-json-schema",
+						version: pkg.version,
+						rules: [...ruleMap.values()],
+					},
+				},
+				results: errors.map((err) => {
+					const ruleId = err.schemaPath
+						? err.schemaPath.replace(/^#\//, "").split("/")[0] ||
+							err.keyword
+						: (err.keyword ?? "unknown");
+					return {
+						ruleId,
+						level: "error",
+						message: { text: err.message ?? err.keyword ?? "schema issue" },
+						locations: [
+							{
+								physicalLocation: {
+									artifactLocation: { uri: inputUri },
+								},
+								logicalLocations: [
+									{
+										fullyQualifiedName: err.instancePath ?? "",
+										kind: "value",
+									},
+								],
+							},
+						],
+						properties: {
+							instancePath: err.instancePath ?? "",
+							schemaPath: err.schemaPath ?? "",
+							keyword: err.keyword ?? "",
+							...(err.params ?? {}),
+						},
+					};
+				}),
+			},
+		],
+	};
+};
+
 // --- CLI entrypoint ---
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
 	const die = (msg) => {
@@ -920,7 +992,8 @@ Options:
                                    Downstream language whose deserialization-vector names
                                    to deny in property keys. "default" is the union of
                                    every named language. (default: default)
-  --format <human|json>            Output format (default: human)
+  --format <human|json|sarif>      Output format. "sarif" emits SARIF 2.1.0 for
+                                   GitHub code-scanning / SonarQube / Semgrep (default: human)
   -v, --version                    Show version
   -h, --help                       Show this help
 
@@ -936,8 +1009,14 @@ Exit codes:
 		process.exit(0);
 	}
 
-	if (values.format !== "human" && values.format !== "json") {
-		die(`--format must be "human" or "json", got "${values.format}"`);
+	if (
+		values.format !== "human" &&
+		values.format !== "json" &&
+		values.format !== "sarif"
+	) {
+		die(
+			`--format must be "human", "json", or "sarif", got "${values.format}"`,
+		);
 	}
 
 	if (!Object.hasOwn(DANGEROUS_NAMES_BY_LANG, values.lang)) {
@@ -990,6 +1069,12 @@ Exit codes:
 
 	if (values.format === "json") {
 		process.stdout.write(`${JSON.stringify(errors)}\n`);
+		if (errors.length) {
+			console.error(`${input} has ${errors.length} issue(s)`);
+			process.exit(1);
+		}
+	} else if (values.format === "sarif") {
+		process.stdout.write(`${JSON.stringify(formatSarif(errors, input))}\n`);
 		if (errors.length) {
 			console.error(`${input} has ${errors.length} issue(s)`);
 			process.exit(1);

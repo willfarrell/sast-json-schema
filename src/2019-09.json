@@ -74,6 +74,9 @@
 				"dependentRequired": {
 					"$ref": "#/$defs/properties.dependentRequired"
 				},
+				"deprecated": {
+					"$ref": "#/$defs/properties.deprecated"
+				},
 				"$dynamicRef": false,
 				"$dynamicAnchor": false,
 				"$vocabulary": false

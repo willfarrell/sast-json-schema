@@ -143,6 +143,38 @@ describe("cli.", () => {
 		ok(parsed.length > 0);
 	});
 
+	test("--format sarif emits a SARIF 2.1.0 log on stdout", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "insecure.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+			}),
+		);
+		const r = await runCli(["--offline", "--format", "sarif", path]);
+		strictEqual(r.code, 1);
+		const parsed = JSON.parse(r.stdout);
+		strictEqual(parsed.version, "2.1.0");
+		ok(Array.isArray(parsed.runs) && parsed.runs.length === 1);
+		const run = parsed.runs[0];
+		strictEqual(run.tool.driver.name, "sast-json-schema");
+		ok(typeof run.tool.driver.version === "string");
+		ok(Array.isArray(run.tool.driver.rules));
+		ok(Array.isArray(run.results) && run.results.length > 0);
+		const result = run.results[0];
+		ok(typeof result.ruleId === "string");
+		strictEqual(result.level, "error");
+		ok(typeof result.message.text === "string");
+		ok(result.locations[0].physicalLocation.artifactLocation.uri.startsWith("file://"));
+		ok(typeof result.locations[0].logicalLocations[0].fullyQualifiedName === "string");
+	});
+
 	test("clean schema with --offline exits 0", async () => {
 		const { writeFile, mkdtemp } = await import("node:fs/promises");
 		const { tmpdir } = await import("node:os");

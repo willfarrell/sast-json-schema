@@ -43,6 +43,38 @@ full announcement, and may ask for additional information or guidance.
 Report security vulnerabilities in third-party modules to the person or
 team maintaining the module.
 
+## Out-of-scope attack classes
+
+The meta-schema and CLI catch many security-relevant misconfigurations, but the following classes cannot be fully addressed at the schema layer. They are documented here so consumers can apply mitigations at the appropriate layer.
+
+### XML-family `contentMediaType` (XXE)
+
+When a schema declares `contentMediaType: application/xml` (or any of `text/xml`, `application/soap+xml`, `application/xml-dtd`, `application/xml-external-parsed-entity`, `image/svg+xml`), a downstream consumer that decodes and parses the payload with default XML parser settings is exposed to XML External Entity (XXE) attacks: file disclosure, SSRF, billion-laughs DoS.
+
+The meta-schema cannot prevent this. `contentMediaType` is purely an annotation, and the consumer's XML parser is what creates the vulnerability. Mitigations are at the consumer layer:
+
+- **libxml2-based parsers** (Python `lxml`, PHP `DOMDocument`): set `XML_PARSE_NOENT` to `0`, `XML_PARSE_NOCDATA`, disable DTD loading via `XML_PARSE_NONET`.
+- **Java**: `XMLInputFactory.setProperty(XMLInputFactory.SUPPORT_DTD, false)` and `XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES = false`. For SAX, `XMLReader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)`.
+- **.NET**: `XmlReaderSettings.DtdProcessing = DtdProcessing.Prohibit`, `XmlResolver = null`.
+- **Node.js**: avoid `xmldom` (XXE history); prefer `fast-xml-parser` with default-secure settings.
+
+Parallel guidance applies to XSS-risky types (`text/html`, `application/xhtml+xml`, `image/svg+xml`): sanitize before rendering.
+
+### Atom-table / symbol-package exhaustion (BEAM, Common Lisp)
+
+If your consumer opts into key-to-atom decoding (`Jason.decode(json, keys: :atoms)` in Elixir, `cl-json:decode-json` with the default `*json-symbols-package*` in Common Lisp), every novel key gets interned into a runtime-global table that is never freed. An attacker submitting unique keys across many requests can fill it and crash the runtime.
+
+Schema keywords that admit unbounded distinct keys:
+
+- `additionalProperties: <typed schema>`: any key matching the typed schema is accepted.
+- `patternProperties`: any key matching the regex, generally infinite.
+
+Schema keywords that keep the keyset finite and are safe to pair with atom-keyed decoding:
+
+- `additionalProperties: false` + an explicit `properties` allowlist.
+
+The validator and the schema cannot fix this; the choice is in your decoder. Use `Jason.decode(json, keys: :atoms!)` (existing atoms only) or string keys; in Common Lisp set `*json-symbols-package*` to `nil`.
+
 ## Disclosure Policy
 
 When the security team receives a security bug report, they will assign it

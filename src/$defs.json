@@ -12,7 +12,7 @@
 		"uniqueItems": true
 	},
 	"safeArrayLimits": {
-		"$comment": "Like safeArrayItemsLimits but without uniqueItems — for schema arrays (allOf/anyOf/oneOf/prefixItems) where deep-equal subschemas are not an injection risk and enforcing uniqueness creates odd invariants.",
+		"$comment": "Like safeArrayItemsLimits but without uniqueItems, for schema arrays (allOf/anyOf/oneOf/prefixItems) where deep-equal subschemas are not an injection risk and enforcing uniqueness creates odd invariants.",
 		"type": "array",
 		"minItems": 0,
 		"maxItems": 1024
@@ -56,7 +56,7 @@
 		"maxLength": 4096
 	},
 	"safePropertyName": {
-		"$comment": "Universal baseline denylist: __proto__/constructor/prototype are dangerous in every language entry exposed by --lang (js/py/rb/rs/java/cs/php), so they are rejected at the meta-schema layer for direct consumers. Language-specific extensions (e.g. __class__ for py, @type for java, $type for cs) are enforced additively at the cli.js analyze() layer via --lang. patternProperties keys are NOT denied here — see properties.patternProperties.",
+		"$comment": "Universal baseline denylist: __proto__/constructor/prototype are dangerous in every language entry exposed by --lang (js/py/rb/rs/java/cs/php), so they are rejected at the meta-schema layer for direct consumers. Language-specific extensions (e.g. __class__ for py, @type for java, $type for cs) are enforced additively at the cli.js analyze() layer via --lang. patternProperties keys are NOT denied here; see properties.patternProperties.",
 		"type": "string",
 		"minLength": 1,
 		"maxLength": 1024,
@@ -289,7 +289,7 @@
 		]
 	},
 	"safeUrl": {
-		"$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection. Explicit ports are rejected entirely; only the implicit default HTTPS port 443 is reachable — strip `:443` before validation if your source includes it.",
+		"$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection. Explicit ports are rejected entirely; only the implicit default HTTPS port 443 is reachable. Strip `:443` before validation if your source includes it.",
 		"type": "string",
 		"allOf": [
 			{
@@ -758,6 +758,10 @@
 	"properties.default": {
 		"$ref": "#/$defs/safeValueSizeLimits"
 	},
+	"properties.deprecated": {
+		"$comment": "Annotation introduced in JSON Schema 2019-09 (and present in 2020-12). Boolean only; meaningful values are `true` (mark schema as deprecated); `false` is the default. Older drafts (04/06/07) reject this keyword via explicit `: false` in their schemaBase.",
+		"type": "boolean"
+	},
 	"properties.examples": {
 		"type": "array",
 		"$ref": "#/$defs/safeArrayItemsLimits",
@@ -1168,7 +1172,7 @@
 		}
 	},
 	"dependentSchemas.contentMediaType": {
-		"$comment": "Media types must follow IANA registry format (RFC 6838). Source: https://www.iana.org/assignments/media-types/media-types.xhtml. Note: Does not denylist XSS-risky types (text/html, application/xhtml+xml, image/svg+xml). If your application renders content based on this annotation, ensure it is sanitized.",
+		"$comment": "Media types must follow IANA registry format (RFC 6838). Source: https://www.iana.org/assignments/media-types/media-types.xhtml. Note 1: Does not denylist XSS-risky types (text/html, application/xhtml+xml, image/svg+xml). If your application renders content based on this annotation, ensure it is sanitized. Note 2: Does not denylist XXE-risky types (application/xml, text/xml, application/soap+xml, application/xml-dtd, application/xml-external-parsed-entity, image/svg+xml). If your consumer parses these payloads, configure the XML parser to disable external entity resolution and DTD processing. See SECURITY.md.",
 		"properties": {
 			"contentMediaType": {
 				"type": "string",

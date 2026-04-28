@@ -47,13 +47,13 @@ describe("built meta-schemas compile without error", () => {
 // patterns match, that const/default types agree with declared types).
 //
 // Stubbed rules:
-//   - safePattern: meta-schema regexes are trusted — may use [^...], lookarounds
-//   - schemaBase.oneOf: "must declare type/const/$ref/…" gate — meta-schema $defs
+//   - safePattern: meta-schema regexes are trusted (may use [^...], lookarounds)
+//   - schemaBase.oneOf: "must declare type/const/$ref/…" gate; meta-schema $defs
 //     are composition helpers wired via if/then/allOf, not data-shape schemas
-//   - schemaBase.dependentRequired: "properties → required+maxProperties"
+//   - schemaBase.dependentRequired: "properties to required+maxProperties"
 //     coupling targets user-facing object schemas
 //   - dependentSchemas.{type,items,prefixItems,contains,pattern}: per-type
-//     strictness and limit rules — composition helpers like `{type: "array"}`
+//     strictness and limit rules; composition helpers like `{type: "array"}`
 //     inside `constIsArray` can't satisfy user-facing strictness gates
 const STUBBED_DEPENDENT_SCHEMA_RULES = [
 	"type",

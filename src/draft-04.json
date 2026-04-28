@@ -219,6 +219,7 @@
 				"contains": false,
 				"propertyNames": false,
 				"examples": false,
+				"deprecated": false,
 				"$vocabulary": false
 			},
 			"dependentRequired": {

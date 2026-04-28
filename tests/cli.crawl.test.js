@@ -523,7 +523,7 @@ describe("crawlSchema", () => {
 		ok(!r.errors.some((e) => e.keyword === "patternProperties"));
 	});
 
-	test("should not flag _proto_ (single underscores) — case-sensitive exact match only", () => {
+	test("should not flag _proto_ (single underscores), case-sensitive exact match only", () => {
 		const r = crawlSchema({
 			patternProperties: { "^_proto_$": { type: "string" } },
 		});
