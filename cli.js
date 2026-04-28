@@ -65,6 +65,11 @@ export const MAX_SCHEMA_SIZE = 64 * 1024 * 1024; // 64 MiB
 // scan time bounded on adversarial input.
 export const REDOS_TIMEOUT_MS = 1_000;
 
+// Names with prototype semantics in V8. Property keys (or patternProperties
+// regex keys that match these literals) can be vectors for prototype pollution
+// in downstream validators that copy keys onto plain objects.
+const PROTOTYPE_POLLUTION_NAMES = ["__proto__", "constructor", "prototype"];
+
 // AJV schema paths used by override filters. Verified by regression tests
 // in cli.analyze.test.js to match what AJV actually emits.
 const SCHEMA_PATH_MAX_ITEMS = "#/$defs/safeArrayItemsLimits/maxItems";
@@ -302,6 +307,30 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH) => {
 					params: { pattern: current.pattern, reason: "parseError" },
 					message: "pattern could not be parsed for ReDoS analysis",
 				});
+			}
+		}
+
+		if (
+			Object.hasOwn(current, "patternProperties") &&
+			typeof current.patternProperties === "object" &&
+			current.patternProperties !== null
+		) {
+			for (const patternKey of Object.keys(current.patternProperties)) {
+				try {
+					const re = new RegExp(patternKey);
+					const matches = PROTOTYPE_POLLUTION_NAMES.filter((n) => re.test(n));
+					if (matches.length > 0) {
+						result.errors.push({
+							instancePath: `${path}/patternProperties/${escapeJsonPointer(patternKey)}`,
+							schemaPath: "#/prototype-pollution",
+							keyword: "patternProperties",
+							params: { pattern: patternKey, matches },
+							message: `patternProperties key "${patternKey}" matches prototype-pollution-prone name(s): ${matches.join(", ")}`,
+						});
+					}
+				} catch {
+					// unparseable regex — safePattern at the meta-schema layer rejects it
+				}
 			}
 		}
 

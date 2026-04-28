@@ -56,9 +56,13 @@
 		"maxLength": 4096
 	},
 	"safePropertyName": {
+		"$comment": "Reject property names with prototype semantics in V8 (__proto__, constructor, prototype) to mitigate prototype pollution in downstream validators that copy keys onto plain objects.",
 		"type": "string",
 		"minLength": 1,
-		"maxLength": 1024
+		"maxLength": 1024,
+		"not": {
+			"enum": ["__proto__", "constructor", "prototype"]
+		}
 	},
 	"safePropertyNameArray": {
 		"$ref": "#/$defs/safeArrayItemsLimits",
@@ -615,6 +619,9 @@
 	},
 	"properties.$defs": {
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
+		"propertyNames": {
+			"$ref": "#/$defs/safePropertyName"
+		},
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
@@ -638,6 +645,9 @@
 	},
 	"properties.definitions": {
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
+		"propertyNames": {
+			"$ref": "#/$defs/safePropertyName"
+		},
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
@@ -647,11 +657,15 @@
 	},
 	"properties.dependentSchemas": {
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
+		"propertyNames": {
+			"$ref": "#/$defs/safePropertyName"
+		},
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
 	},
 	"properties.patternProperties": {
+		"$comment": "Prototype-pollution-prone names (__proto__, constructor, prototype) cannot be reliably denied at the meta-schema layer because patternProperties keys are regex strings — any literal denylist is trivially bypassed (^_{2}proto_{2}$, ^.{9}$, ^[a-z_]{9}$). Detection runs at the cli.js crawlSchema layer, which compiles each key and tests it against the denylisted names.",
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
@@ -659,6 +673,9 @@
 	},
 	"properties.properties": {
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
+		"propertyNames": {
+			"$ref": "#/$defs/safePropertyName"
+		},
 		"additionalProperties": {
 			"$ref": "#/$defs/schemaRules"
 		}
@@ -768,6 +785,9 @@
 	},
 	"properties.dependentRequired": {
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
+		"propertyNames": {
+			"$ref": "#/$defs/safePropertyName"
+		},
 		"additionalProperties": {
 			"$ref": "#/$defs/safePropertyNameArray"
 		}

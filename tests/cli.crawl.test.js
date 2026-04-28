@@ -466,4 +466,74 @@ describe("crawlSchema", () => {
 		});
 		strictEqual(r.errors.length, 0);
 	});
+
+	// --- patternProperties prototype-pollution detection ---
+	test("should flag patternProperties key matching __proto__ literally", () => {
+		const r = crawlSchema({
+			patternProperties: { "^__proto__$": { type: "string" } },
+		});
+		const err = r.errors.find((e) => e.keyword === "patternProperties");
+		ok(err, "expected a patternProperties error");
+		ok(err.params.matches.includes("__proto__"));
+	});
+
+	test("should flag patternProperties key matching constructor literally", () => {
+		const r = crawlSchema({
+			patternProperties: { "^constructor$": { type: "string" } },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "patternProperties" &&
+					e.params.matches.includes("constructor"),
+			),
+		);
+	});
+
+	test("should flag patternProperties key matching __proto__ via class quantifier (bypass)", () => {
+		const r = crawlSchema({
+			patternProperties: { "^_{2}proto_{2}$": { type: "string" } },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "patternProperties" &&
+					e.params.matches.includes("__proto__"),
+			),
+		);
+	});
+
+	test("should flag patternProperties key matching __proto__ via length-only pattern (bypass)", () => {
+		const r = crawlSchema({
+			patternProperties: { "^[a-z_]{9}$": { type: "string" } },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "patternProperties" &&
+					e.params.matches.includes("__proto__"),
+			),
+		);
+	});
+
+	test("should not flag patternProperties keys that don't match denylisted names", () => {
+		const r = crawlSchema({
+			patternProperties: { "^[A-Z]+$": { type: "string" } },
+		});
+		ok(!r.errors.some((e) => e.keyword === "patternProperties"));
+	});
+
+	test("should not flag _proto_ (single underscores) — case-sensitive exact match only", () => {
+		const r = crawlSchema({
+			patternProperties: { "^_proto_$": { type: "string" } },
+		});
+		ok(!r.errors.some((e) => e.keyword === "patternProperties"));
+	});
+
+	test("should handle unparseable patternProperties keys without crashing", () => {
+		const r = crawlSchema({
+			patternProperties: { "[unclosed": { type: "string" } },
+		});
+		ok(Array.isArray(r.errors));
+	});
 });
