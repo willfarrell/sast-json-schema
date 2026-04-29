@@ -658,11 +658,9 @@ describe("crawlSchema", () => {
 	});
 
 	test("lang=java should flag @type", () => {
-		const r = crawlSchema(
-			{ properties: { "@type": { type: "string" } } },
-			32,
-			{ lang: "java" },
-		);
+		const r = crawlSchema({ properties: { "@type": { type: "string" } } }, 32, {
+			lang: "java",
+		});
 		ok(
 			r.errors.some(
 				(e) => e.keyword === "properties" && e.params.name === "@type",
@@ -704,20 +702,16 @@ describe("crawlSchema", () => {
 	});
 
 	test("lang=objc should flag isa", () => {
-		const r = crawlSchema(
-			{ properties: { isa: { type: "string" } } },
-			32,
-			{ lang: "objc" },
-		);
+		const r = crawlSchema({ properties: { isa: { type: "string" } } }, 32, {
+			lang: "objc",
+		});
 		ok(r.errors.some((e) => e.params.name === "isa"));
 	});
 
 	test("lang=swift (alias of objc) should flag isa", () => {
-		const r = crawlSchema(
-			{ properties: { isa: { type: "string" } } },
-			32,
-			{ lang: "swift" },
-		);
+		const r = crawlSchema({ properties: { isa: { type: "string" } } }, 32, {
+			lang: "swift",
+		});
 		ok(r.errors.some((e) => e.params.name === "isa"));
 	});
 
@@ -740,20 +734,16 @@ describe("crawlSchema", () => {
 	});
 
 	test("lang=kotlin (alias of java) should flag @type", () => {
-		const r = crawlSchema(
-			{ properties: { "@type": { type: "string" } } },
-			32,
-			{ lang: "kotlin" },
-		);
+		const r = crawlSchema({ properties: { "@type": { type: "string" } } }, 32, {
+			lang: "kotlin",
+		});
 		ok(r.errors.some((e) => e.params.name === "@type"));
 	});
 
 	test("lang=vb (alias of cs) should flag $type", () => {
-		const r = crawlSchema(
-			{ properties: { $type: { type: "string" } } },
-			32,
-			{ lang: "vb" },
-		);
+		const r = crawlSchema({ properties: { $type: { type: "string" } } }, 32, {
+			lang: "vb",
+		});
 		ok(r.errors.some((e) => e.params.name === "$type"));
 	});
 

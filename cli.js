@@ -513,11 +513,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				"dependentRequired",
 			]) {
 				const site = current[siteKey];
-				if (
-					typeof site === "object" &&
-					site !== null &&
-					!Array.isArray(site)
-				) {
+				if (typeof site === "object" && site !== null && !Array.isArray(site)) {
 					for (const name of Object.keys(site)) {
 						if (denySet.has(name)) {
 							result.errors.push({
@@ -910,16 +906,14 @@ export const formatSarif = (errors, inputPath) => {
 				tool: {
 					driver: {
 						name: "sast-json-schema",
-						informationUri:
-							"https://github.com/willfarrell/sast-json-schema",
+						informationUri: "https://github.com/willfarrell/sast-json-schema",
 						version: pkg.version,
 						rules: [...ruleMap.values()],
 					},
 				},
 				results: errors.map((err) => {
 					const ruleId = err.schemaPath
-						? err.schemaPath.replace(/^#\//, "").split("/")[0] ||
-							err.keyword
+						? err.schemaPath.replace(/^#\//, "").split("/")[0] || err.keyword
 						: (err.keyword ?? "unknown");
 					return {
 						ruleId,
@@ -1014,9 +1008,7 @@ Exit codes:
 		values.format !== "json" &&
 		values.format !== "sarif"
 	) {
-		die(
-			`--format must be "human", "json", or "sarif", got "${values.format}"`,
-		);
+		die(`--format must be "human", "json", or "sarif", got "${values.format}"`);
 	}
 
 	if (!Object.hasOwn(DANGEROUS_NAMES_BY_LANG, values.lang)) {

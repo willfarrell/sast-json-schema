@@ -171,8 +171,15 @@ describe("cli.", () => {
 		ok(typeof result.ruleId === "string");
 		strictEqual(result.level, "error");
 		ok(typeof result.message.text === "string");
-		ok(result.locations[0].physicalLocation.artifactLocation.uri.startsWith("file://"));
-		ok(typeof result.locations[0].logicalLocations[0].fullyQualifiedName === "string");
+		ok(
+			result.locations[0].physicalLocation.artifactLocation.uri.startsWith(
+				"file://",
+			),
+		);
+		ok(
+			typeof result.locations[0].logicalLocations[0].fullyQualifiedName ===
+				"string",
+		);
 	});
 
 	test("clean schema with --offline exits 0", async () => {
