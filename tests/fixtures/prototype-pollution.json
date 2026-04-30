@@ -1,0 +1,158 @@
+[
+  {
+    "description": "Universal baseline: meta-schema rejects __proto__ / constructor / prototype as property-name keys regardless of --lang",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should fail when required contains __proto__",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["__proto__"]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when required contains constructor",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["constructor"]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when required contains prototype",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["prototype"]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when properties key is constructor",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "constructor": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["name"]
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $defs key is prototype",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["name"],
+          "$defs": {
+            "prototype": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          }
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "Lookalike names (case-sensitive exact match) pass meta-schema",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when properties uses _proto_ (single underscores)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "_proto_": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["_proto_"]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when properties uses Constructor (capitalized)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "Constructor": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "maxProperties": 10,
+          "required": ["Constructor"]
+        },
+        "valid": true
+      }
+    ]
+  }
+]

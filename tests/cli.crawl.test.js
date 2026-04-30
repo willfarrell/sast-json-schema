@@ -466,4 +466,338 @@ describe("crawlSchema", () => {
 		});
 		strictEqual(r.errors.length, 0);
 	});
+
+	// --- patternProperties prototype-pollution detection ---
+	test("should flag patternProperties key matching __proto__ literally", () => {
+		const r = crawlSchema({
+			patternProperties: { "^__proto__$": { type: "string" } },
+		});
+		const err = r.errors.find((e) => e.keyword === "patternProperties");
+		ok(err, "expected a patternProperties error");
+		ok(err.params.matches.includes("__proto__"));
+	});
+
+	test("should flag patternProperties key matching constructor literally", () => {
+		const r = crawlSchema({
+			patternProperties: { "^constructor$": { type: "string" } },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "patternProperties" &&
+					e.params.matches.includes("constructor"),
+			),
+		);
+	});
+
+	test("should flag patternProperties key matching __proto__ via class quantifier (bypass)", () => {
+		const r = crawlSchema({
+			patternProperties: { "^_{2}proto_{2}$": { type: "string" } },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "patternProperties" &&
+					e.params.matches.includes("__proto__"),
+			),
+		);
+	});
+
+	test("should flag patternProperties key matching __proto__ via length-only pattern (bypass)", () => {
+		const r = crawlSchema({
+			patternProperties: { "^[a-z_]{9}$": { type: "string" } },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "patternProperties" &&
+					e.params.matches.includes("__proto__"),
+			),
+		);
+	});
+
+	test("should not flag patternProperties keys that don't match denylisted names", () => {
+		const r = crawlSchema({
+			patternProperties: { "^[A-Z]+$": { type: "string" } },
+		});
+		ok(!r.errors.some((e) => e.keyword === "patternProperties"));
+	});
+
+	test("should not flag _proto_ (single underscores), case-sensitive exact match only", () => {
+		const r = crawlSchema({
+			patternProperties: { "^_proto_$": { type: "string" } },
+		});
+		ok(!r.errors.some((e) => e.keyword === "patternProperties"));
+	});
+
+	test("should handle unparseable patternProperties keys without crashing", () => {
+		const r = crawlSchema({
+			patternProperties: { "[unclosed": { type: "string" } },
+		});
+		ok(Array.isArray(r.errors));
+	});
+
+	// --- dangerous-name detection across all property-key sites (default lang=js) ---
+	// Schemas come from JSON.parse in real usage. Object literals like
+	// `{ __proto__: x }` set the prototype rather than adding a key, so we
+	// build inputs via JSON.parse to exercise the actual attack surface.
+	test("should flag __proto__ in properties keys", () => {
+		const r = crawlSchema(
+			JSON.parse('{"properties":{"__proto__":{"type":"string"}}}'),
+		);
+		const err = r.errors.find(
+			(e) => e.keyword === "properties" && e.params.name === "__proto__",
+		);
+		ok(err, "expected an error for properties.__proto__");
+		strictEqual(err.params.lang, "default");
+	});
+
+	test("should flag __proto__ in $defs keys", () => {
+		const r = crawlSchema(
+			JSON.parse('{"$defs":{"__proto__":{"type":"string"}}}'),
+		);
+		ok(
+			r.errors.some(
+				(e) => e.keyword === "$defs" && e.params.name === "__proto__",
+			),
+		);
+	});
+
+	test("should flag __proto__ in definitions keys (legacy)", () => {
+		const r = crawlSchema(
+			JSON.parse('{"definitions":{"__proto__":{"type":"string"}}}'),
+		);
+		ok(
+			r.errors.some(
+				(e) => e.keyword === "definitions" && e.params.name === "__proto__",
+			),
+		);
+	});
+
+	test("should flag __proto__ in dependentSchemas keys", () => {
+		const r = crawlSchema(
+			JSON.parse('{"dependentSchemas":{"__proto__":{"type":"string"}}}'),
+		);
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "dependentSchemas" && e.params.name === "__proto__",
+			),
+		);
+	});
+
+	test("should flag __proto__ in dependentRequired keys", () => {
+		const r = crawlSchema(
+			JSON.parse('{"dependentRequired":{"__proto__":["x"]}}'),
+		);
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "dependentRequired" && e.params.name === "__proto__",
+			),
+		);
+	});
+
+	test("should flag __proto__ in dependentRequired array values", () => {
+		const r = crawlSchema({
+			dependentRequired: { trigger: ["__proto__"] },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "dependentRequired" &&
+					e.params.name === "__proto__" &&
+					e.instancePath.endsWith("/trigger/0"),
+			),
+		);
+	});
+
+	test("should flag __proto__ in required array entries", () => {
+		const r = crawlSchema({
+			required: ["name", "__proto__"],
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "required" &&
+					e.params.name === "__proto__" &&
+					e.instancePath.endsWith("/required/1"),
+			),
+		);
+	});
+
+	test("should not flag harmless names with default lang", () => {
+		const r = crawlSchema({
+			properties: { name: { type: "string" }, _proto_: { type: "string" } },
+			required: ["name"],
+		});
+		ok(!r.errors.some((e) => e.schemaPath === "#/dangerous-name"));
+	});
+
+	// --- lang selection ---
+	test("lang=py should flag __class__", () => {
+		const r = crawlSchema(
+			{ properties: { __class__: { type: "string" } } },
+			32,
+			{ lang: "py" },
+		);
+		ok(
+			r.errors.some(
+				(e) => e.keyword === "properties" && e.params.name === "__class__",
+			),
+		);
+	});
+
+	test("lang=js should NOT flag __class__", () => {
+		const r = crawlSchema(
+			{ properties: { __class__: { type: "string" } } },
+			32,
+			{ lang: "js" },
+		);
+		ok(!r.errors.some((e) => e.params.name === "__class__"));
+	});
+
+	test("lang=java should flag @type", () => {
+		const r = crawlSchema({ properties: { "@type": { type: "string" } } }, 32, {
+			lang: "java",
+		});
+		ok(
+			r.errors.some(
+				(e) => e.keyword === "properties" && e.params.name === "@type",
+			),
+		);
+	});
+
+	test("lang=cs should flag $type and @odata.type", () => {
+		const r = crawlSchema(
+			{
+				properties: {
+					$type: { type: "string" },
+					"@odata.type": { type: "string" },
+				},
+			},
+			32,
+			{ lang: "cs" },
+		);
+		ok(r.errors.some((e) => e.params.name === "$type"));
+		ok(r.errors.some((e) => e.params.name === "@odata.type"));
+	});
+
+	test("lang=php should flag __wakeup", () => {
+		const r = crawlSchema(
+			{ properties: { __wakeup: { type: "string" } } },
+			32,
+			{ lang: "php" },
+		);
+		ok(r.errors.some((e) => e.params.name === "__wakeup"));
+	});
+
+	test("lang=rb should flag __send__", () => {
+		const r = crawlSchema(
+			{ properties: { __send__: { type: "string" } } },
+			32,
+			{ lang: "rb" },
+		);
+		ok(r.errors.some((e) => e.params.name === "__send__"));
+	});
+
+	test("lang=objc should flag isa", () => {
+		const r = crawlSchema({ properties: { isa: { type: "string" } } }, 32, {
+			lang: "objc",
+		});
+		ok(r.errors.some((e) => e.params.name === "isa"));
+	});
+
+	test("lang=swift (alias of objc) should flag isa", () => {
+		const r = crawlSchema({ properties: { isa: { type: "string" } } }, 32, {
+			lang: "swift",
+		});
+		ok(r.errors.some((e) => e.params.name === "isa"));
+	});
+
+	test("lang=ex should flag __struct__", () => {
+		const r = crawlSchema(
+			JSON.parse('{"properties":{"__struct__":{"type":"string"}}}'),
+			32,
+			{ lang: "ex" },
+		);
+		ok(r.errors.some((e) => e.params.name === "__struct__"));
+	});
+
+	test("lang=lua should flag __index", () => {
+		const r = crawlSchema(
+			JSON.parse('{"properties":{"__index":{"type":"string"}}}'),
+			32,
+			{ lang: "lua" },
+		);
+		ok(r.errors.some((e) => e.params.name === "__index"));
+	});
+
+	test("lang=kotlin (alias of java) should flag @type", () => {
+		const r = crawlSchema({ properties: { "@type": { type: "string" } } }, 32, {
+			lang: "kotlin",
+		});
+		ok(r.errors.some((e) => e.params.name === "@type"));
+	});
+
+	test("lang=vb (alias of cs) should flag $type", () => {
+		const r = crawlSchema({ properties: { $type: { type: "string" } } }, 32, {
+			lang: "vb",
+		});
+		ok(r.errors.some((e) => e.params.name === "$type"));
+	});
+
+	test("lang=fsharp (alias of cs) should flag @odata.type", () => {
+		const r = crawlSchema(
+			{ properties: { "@odata.type": { type: "string" } } },
+			32,
+			{ lang: "fsharp" },
+		);
+		ok(r.errors.some((e) => e.params.name === "@odata.type"));
+	});
+
+	test("lang=clojure (alias of java) should flag @class", () => {
+		const r = crawlSchema(
+			{ properties: { "@class": { type: "string" } } },
+			32,
+			{ lang: "clojure" },
+		);
+		ok(r.errors.some((e) => e.params.name === "@class"));
+	});
+
+	test("lang=default should include objc/ex/lua entries (union)", () => {
+		const r = crawlSchema(
+			JSON.parse(
+				'{"properties":{"isa":{"type":"string"},"__struct__":{"type":"string"},"__index":{"type":"string"}}}',
+			),
+			32,
+			{ lang: "default" },
+		);
+		ok(r.errors.some((e) => e.params.name === "isa"));
+		ok(r.errors.some((e) => e.params.name === "__struct__"));
+		ok(r.errors.some((e) => e.params.name === "__index"));
+	});
+
+	test("lang=default (union) should flag __class__ and @type from non-js langs", () => {
+		const r = crawlSchema(
+			JSON.parse(
+				'{"properties":{"__class__":{"type":"string"},"@type":{"type":"string"}}}',
+			),
+			32,
+			{ lang: "default" },
+		);
+		ok(r.errors.some((e) => e.params.name === "__class__"));
+		ok(r.errors.some((e) => e.params.name === "@type"));
+	});
+
+	test("unknown lang should throw", () => {
+		let threw = false;
+		try {
+			crawlSchema({}, 32, { lang: "elvish" });
+		} catch (e) {
+			threw = true;
+			ok(e.message.includes("elvish"));
+		}
+		ok(threw, "expected unknown lang to throw");
+	});
 });

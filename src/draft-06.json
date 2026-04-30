@@ -78,6 +78,7 @@
 				"contentEncoding": false,
 				"readOnly": false,
 				"writeOnly": false,
+				"deprecated": false,
 				"$vocabulary": false
 			},
 			"dependentRequired": {

@@ -244,7 +244,20 @@
           }
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when `deprecated` is used (not in draft-07 spec)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "string",
+          "maxLength": 8,
+          "enum": ["a"],
+          "deprecated": true
+        },
+        "valid": false
       }
     ]
   }
 ]
+

@@ -101,6 +101,30 @@
           "pattern": "^[a-z]+$"
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when `deprecated: true` is used (annotation is in 2019-09 spec)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "$id": "test",
+          "type": "string",
+          "maxLength": 8,
+          "enum": ["a"],
+          "deprecated": true
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when `deprecated` is non-boolean",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "$id": "test",
+          "type": "string",
+          "maxLength": 8,
+          "enum": ["a"],
+          "deprecated": "yes"
+        },
+        "valid": false
       }
     ]
   }

@@ -75,14 +75,15 @@ npx sast-json-schema path/to/schema.json
 ```
 
 Options:
-- `--override-max-depth <n>` — Override max depth limit (default: 32)
-- `--override-max-items <n>` — Override max items limit (default: 1024)
-- `--override-max-properties <n>` — Override max properties limit (default: 1024)
-- `--ignore <instancePath>` — Suppress errors by instancePath or instancePath:keyword (repeatable). Paths use [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901) JSON Pointer encoding (`~` → `~0`, `/` → `~1`)
-- `--offline` — Skip SSRF DNS resolution for remote `$ref` URLs (useful in airgapped CI)
-- `--format <human|json>` — Output format. `json` emits a JSON array of error objects on stdout; `human` is the default
-- `-v, --version` — Show version
-- `-h, --help` — Show this help
+- `--override-max-depth <n>`: Override max depth limit (default: 32)
+- `--override-max-items <n>`: Override max items limit (default: 1024)
+- `--override-max-properties <n>`: Override max properties limit (default: 1024)
+- `--ignore <instancePath>`: Suppress errors by instancePath or instancePath:keyword (repeatable). Paths use [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901) JSON Pointer encoding (`~` to `~0`, `/` to `~1`)
+- `--offline`: Skip SSRF DNS resolution for remote `$ref` URLs (useful in airgapped CI)
+- `--lang <code>`: Downstream language whose deserialization-vector names to deny in property keys. Default is `default` (union of every named language). See [language coverage](#language-coverage) below
+- `--format <human|json|sarif>`: Output format. `json` emits a JSON array of error objects on stdout; `sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code-scanning, SonarQube, Semgrep and other security pipelines; `human` is the default
+- `-v, --version`: Show version
+- `-h, --help`: Show this help
 
 #### Exit codes
 
@@ -102,14 +103,58 @@ ajv sast --fail path/to/schema.json
 
 - **`$ref: "#"` (self-reference) is rejected.** The meta-schema requires `$ref` values to have at least one character after `#`. Bare self-references (`$ref: "#"`) are blocked to prevent infinite recursion in validators. If you need a self-referencing schema, use a named `$defs` entry and reference it explicitly.
 - **`contentMediaType` does not flag XSS-risky media types.** The meta-schema validates that `contentMediaType` follows IANA format ([RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)) but does not warn about types whose content can execute scripts when rendered, such as `text/html`, `application/xhtml+xml`, or `image/svg+xml`. If your application renders content based on this annotation, ensure it is sanitized to prevent XSS.
+- **`contentMediaType` does not flag XXE-risky media types.** XML-family types (`application/xml`, `text/xml`, `application/soap+xml`, `application/xml-dtd`, `application/xml-external-parsed-entity`, `image/svg+xml`) are accepted without warning. If your consumer parses these payloads, configure the XML parser to disable external entity resolution and DTD processing. See [SECURITY.md](./SECURITY.md#xml-family-contentmediatype-xxe).
 - **`format: "regex"` does not validate regex safety.** A schema using `format: "regex"` validates that input strings are syntactically valid regular expressions, but the meta-schema does not ensure those regex strings are safe from ReDoS. If your application compiles user-provided regex strings, use runtime ReDoS checking on the input. i.e. JavaScript: `redos-detector`.
 
 ### Meta-schema only
 
 - **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default). Enforced by the CLI, see `--override-max-depth`.
 - **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced by the CLI.
-- **`pattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Bare alternation at the top level (`^a|b$`) is rejected, but alternation across sibling groups (`^(a)|(b)$`) is not detected at the meta-schema level — it is enforced by the CLI. The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection.
+- **`pattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Bare alternation at the top level (`^a|b$`) is rejected, but alternation across sibling groups (`^(a)|(b)$`) is not detected at the meta-schema level (it is enforced by the CLI). The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection.
 - **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref` to `#` (local) or `https://` URLs and blocks private IP ranges (dotted-decimal, hex `0x`, and decimal representations), but DNS-based bypasses (domains resolving to internal IPs) cannot be detected at the schema level. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended. Enforced by the CLI.
+
+## Language coverage
+
+JSON Schemas are language-agnostic, but the JSON they validate gets deserialized into objects in many different languages, each of which has its own set of "magic" property names that downstream libraries may interpret as type discriminators, runtime hooks, or pollution vectors. The `--lang` flag selects which language's deserialization-vector names to deny in property keys (`properties`, `$defs`, `definitions`, `dependentSchemas`, `dependentRequired`, `required`, and `patternProperties` regex keys).
+
+The meta-schema itself enforces a universal baseline of `__proto__`, `constructor`, `prototype` regardless of `--lang`: those names are dangerous in every named entry below. Language-specific extras are enforced additively at the CLI / `analyze()` layer.
+
+For a list of JSON-Schema validators per language, see [json-schema.org/tools#validator](https://json-schema.org/tools#validator).
+
+| Language | `--lang` | Extras over JS baseline |
+|---|---|---|
+| JavaScript / TypeScript / Node.js | `js` | (none, the universal baseline) |
+| Python | `py` | `__class__`, `__init__`, `__globals__`, `__builtins__`, `__import__`, `__reduce__`, `__subclasses__`, `__dict__`, `__mro__` |
+| Ruby | `rb` | `__send__`, `json_class`, `instance_eval`, `instance_variable_set`, `singleton_class` |
+| Rust | `rs` | (none. `serde` is type-safe; baseline applies because specs often pass through JS tooling) |
+| Java | `java` | `@type`, `@class` (Jackson / Fastjson polymorphic markers) |
+| Kotlin | `kotlin` | alias of `java` (JVM/Jackson) |
+| Clojure | `clojure` | alias of `java` (JVM/Cheshire) |
+| C# | `cs` | `$type`, `__type`, `@odata.type` (Json.NET, DataContractJsonSerializer, OData) |
+| VB.NET | `vb` | alias of `cs` |
+| F# | `fsharp` | alias of `cs` |
+| ASP.NET / ASPX | `cs` | shares the .NET serializer stack |
+| PHP | `php` | `__construct`, `__destruct`, `__wakeup`, `__sleep`, `__serialize`, `__unserialize`, `__call`, `__callStatic`, `__get`, `__set`, `__isset`, `__unset`, `__toString`, `__invoke`, `__set_state`, `__clone`, `__debugInfo` |
+| Objective-C | `objc` | `isa`, `class`, `superclass`, `description`, `init`, `_cmd` (Obj-C runtime + KVC + `performSelector:`) |
+| Swift | `swift` | alias of `objc` (mixed Obj-C interop; pure `Codable` is type-safe) |
+| Elixir | `ex` | `__struct__`, `__exception__`, `__protocol__` (BEAM struct-identifier keys when JSON is decoded with `:keys => :atoms`) |
+| Lua | `lua` | metamethod names: `__index`, `__newindex`, `__call`, `__metatable`, `__tostring`, `__name`, `__pairs`, `__eq`, `__lt`, `__le`, `__add`, `__sub`, `__mul`, `__div`, `__mod`, `__pow`, `__concat`, `__len`, `__unm`, `__band`, `__bor`, `__bxor`, `__bnot`, `__shl`, `__shr`, `__idiv`, `__close`, `__gc` |
+| _Union of every named language above_ | `default` | every extra above (the implicit default) |
+
+### Languages without a dedicated entry
+
+These ecosystems have JSON-Schema validators but either deserialize type-safely (no magic-name attack class) or their deserialization risks aren't expressible as a property-name denylist. The universal `__proto__` / `constructor` / `prototype` baseline still applies via the meta-schema.
+
+| Language | Reason |
+|---|---|
+| Go | `encoding/json` is reflection-by-struct-tag; no magic keys |
+| C / C++ | `nlohmann/json` + `valijson` are type-safe; no runtime polymorphism via key names |
+| Erlang / Elixir (BEAM, raw `:atoms` mode) | Attack class is **atom-table exhaustion DoS** when user keys are interned via `binary_to_atom/1`. Use `binary_to_existing_atom/1`, or `Jason.decode/2` without `:keys => :atoms`. See [SECURITY.md](./SECURITY.md#atom-table--symbol-package-exhaustion-beam-common-lisp). |
+| Common Lisp | `cl-json` symbol-interning has the same exhaustion shape. Set `cl-json:*json-symbols-package*` to `:keyword` or `nil`. See [SECURITY.md](./SECURITY.md#atom-table--symbol-package-exhaustion-beam-common-lisp). |
+| Perl | `JSON::PP` does not auto-`bless`; magic only kicks in if `convert_blessed` is set, and the marker key is library-defined |
+| Julia | `JSONSchema.jl` + `JSON3.jl` are type-safe |
+
+If you have a language-specific deserialization vector that fits the magic-name pattern and isn't covered, please open an issue.
 
 ## Supported keywords per draft
 
@@ -122,22 +167,23 @@ All meta-schemas reject keywords not listed in their respective JSON Schema spec
 | `$ref`                 | ✓ | ✓ | ✓ | ✓ | ✓ | Restricted to local `#…` or HTTPS; SSRF-checked |
 | `$id` / `id`           | ✓ | ✓ | ✓ | ✓ | ✓ | HTTPS URL, URN, or plain name |
 | `definitions`          | ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `$defs`                | — | — | — | ✓ | ✓ | |
+| `$defs`                | n/a | n/a | n/a | ✓ | ✓ | |
 | `title`, `description`, `default` | ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `const`                | — | ✓ | ✓ | ✓ | ✓ | Type-locked to declared `type` |
-| `contains`             | — | ✓ | ✓ | ✓ | ✓ | Requires `maxContains` + `uniqueItems` |
-| `propertyNames`        | — | ✓ | ✓ | ✓ | ✓ | |
-| `if`/`then`/`else`     | — | — | ✓ | ✓ | ✓ | |
-| `contentMediaType`, `contentEncoding` | — | — | ✓ | ✓ | ✓ | Allow-listed per RFC 6838 / RFC-standard |
-| `contentSchema`        | — | — | — | ✓ | ✓ | |
-| `readOnly` / `writeOnly` | — | **✗** | ✓ | ✓ | ✓ | Rejected in draft-06 (annotation-only, misleading for strictness); accepted but ignored later |
-| `dependencies`         | ✓ | ✓ | ✓ | — | — | Array or subschema form; removed in 2019-09+, prefer `dependentRequired` / `dependentSchemas` |
-| `dependentRequired`    | — | — | — | ✓ | ✓ | |
-| `dependentSchemas`     | — | — | — | ✓ | ✓ | |
-| `prefixItems`          | — | — | — | — | ✓ | |
-| `unevaluatedProperties`/`unevaluatedItems` | — | — | — | ✓ | ✓ | Required for object/array strictness |
+| `const`                | n/a | ✓ | ✓ | ✓ | ✓ | Type-locked to declared `type` |
+| `contains`             | n/a | ✓ | ✓ | ✓ | ✓ | Requires `maxContains` + `uniqueItems` |
+| `propertyNames`        | n/a | ✓ | ✓ | ✓ | ✓ | |
+| `if`/`then`/`else`     | n/a | n/a | ✓ | ✓ | ✓ | |
+| `contentMediaType`, `contentEncoding` | n/a | n/a | ✓ | ✓ | ✓ | Allow-listed per RFC 6838 / RFC-standard |
+| `contentSchema`        | n/a | n/a | n/a | ✓ | ✓ | |
+| `readOnly` / `writeOnly` | n/a | **✗** | ✓ | ✓ | ✓ | Rejected in draft-06 (annotation-only, misleading for strictness); accepted but ignored later |
+| `deprecated`           | n/a | n/a | n/a | ✓ | ✓ | Annotation-only; type-checked as boolean. Rejected in older drafts where it isn't in spec |
+| `dependencies`         | ✓ | ✓ | ✓ | n/a | n/a | Array or subschema form; removed in 2019-09+, prefer `dependentRequired` / `dependentSchemas` |
+| `dependentRequired`    | n/a | n/a | n/a | ✓ | ✓ | |
+| `dependentSchemas`     | n/a | n/a | n/a | ✓ | ✓ | |
+| `prefixItems`          | n/a | n/a | n/a | n/a | ✓ | |
+| `unevaluatedProperties`/`unevaluatedItems` | n/a | n/a | n/a | ✓ | ✓ | Required for object/array strictness |
 
-Legend: ✓ supported · **✗** rejected on security grounds · — not in spec for that draft.
+Legend: ✓ supported · **✗** rejected on security grounds · `n/a` not in spec for that draft.
 
 ## OWASP ASVS 5.0.0 (2026-03)
 

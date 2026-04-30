@@ -228,6 +228,18 @@
           }
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when `deprecated` is used (not in draft-06 spec)",
+        "data": {
+          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$id": "test",
+          "type": "string",
+          "maxLength": 8,
+          "enum": ["a"],
+          "deprecated": true
+        },
+        "valid": false
       }
     ]
   }

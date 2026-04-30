@@ -79,6 +79,7 @@
 				"maxContains": false,
 				"prefixItems": false,
 				"contentSchema": false,
+				"deprecated": false,
 				"$vocabulary": false
 			},
 			"dependentRequired": {

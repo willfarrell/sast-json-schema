@@ -4,6 +4,7 @@
 import { lookup as dnsLookup } from "node:dns/promises";
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import Ajv from "ajv/dist/2020.js";
 import { isSafePattern } from "redos-detector";
@@ -64,6 +65,201 @@ export const MAX_SCHEMA_SIZE = 64 * 1024 * 1024; // 64 MiB
 // fail-closed (reported as unsafe with reason "timedOut") to keep total
 // scan time bounded on adversarial input.
 export const REDOS_TIMEOUT_MS = 1_000;
+
+// Property names that act as deserialization / type-confusion vectors in
+// each downstream language ecosystem. Selected at the analyze() / CLI layer
+// via the `lang` option (default: "default", the union of every named lang,
+// because JSON specs typically flow through multiple language toolchains
+// and the safe default is to catch them all). Set --lang explicitly to
+// narrow scope when you control the consumer environment.
+//
+// "default": union of every named language entry below. Most paranoid baseline.
+// "js":      V8 prototype-pollution: __proto__, constructor, prototype.
+// "py":      js + Python introspection / pickle gadget keys.
+// "rb":      js + Ruby reflection / JSON.load(create_additions: true).
+// "rs":      js baseline (Rust serde itself is type-safe, but specs often
+//            pass through JS tooling that is not).
+// "java":    js + Jackson/Fastjson polymorphic deserialization markers.
+// "kotlin":  alias of java (JVM/Jackson).
+// "clojure": alias of java (JVM/Cheshire).
+// "cs":      js + .NET JSON deserialization markers. Covers C#, VB.NET,
+//            ASP.NET, and ASPX (they all share the same serializer stack:
+//            Json.NET $type, DataContractJsonSerializer __type, OData @odata.type).
+// "vb":      alias of cs (.NET stack).
+// "fsharp":  alias of cs (.NET stack).
+// "php":     js + PHP magic methods invoked during object hydration
+//            (Symfony Serializer / JMS Serializer / unserialize gadget chains).
+// "objc":    js + Objective-C runtime keys: isa, class, superclass,
+//            description, init, _cmd (KVC + performSelector: vectors).
+// "swift":   alias of objc (Obj-C runtime exposure via interop; pure Codable
+//            is type-safe but mixed projects share the same surface).
+// "ex":      js + Elixir/BEAM struct-identifier keys: __struct__,
+//            __exception__, __protocol__ (auto-recognized when JSON is
+//            decoded with :keys => :atoms and hydrated into a struct).
+// "lua":     js + Lua metamethod names (__index, __newindex, __call,
+//            __metatable, __tostring, __gc, __close, etc.) for libraries
+//            that auto-bind metatables onto JSON-decoded tables.
+//
+// There is no "off" switch: the meta-schema enforces __proto__/constructor/
+// prototype universally, so the narrowest opt-out is --lang js (which adds
+// no extras over the meta-schema baseline). For per-path false positives,
+// use --ignore <instancePath>.
+export const DANGEROUS_NAMES_BY_LANG = {
+	js: ["__proto__", "constructor", "prototype"],
+	py: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"__class__",
+		"__init__",
+		"__globals__",
+		"__builtins__",
+		"__import__",
+		"__reduce__",
+		"__subclasses__",
+		"__dict__",
+		"__mro__",
+	],
+	rb: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"__send__",
+		"json_class",
+		"instance_eval",
+		"instance_variable_set",
+		"singleton_class",
+	],
+	rs: ["__proto__", "constructor", "prototype"],
+	java: ["__proto__", "constructor", "prototype", "@type", "@class"],
+	kotlin: ["__proto__", "constructor", "prototype", "@type", "@class"],
+	clojure: ["__proto__", "constructor", "prototype", "@type", "@class"],
+	cs: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"$type",
+		"__type",
+		"@odata.type",
+	],
+	vb: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"$type",
+		"__type",
+		"@odata.type",
+	],
+	fsharp: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"$type",
+		"__type",
+		"@odata.type",
+	],
+	php: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"__construct",
+		"__destruct",
+		"__wakeup",
+		"__sleep",
+		"__serialize",
+		"__unserialize",
+		"__call",
+		"__callStatic",
+		"__get",
+		"__set",
+		"__isset",
+		"__unset",
+		"__toString",
+		"__invoke",
+		"__set_state",
+		"__clone",
+		"__debugInfo",
+	],
+	objc: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"isa",
+		"class",
+		"superclass",
+		"description",
+		"init",
+		"_cmd",
+	],
+	swift: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"isa",
+		"class",
+		"superclass",
+		"description",
+		"init",
+		"_cmd",
+	],
+	ex: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"__struct__",
+		"__exception__",
+		"__protocol__",
+	],
+	lua: [
+		"__proto__",
+		"constructor",
+		"prototype",
+		"__index",
+		"__newindex",
+		"__call",
+		"__metatable",
+		"__tostring",
+		"__name",
+		"__pairs",
+		"__eq",
+		"__lt",
+		"__le",
+		"__add",
+		"__sub",
+		"__mul",
+		"__div",
+		"__mod",
+		"__pow",
+		"__concat",
+		"__len",
+		"__unm",
+		"__band",
+		"__bor",
+		"__bxor",
+		"__bnot",
+		"__shl",
+		"__shr",
+		"__idiv",
+		"__close",
+		"__gc",
+	],
+};
+DANGEROUS_NAMES_BY_LANG.default = [
+	...new Set(Object.values(DANGEROUS_NAMES_BY_LANG).flat()),
+];
+export const DEFAULT_LANG = "default";
+
+const resolveDangerousNames = (lang) => {
+	if (lang == null) return DANGEROUS_NAMES_BY_LANG[DEFAULT_LANG];
+	if (Array.isArray(lang)) return lang;
+	const list = DANGEROUS_NAMES_BY_LANG[lang];
+	if (!list) {
+		throw new TypeError(
+			`unknown lang "${lang}", expected one of: ${Object.keys(DANGEROUS_NAMES_BY_LANG).join(", ")}`,
+		);
+	}
+	return list;
+};
 
 // AJV schema paths used by override filters. Verified by regression tests
 // in cli.analyze.test.js to match what AJV actually emits.
@@ -176,9 +372,12 @@ const escapeJsonPointer = (token) =>
 // `{properties: {a: {properties: {b: {...}}}}}` reaches depth 5 (root,
 // properties, a, properties, b). With MAX_DEPTH=32 this corresponds to roughly
 // 16 levels of real schema nesting.
-export const crawlSchema = (obj, maxDepth = MAX_DEPTH) => {
+export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 	const result = { depth: 0, depthExceeded: false, errors: [], refs: [] };
 	if (typeof obj !== "object" || obj === null) return result;
+
+	const denylist = resolveDangerousNames(options.lang);
+	const denySet = new Set(denylist);
 
 	const visited = new WeakSet();
 	visited.add(obj);
@@ -302,6 +501,99 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH) => {
 					params: { pattern: current.pattern, reason: "parseError" },
 					message: "pattern could not be parsed for ReDoS analysis",
 				});
+			}
+		}
+
+		if (denylist.length > 0) {
+			for (const siteKey of [
+				"properties",
+				"$defs",
+				"definitions",
+				"dependentSchemas",
+				"dependentRequired",
+			]) {
+				const site = current[siteKey];
+				if (typeof site === "object" && site !== null && !Array.isArray(site)) {
+					for (const name of Object.keys(site)) {
+						if (denySet.has(name)) {
+							result.errors.push({
+								instancePath: `${path}/${siteKey}/${escapeJsonPointer(name)}`,
+								schemaPath: "#/dangerous-name",
+								keyword: siteKey,
+								params: { name, lang: options.lang ?? DEFAULT_LANG },
+								message: `${siteKey} key "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
+							});
+						}
+					}
+				}
+			}
+
+			if (Array.isArray(current.required)) {
+				for (let i = 0; i < current.required.length; i++) {
+					const name = current.required[i];
+					if (typeof name === "string" && denySet.has(name)) {
+						result.errors.push({
+							instancePath: `${path}/required/${i}`,
+							schemaPath: "#/dangerous-name",
+							keyword: "required",
+							params: { name, lang: options.lang ?? DEFAULT_LANG },
+							message: `required entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
+						});
+					}
+				}
+			}
+
+			if (
+				typeof current.dependentRequired === "object" &&
+				current.dependentRequired !== null &&
+				!Array.isArray(current.dependentRequired)
+			) {
+				for (const [trigger, deps] of Object.entries(
+					current.dependentRequired,
+				)) {
+					if (Array.isArray(deps)) {
+						for (let i = 0; i < deps.length; i++) {
+							const name = deps[i];
+							if (typeof name === "string" && denySet.has(name)) {
+								result.errors.push({
+									instancePath: `${path}/dependentRequired/${escapeJsonPointer(trigger)}/${i}`,
+									schemaPath: "#/dangerous-name",
+									keyword: "dependentRequired",
+									params: { name, lang: options.lang ?? DEFAULT_LANG },
+									message: `dependentRequired entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
+								});
+							}
+						}
+					}
+				}
+			}
+
+			if (
+				typeof current.patternProperties === "object" &&
+				current.patternProperties !== null &&
+				!Array.isArray(current.patternProperties)
+			) {
+				for (const patternKey of Object.keys(current.patternProperties)) {
+					try {
+						const re = new RegExp(patternKey);
+						const matches = denylist.filter((n) => re.test(n));
+						if (matches.length > 0) {
+							result.errors.push({
+								instancePath: `${path}/patternProperties/${escapeJsonPointer(patternKey)}`,
+								schemaPath: "#/dangerous-name",
+								keyword: "patternProperties",
+								params: {
+									pattern: patternKey,
+									matches,
+									lang: options.lang ?? DEFAULT_LANG,
+								},
+								message: `patternProperties key "${patternKey}" matches deserialization vector(s) for lang="${options.lang ?? DEFAULT_LANG}": ${matches.join(", ")}`,
+							});
+						}
+					} catch {
+						// unparseable regex; meta-schema safePattern rejects it
+					}
+				}
 			}
 		}
 
@@ -521,7 +813,9 @@ export const analyze = async (schema, options = {}) => {
 			? Number(options.overrideMaxDepth)
 			: MAX_DEPTH;
 
-	const crawl = crawlSchema(schema, maxDepth);
+	resolveDangerousNames(options.lang); // throws on unknown lang
+
+	const crawl = crawlSchema(schema, maxDepth, { lang: options.lang });
 
 	if (crawl.depthExceeded) {
 		return [
@@ -582,6 +876,75 @@ export const analyze = async (schema, options = {}) => {
 	return errors;
 };
 
+// Maps the analyze() error array to SARIF 2.1.0. Designed for GitHub
+// code-scanning, SonarQube, and other security pipelines that consume SARIF.
+// instancePath is encoded as logicalLocations.fullyQualifiedName (JSON Pointer)
+// since SARIF doesn't natively model JSON-pointer regions.
+export const formatSarif = (errors, inputPath) => {
+	const inputUri = pathToFileURL(resolve(inputPath)).href;
+	const ruleMap = new Map();
+	for (const err of errors) {
+		const ruleId = err.schemaPath
+			? err.schemaPath.replace(/^#\//, "").split("/")[0] || err.keyword
+			: (err.keyword ?? "unknown");
+		if (!ruleMap.has(ruleId)) {
+			ruleMap.set(ruleId, {
+				id: ruleId,
+				name: ruleId,
+				shortDescription: { text: ruleId },
+				fullDescription: { text: err.message ?? ruleId },
+				defaultConfiguration: { level: "error" },
+			});
+		}
+	}
+	return {
+		$schema:
+			"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/Schemata/sarif-schema-2.1.0.json",
+		version: "2.1.0",
+		runs: [
+			{
+				tool: {
+					driver: {
+						name: "sast-json-schema",
+						informationUri: "https://github.com/willfarrell/sast-json-schema",
+						version: pkg.version,
+						rules: [...ruleMap.values()],
+					},
+				},
+				results: errors.map((err) => {
+					const ruleId = err.schemaPath
+						? err.schemaPath.replace(/^#\//, "").split("/")[0] || err.keyword
+						: (err.keyword ?? "unknown");
+					return {
+						ruleId,
+						level: "error",
+						message: { text: err.message ?? err.keyword ?? "schema issue" },
+						locations: [
+							{
+								physicalLocation: {
+									artifactLocation: { uri: inputUri },
+								},
+								logicalLocations: [
+									{
+										fullyQualifiedName: err.instancePath ?? "",
+										kind: "value",
+									},
+								],
+							},
+						],
+						properties: {
+							instancePath: err.instancePath ?? "",
+							schemaPath: err.schemaPath ?? "",
+							keyword: err.keyword ?? "",
+							...(err.params ?? {}),
+						},
+					};
+				}),
+			},
+		],
+	};
+};
+
 // --- CLI entrypoint ---
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
 	const die = (msg) => {
@@ -600,6 +963,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
 				"override-max-properties": { type: "string" },
 				ignore: { type: "string", multiple: true },
 				offline: { type: "boolean", default: false },
+				lang: { type: "string", default: DEFAULT_LANG },
 				format: { type: "string", default: "human" },
 				version: { type: "boolean", short: "v", default: false },
 				help: { type: "boolean", short: "h", default: false },
@@ -618,7 +982,12 @@ Options:
   --override-max-properties <n>    Override max properties limit (default: 1024)
   --ignore <instancePath>          Suppress errors by instancePath or instancePath:keyword (repeatable)
   --offline                        Skip SSRF DNS resolution for remote $ref URLs
-  --format <human|json>            Output format (default: human)
+  --lang <default|js|py|rb|rs|java|kotlin|clojure|cs|vb|fsharp|php|objc|swift|ex|lua>
+                                   Downstream language whose deserialization-vector names
+                                   to deny in property keys. "default" is the union of
+                                   every named language. (default: default)
+  --format <human|json|sarif>      Output format. "sarif" emits SARIF 2.1.0 for
+                                   GitHub code-scanning / SonarQube / Semgrep (default: human)
   -v, --version                    Show version
   -h, --help                       Show this help
 
@@ -634,8 +1003,18 @@ Exit codes:
 		process.exit(0);
 	}
 
-	if (values.format !== "human" && values.format !== "json") {
-		die(`--format must be "human" or "json", got "${values.format}"`);
+	if (
+		values.format !== "human" &&
+		values.format !== "json" &&
+		values.format !== "sarif"
+	) {
+		die(`--format must be "human", "json", or "sarif", got "${values.format}"`);
+	}
+
+	if (!Object.hasOwn(DANGEROUS_NAMES_BY_LANG, values.lang)) {
+		die(
+			`--lang must be one of: ${Object.keys(DANGEROUS_NAMES_BY_LANG).join(", ")}, got "${values.lang}"`,
+		);
 	}
 
 	const input = positionals[0];
@@ -664,7 +1043,7 @@ Exit codes:
 		die(`invalid JSON in "${input}"`);
 	}
 
-	const options = { offline: values.offline };
+	const options = { offline: values.offline, lang: values.lang };
 	if (values["override-max-items"] != null)
 		options.overrideMaxItems = values["override-max-items"];
 	if (values["override-max-depth"] != null)
@@ -682,6 +1061,12 @@ Exit codes:
 
 	if (values.format === "json") {
 		process.stdout.write(`${JSON.stringify(errors)}\n`);
+		if (errors.length) {
+			console.error(`${input} has ${errors.length} issue(s)`);
+			process.exit(1);
+		}
+	} else if (values.format === "sarif") {
+		process.stdout.write(`${JSON.stringify(formatSarif(errors, input))}\n`);
 		if (errors.length) {
 			console.error(`${input} has ${errors.length} issue(s)`);
 			process.exit(1);
