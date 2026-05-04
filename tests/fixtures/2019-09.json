@@ -15,6 +15,7 @@
           "required": [
             "name"
           ],
+          "additionalProperties": false,
           "unevaluatedProperties": false,
           "maxProperties": 10,
           "properties": {

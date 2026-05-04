@@ -15,6 +15,7 @@
             "null"
           ],
           "unevaluatedProperties": false,
+          "additionalProperties": false,
           "properties": {},
           "maxProperties": 10,
           "required": []
@@ -130,6 +131,7 @@
           "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
+          "additionalProperties": false,
           "properties": {},
           "maxProperties": 10,
           "required": []
@@ -174,6 +176,7 @@
           "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
+          "additionalProperties": false,
           "properties": {},
           "maxProperties": 10,
           "required": []
@@ -211,6 +214,50 @@
           ]
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when properties is used with additionalProperties: false (maxProperties not required)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ]
+            }
+          },
+          "required": [
+            "a"
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when properties is set without additionalProperties",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "a": {
+              "type": "string",
+              "enum": [
+                "x"
+              ]
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "maxProperties": 10
+        },
+        "valid": false
       }
     ]
   },
@@ -227,6 +274,7 @@
           "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
+          "additionalProperties": false,
           "properties": {},
           "maxProperties": 10,
           "required": []
@@ -266,6 +314,7 @@
           "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
+          "additionalProperties": false,
           "properties": {
             "name": {
               "type": "string",
@@ -475,6 +524,7 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "name": {
               "type": "string",
@@ -727,6 +777,7 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "a": {
               "type": "string",
@@ -739,6 +790,7 @@
           "dependentSchemas": {
             "a": {
               "type": "object",
+              "additionalProperties": false,
               "properties": {},
               "maxProperties": 10,
               "unevaluatedProperties": false,
@@ -835,6 +887,7 @@
           "type": "string",
           "contentSchema": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {},
             "maxProperties": 10,
             "unevaluatedProperties": false,
@@ -875,6 +928,7 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "a": {
               "type": "boolean"
@@ -931,6 +985,7 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "a": {
               "type": "string",
@@ -1005,6 +1060,7 @@
           "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
+          "additionalProperties": false,
           "properties": {
             "name": {
               "type": "string",

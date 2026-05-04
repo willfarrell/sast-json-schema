@@ -80,6 +80,7 @@
           "$id": "test",
           "type": "object",
           "unevaluatedProperties": false,
+          "additionalProperties": false,
           "propertyNames": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$",

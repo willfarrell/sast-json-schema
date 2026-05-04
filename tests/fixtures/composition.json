@@ -639,6 +639,7 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
           "type": "object",
+          "additionalProperties": false,
           "dependentRequired": {
             "a": [
               "b",
