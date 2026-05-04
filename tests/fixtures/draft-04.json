@@ -326,6 +326,36 @@
           "deprecated": true
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when enum is set without maxLength (enum bounds value space)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "string",
+          "enum": ["a", "bb"]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when pattern is set without maxLength",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "string",
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when format is set without maxLength",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "string",
+          "format": "uuid"
+        },
+        "valid": false
       }
     ]
   }

@@ -28,7 +28,7 @@
 
 - Ensure strictness of interpretation.
 - Ensure `integer` or `number` are within a safe range.
-- Ensure `string` have defined allowed values and maxLength.
+- Ensure `string` have defined allowed values, and `maxLength`.
 - Ensure `arrays` have defined properties and maxItems.
 - Ensure `object` have defined properties and maxProperties when needed.
 - Ensure `pattern` follow safe RegExp usage.
@@ -108,6 +108,8 @@ ajv sast --fail path/to/schema.json
 
 ### Meta-schema only
 
+- **Prototype-pollution denylist does not cover `patternProperties` keys.** The meta-schema rejects `__proto__`, `constructor`, and `prototype` as literal keys in `properties`, `$defs`, `definitions`, `dependentSchemas`, `dependentRequired`, and `required`. It does NOT reject these names when introduced via a `patternProperties` regex key, because any literal denylist (`^__proto__$`) is trivially bypassed by equivalent regexes (`^_{2}proto_{2}$`, `^[_][_]proto__$`, `^.{9}$`). Enforced by the CLI: `crawlSchema` compiles each `patternProperties` key and tests it against the denylisted names. Consumers using the meta-schema standalone (without `cli.js` / `analyze()`) get property-key protection but not `patternProperties` protection.
+- **Language-specific deserialization-vector names are not in the meta-schema.** Only `__proto__`, `constructor`, `prototype` are rejected at the meta-schema layer (the universal baseline). Names like `@type` (Java), `$type` (.NET), `__class__` (Python), `isa` (Objective-C), `__struct__` (Elixir), or PHP magic methods are enforced only at the CLI / `analyze()` layer via `--lang`. See [Language coverage](#language-coverage).
 - **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default). Enforced by the CLI, see `--override-max-depth`.
 - **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced by the CLI.
 - **`pattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Bare alternation at the top level (`^a|b$`) is rejected, but alternation across sibling groups (`^(a)|(b)$`) is not detected at the meta-schema level (it is enforced by the CLI). The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection.
