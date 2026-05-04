@@ -64,6 +64,7 @@ const STUBBED_DEPENDENT_SCHEMA_RULES = [
 	"additionalProperties",
 	"pattern",
 	"propertyNames",
+	"$ref",
 ];
 
 const stubForSelfValidation = (schema) => {

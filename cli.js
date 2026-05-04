@@ -746,8 +746,10 @@ const lookupHostname = async (hostname, entries, timeoutMs) => {
 export const resolveSSRFRefs = async (refs, options = {}) => {
 	const timeoutMs = options.dnsTimeoutMs ?? DNS_TIMEOUT_MS;
 	const concurrency = options.dnsConcurrency ?? DNS_CONCURRENCY;
+	const safeHostnames = options.safeHostnames ?? new Set();
 	const hostnameMap = new Map();
 	for (const entry of refs) {
+		if (safeHostnames.has(entry.hostname)) continue;
 		if (!hostnameMap.has(entry.hostname)) {
 			hostnameMap.set(entry.hostname, []);
 		}
@@ -839,6 +841,7 @@ export const analyze = async (schema, options = {}) => {
 		const ssrfErrors = await resolveSSRFRefs(crawl.refs, {
 			dnsTimeoutMs: options.dnsTimeoutMs,
 			dnsConcurrency: options.dnsConcurrency,
+			safeHostnames: options.safeHostnames,
 		});
 		errors.push(...ssrfErrors);
 	}
@@ -952,6 +955,20 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
 		process.exit(2);
 	};
 
+	const readJsonFile = async (filePath, label) => {
+		let content;
+		try {
+			content = await readFile(filePath, "utf8");
+		} catch (err) {
+			die(`cannot read ${label}: ${err.message}`);
+		}
+		try {
+			return JSON.parse(content);
+		} catch {
+			die(`invalid JSON in ${label}`);
+		}
+	};
+
 	let values;
 	let positionals;
 	try {
@@ -965,6 +982,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
 				offline: { type: "boolean", default: false },
 				lang: { type: "string", default: DEFAULT_LANG },
 				format: { type: "string", default: "human" },
+				ref: { type: "string", multiple: true, short: "r" },
 				version: { type: "boolean", short: "v", default: false },
 				help: { type: "boolean", short: "h", default: false },
 			},
@@ -982,6 +1000,8 @@ Options:
   --override-max-properties <n>    Override max properties limit (default: 1024)
   --ignore <instancePath>          Suppress errors by instancePath or instancePath:keyword (repeatable)
   --offline                        Skip SSRF DNS resolution for remote $ref URLs
+  --ref <file>                     Load a reference schema; its $id hostname is treated as safe
+                                   and skipped during SSRF DNS checks (repeatable)
   --lang <default|js|py|rb|rs|java|kotlin|clojure|cs|vb|fsharp|php|objc|swift|ex|lua>
                                    Downstream language whose deserialization-vector names
                                    to deny in property keys. "default" is the union of
@@ -1030,17 +1050,22 @@ Exit codes:
 	if (fileStat.size > MAX_SCHEMA_SIZE) {
 		die(`schema file exceeds ${MAX_SCHEMA_SIZE} byte limit: "${input}"`);
 	}
-	let content;
-	try {
-		content = await readFile(filePath, "utf8");
-	} catch (err) {
-		die(`cannot read file "${input}": ${err.message}`);
-	}
-	let schema;
-	try {
-		schema = JSON.parse(content);
-	} catch {
-		die(`invalid JSON in "${input}"`);
+	const schema = await readJsonFile(filePath, `file "${input}"`);
+
+	const safeHostnames = new Set();
+	if (values.ref) {
+		for (const refFile of values.ref) {
+			const refSchema = await readJsonFile(
+				resolve(refFile),
+				`--ref file "${refFile}"`,
+			);
+			if (typeof refSchema.$id === "string") {
+				try {
+					const url = new URL(refSchema.$id);
+					if (url.hostname) safeHostnames.add(url.hostname);
+				} catch {}
+			}
+		}
 	}
 
 	const options = { offline: values.offline, lang: values.lang };
@@ -1051,6 +1076,7 @@ Exit codes:
 	if (values["override-max-properties"] != null)
 		options.overrideMaxProperties = values["override-max-properties"];
 	if (values.ignore) options.ignore = values.ignore;
+	options.safeHostnames = safeHostnames;
 
 	let errors;
 	try {

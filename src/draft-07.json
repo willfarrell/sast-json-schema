@@ -135,7 +135,7 @@
 					"$ref": "#/$defs/dependentSchemas.multipleOf"
 				},
 				"$ref": {
-					"$ref": "#/$defs/dependentSchemas.$ref"
+					"$ref": "#/$defs/dependentSchemas.$ref.draft"
 				},
 				"if": {
 					"$ref": "#/$defs/dependentSchemas.if"

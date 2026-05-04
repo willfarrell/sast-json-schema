@@ -121,6 +121,15 @@
         "valid": true
       },
       {
+        "description": "Should fail when $ref is an arbitrary JSON Pointer (not $defs or definitions)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "#/properties/foo"
+        },
+        "valid": false
+      },
+      {
         "description": "Should pass when $ref is an https URL",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1246,6 +1255,15 @@
           "$ref": "https://192.168.1.1/schema.json"
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when $ref URL contains $ in path (e.g. cross-file $defs fragment)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://schema.example.org/#/$defs/age"
+        },
+        "valid": true
       }
     ]
   },
