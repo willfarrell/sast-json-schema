@@ -1,7 +1,7 @@
 import { ok, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
 import schema202012 from "../2020-12.json" with { type: "json" };
-import { analyze, resolveSSRFRefs } from "../cli.js";
+import { analyze, formatSarif, resolveSSRFRefs } from "../cli.js";
 
 test("analyze should filter errors matching options.ignore by instancePath", async () => {
 	const schema = {
@@ -335,6 +335,22 @@ describe("analyze DNS options", () => {
 			"public hostname must not be flagged as private",
 		);
 	});
+
+	test("safeHostnames in analyze options suppresses ssrf for matching $ref hostname", async () => {
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "https://schema.project-owned.invalid/root.json",
+			$ref: "https://schema.project-owned.invalid/defs.json",
+		};
+		const errors = await analyze(schema, {
+			safeHostnames: new Set(["schema.project-owned.invalid"]),
+		});
+		strictEqual(
+			errors.filter((e) => e.keyword === "ssrf").length,
+			0,
+			"safeHostnames must suppress ssrf for project-owned domain",
+		);
+	});
 });
 
 // --- resolveSSRFRefs direct tests ---
@@ -395,6 +411,21 @@ describe("resolveSSRFRefs", () => {
 		});
 		strictEqual(errors.length, 2);
 	});
+
+	test("should skip DNS for hostnames in safeHostnames", async () => {
+		const refs = [
+			{
+				hostname: "schema.unresolvable-project.invalid",
+				ref: "https://schema.unresolvable-project.invalid/schema.json",
+				path: "/$ref",
+			},
+		];
+		const errors = await resolveSSRFRefs(refs, {
+			dnsTimeoutMs: 100,
+			safeHostnames: new Set(["schema.unresolvable-project.invalid"]),
+		});
+		strictEqual(errors.length, 0);
+	});
 });
 
 // --- resolveInstancePath (via analyze overrides) ---
@@ -453,5 +484,185 @@ describe("resolveInstancePath via overrides", () => {
 			offline: true,
 		});
 		ok(errors.some((e) => e.keyword === "maxItems"));
+	});
+});
+
+// --- resolveSSRFRefs private IP detection ---
+
+describe("resolveSSRFRefs private IP", () => {
+	test("should report ssrf error when hostname resolves to private IP", async () => {
+		const refs = [
+			{
+				hostname: "localhost",
+				ref: "https://localhost/schema.json",
+				path: "/$ref",
+			},
+		];
+		const errors = await resolveSSRFRefs(refs, { dnsTimeoutMs: 5_000 });
+		strictEqual(errors.length, 1);
+		strictEqual(errors[0].keyword, "ssrf");
+		ok(errors[0].params.resolvedIP, "should include the resolved private IP");
+		ok(errors[0].message.includes("private IP"));
+	});
+});
+
+// --- analyze lang as array ---
+
+describe("analyze lang as array", () => {
+	test("lang=[] (empty array) should not flag any dangerous names", async () => {
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "test",
+			type: "string",
+			maxLength: 10,
+			pattern: "^[a-z]+$",
+		};
+		const errors = await analyze(schema, { offline: true, lang: [] });
+		ok(!errors.some((e) => e.schemaPath === "#/dangerous-name"));
+	});
+
+	test("lang=['__proto__'] (array) should flag __proto__ in properties", async () => {
+		const schema = JSON.parse(
+			'{"properties":{"__proto__":{"type":"string","maxLength":10,"pattern":"^[a-z]+$"}},"required":["__proto__"],"maxProperties":5,"unevaluatedProperties":false}',
+		);
+		const errors = await analyze(schema, {
+			offline: true,
+			lang: ["__proto__"],
+		});
+		ok(
+			errors.some(
+				(e) => e.keyword === "properties" && e.params.name === "__proto__",
+			),
+		);
+	});
+
+	test("analyze with unknown lang should throw TypeError", async () => {
+		try {
+			await analyze(
+				{ type: "string", maxLength: 10 },
+				{ offline: true, lang: "elvish" },
+			);
+			ok(false, "should have thrown");
+		} catch (err) {
+			ok(err instanceof TypeError);
+			ok(err.message.includes("elvish"));
+		}
+	});
+});
+
+// --- formatSarif ---
+
+describe("formatSarif", () => {
+	test("should produce valid SARIF 2.1.0 structure", () => {
+		const errors = [
+			{
+				instancePath: "/properties/name",
+				schemaPath: "#/maxLength",
+				keyword: "maxLength",
+				params: { limit: 100 },
+				message: "must have maxLength",
+			},
+		];
+		const sarif = formatSarif(errors, "/tmp/schema.json");
+		strictEqual(sarif.version, "2.1.0");
+		ok(Array.isArray(sarif.runs));
+		strictEqual(sarif.runs[0].tool.driver.name, "sast-json-schema");
+		strictEqual(sarif.runs[0].results[0].ruleId, "maxLength");
+		strictEqual(sarif.runs[0].results[0].level, "error");
+	});
+
+	test("should use keyword as ruleId when schemaPath is absent", () => {
+		const errors = [
+			{
+				instancePath: "/",
+				keyword: "custom",
+				message: "custom error",
+				params: {},
+			},
+		];
+		const sarif = formatSarif(errors, "/tmp/schema.json");
+		strictEqual(sarif.runs[0].results[0].ruleId, "custom");
+		strictEqual(sarif.runs[0].tool.driver.rules[0].id, "custom");
+	});
+
+	test("should use 'unknown' as ruleId when both schemaPath and keyword are absent", () => {
+		const errors = [
+			{
+				instancePath: "/",
+				message: "error with no keyword",
+			},
+		];
+		const sarif = formatSarif(errors, "/tmp/schema.json");
+		strictEqual(sarif.runs[0].results[0].ruleId, "unknown");
+	});
+
+	test("should fall back to keyword when schemaPath first segment is empty", () => {
+		const errors = [
+			{
+				instancePath: "/",
+				schemaPath: "#/",
+				keyword: "fallback",
+				message: "test",
+			},
+		];
+		const sarif = formatSarif(errors, "/tmp/schema.json");
+		strictEqual(sarif.runs[0].results[0].ruleId, "fallback");
+	});
+
+	test("should use keyword as message text when message is absent", () => {
+		const errors = [
+			{
+				instancePath: "/",
+				schemaPath: "#/maxLength",
+				keyword: "maxLength",
+				params: {},
+			},
+		];
+		const sarif = formatSarif(errors, "/tmp/schema.json");
+		strictEqual(sarif.runs[0].results[0].message.text, "maxLength");
+	});
+
+	test("should use 'schema issue' when both message and keyword are absent", () => {
+		const errors = [
+			{
+				instancePath: "/",
+				schemaPath: "#/custom",
+			},
+		];
+		const sarif = formatSarif(errors, "/tmp/schema.json");
+		strictEqual(sarif.runs[0].results[0].message.text, "schema issue");
+	});
+
+	test("should handle errors without params", () => {
+		const errors = [
+			{
+				instancePath: "/",
+				schemaPath: "#/maxLength",
+				keyword: "maxLength",
+				message: "must have maxLength",
+			},
+		];
+		const sarif = formatSarif(errors, "/tmp/schema.json");
+		const props = sarif.runs[0].results[0].properties;
+		strictEqual(props.keyword, "maxLength");
+		strictEqual(props.instancePath, "/");
+	});
+
+	test("should handle errors without instancePath", () => {
+		const errors = [
+			{
+				schemaPath: "#/maxLength",
+				keyword: "maxLength",
+				message: "must have maxLength",
+				params: {},
+			},
+		];
+		const sarif = formatSarif(errors, "/tmp/schema.json");
+		strictEqual(sarif.runs[0].results[0].properties.instancePath, "");
+		strictEqual(
+			sarif.runs[0].results[0].locations[0].logicalLocations[0]
+				.fullyQualifiedName,
+			"",
+		);
 	});
 });

@@ -256,17 +256,32 @@
 		"not": { "pattern": "\\.\\." },
 		"maxLength": 1024
 	},
+	"safeLocalDefsRef": {
+		"$comment": "Local $ref restricted to #/$defs/<name> or #/definitions/<name>. For modern drafts (2019-09+) that support both keywords.",
+		"type": "string",
+		"pattern": "^#/(\\$defs|definitions)/[-a-zA-Z0-9_.]+$",
+		"maxLength": 1024
+	},
+	"safeLocalDefinitionsRef": {
+		"$comment": "Local $ref restricted to #/definitions/<name> only. For classic drafts (draft-04/06/07) that do not support $defs.",
+		"type": "string",
+		"pattern": "^#/definitions/[-a-zA-Z0-9_.]+$",
+		"maxLength": 1024
+	},
 	"safeUrn": {
 		"$comment": "RFC 8141 URN. NID: 2-32 chars, alphanumeric with internal hyphens. NSS: conservative allowlist ([A-Za-z0-9._:-]+) to limit attack surface; rejects percent-encoding, r/q/f components, and reserved delimiters that could bypass downstream parsers.",
 		"type": "string",
 		"maxLength": 1024,
 		"pattern": "^urn:[A-Za-z0-9][-A-Za-z0-9]{0,30}[A-Za-z0-9]:[A-Za-z0-9._:-]+$"
 	},
-	"safeSchemaUrl": {
-		"$comment": "Like safeUrl but also rejects query strings. Schema references should not need query parameters.",
+	"safeRemoteRef": {
+		"$comment": "Safe HTTPS URL for remote $dynamicRef/$recursiveRef: no query strings, no fragment, no $ in path.",
 		"allOf": [
 			{
 				"$ref": "#/$defs/safeUrl"
+			},
+			{
+				"pattern": "^https://[-a-zA-Z0-9.]+\\.[a-zA-Z]+(/[-a-zA-Z0-9._/?&~+]*)?$"
 			},
 			{
 				"not": {
@@ -276,24 +291,39 @@
 		]
 	},
 	"safeIdUrl": {
-		"$comment": "Like safeUrl but rejects fragments. JSON Schema spec section 8.2.1: $id MUST NOT contain a non-empty fragment.",
+		"$comment": "Safe HTTPS URL for $id: allows query params, no fragment. JSON Schema spec section 8.2.1: $id MUST NOT contain a non-empty fragment.",
 		"allOf": [
 			{
 				"$ref": "#/$defs/safeUrl"
 			},
 			{
+				"pattern": "^https://[-a-zA-Z0-9.]+\\.[a-zA-Z]+(/[-a-zA-Z0-9._/?&=~+]*)?$"
+			}
+		]
+	},
+	"safeRemoteDefsRef": {
+		"$comment": "Safe HTTPS URL for remote $ref: no query strings, no $ in path, optional #anchor fragment allowing $ for #/$defs/ style.",
+		"allOf": [
+			{
+				"$ref": "#/$defs/safeUrl"
+			},
+			{
+				"pattern": "^https://[-a-zA-Z0-9.]+\\.[a-zA-Z]+(/[-a-zA-Z0-9._/?&~+]*)?(#[-a-zA-Z0-9._/?&=$~+]*)?$"
+			},
+			{
 				"not": {
-					"pattern": "#"
+					"pattern": "\\?"
 				}
 			}
 		]
 	},
 	"safeUrl": {
-		"$comment": "Blocks alternative IP representations (hex 0x7f000001, dotted-numeric 0177.0.0.1, decimal 2130706433) and standard private ranges. DNS-based SSRF bypasses require validator-level protection. Explicit ports are rejected entirely; only the implicit default HTTPS port 443 is reachable. Strip `:443` before validation if your source includes it.",
+		"$comment": "SSRF safety constraints with minimum structural baseline. Always compose with an end-anchored positive pattern in each consumer. Explicit ports are rejected entirely; only the implicit default HTTPS port 443 is reachable.",
 		"type": "string",
 		"allOf": [
 			{
-				"pattern": "^https://[-a-zA-Z0-9.]+\\.[a-zA-Z]+(/[-a-zA-Z0-9._/?&#=~+]*)?$"
+				"$comment": "Must start with https:// and a valid hostname + optional path (no end anchor; consumers add $)",
+				"pattern": "^https://[-a-zA-Z0-9.]+\\.[a-zA-Z]+(/[-a-zA-Z0-9._/?&~+]*)?"
 			},
 			{
 				"not": {
@@ -1100,15 +1130,30 @@
 		}
 	},
 	"dependentSchemas.$ref": {
-		"$comment": "Only allow local (#) or HTTPS references. Remote $ref URLs can be SSRF vectors (e.g. internal IPs, metadata endpoints). Validators should independently restrict or disable remote schema loading.",
+		"$comment": "Only allow #/$defs/<name>, #/definitions/<name>, or a safe HTTPS URL for $ref. For modern drafts (2019-09+).",
 		"properties": {
 			"$ref": {
-				"oneOf": [
+				"anyOf": [
 					{
-						"$ref": "#/$defs/safeSchemaUrl"
+						"$ref": "#/$defs/safeRemoteDefsRef"
 					},
 					{
-						"$ref": "#/$defs/safeLocalRef"
+						"$ref": "#/$defs/safeLocalDefsRef"
+					}
+				]
+			}
+		}
+	},
+	"dependentSchemas.$ref.draft": {
+		"$comment": "Like dependentSchemas.$ref but only #/definitions/<name> for classic drafts (draft-04/06/07) that do not support $defs.",
+		"properties": {
+			"$ref": {
+				"anyOf": [
+					{
+						"$ref": "#/$defs/safeRemoteDefsRef"
+					},
+					{
+						"$ref": "#/$defs/safeLocalDefinitionsRef"
 					}
 				]
 			}
@@ -1145,7 +1190,7 @@
 			"$dynamicRef": {
 				"oneOf": [
 					{
-						"$ref": "#/$defs/safeSchemaUrl"
+						"$ref": "#/$defs/safeRemoteRef"
 					},
 					{
 						"$ref": "#/$defs/safeLocalRef"
@@ -1167,7 +1212,7 @@
 			"$recursiveRef": {
 				"oneOf": [
 					{
-						"$ref": "#/$defs/safeSchemaUrl"
+						"$ref": "#/$defs/safeRemoteRef"
 					},
 					{
 						"$ref": "#/$defs/safeLocalRef"
