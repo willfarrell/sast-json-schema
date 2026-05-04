@@ -28,6 +28,7 @@ describe("cli.", () => {
 		strictEqual(r.code, 0);
 		ok(r.stdout.includes("Usage: sast-json-schema"));
 		ok(r.stdout.includes("--offline"));
+		ok(r.stdout.includes("--ref"));
 		ok(r.stdout.includes("--format"));
 	});
 
@@ -266,6 +267,36 @@ describe("cli.", () => {
 		);
 		const r = await runCli(["--offline", "--override-max-depth", "0", path]);
 		strictEqual(r.code, 1);
+	});
+
+	test("--ref treats the ref schema's $id hostname as safe (no ssrf error)", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const refPath = join(dir, "ref.json");
+		const schemaPath = join(dir, "schema.json");
+		await writeFile(
+			refPath,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "https://schema.cli-ref-test.invalid/defs.json",
+			}),
+		);
+		await writeFile(
+			schemaPath,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "https://schema.cli-ref-test.invalid/root.json",
+				$ref: "https://schema.cli-ref-test.invalid/defs.json",
+			}),
+		);
+		const r = await runCli(["--ref", refPath, "--format", "json", schemaPath]);
+		const errors = JSON.parse(r.stdout);
+		ok(
+			!errors.some((e) => e.keyword === "ssrf"),
+			`ssrf error must not be raised for --ref hostname, got: ${JSON.stringify(errors)}`,
+		);
 	});
 
 	test("--ignore can be repeated to suppress multiple paths", async () => {

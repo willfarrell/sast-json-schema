@@ -300,6 +300,15 @@
           "format": "uuid"
         },
         "valid": false
+      },
+      {
+        "description": "Should fail when $ref uses #/$defs/ in draft-07 ($defs is not a draft-07 keyword)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "$ref": "#/$defs/name"
+        },
+        "valid": false
       }
     ]
   }

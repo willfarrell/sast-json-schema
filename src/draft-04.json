@@ -282,7 +282,7 @@
 					"$ref": "#/$defs/dependentSchemas.multipleOf"
 				},
 				"$ref": {
-					"$ref": "#/$defs/dependentSchemas.$ref"
+					"$ref": "#/$defs/dependentSchemas.$ref.draft"
 				},
 				"pattern": {
 					"$ref": "#/$defs/dependentSchemas.pattern"

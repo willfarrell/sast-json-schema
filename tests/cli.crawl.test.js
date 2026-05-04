@@ -158,6 +158,26 @@ describe("crawlSchema", () => {
 		ok(r.errors.some((e) => e.keyword === "minimum"));
 	});
 
+	test("should use exclusiveMinimum when exclusiveMinimum > minimum (exMin is tighter)", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: 3,
+			exclusiveMinimum: 10,
+			maximum: 5,
+		});
+		ok(r.errors.some((e) => e.keyword === "exclusiveMinimum"));
+	});
+
+	test("should not flag when exclusiveMinimum > minimum and range is valid", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: 3,
+			exclusiveMinimum: 10,
+			maximum: 100,
+		});
+		strictEqual(r.errors.length, 0);
+	});
+
 	test("should use maximum when exclusiveMaximum > maximum", () => {
 		const r = crawlSchema({
 			type: "integer",
@@ -166,6 +186,26 @@ describe("crawlSchema", () => {
 			exclusiveMaximum: 95,
 		});
 		ok(r.errors.some((e) => e.keyword === "minimum"));
+	});
+
+	test("should use exclusiveMaximum when exclusiveMaximum < maximum (exMax is tighter)", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: 50,
+			exclusiveMaximum: 30,
+			maximum: 100,
+		});
+		ok(r.errors.some((e) => e.keyword === "exclusiveMaximum"));
+	});
+
+	test("should not flag when exclusiveMaximum < maximum and range is valid", () => {
+		const r = crawlSchema({
+			type: "integer",
+			minimum: 1,
+			exclusiveMaximum: 30,
+			maximum: 100,
+		});
+		strictEqual(r.errors.length, 0);
 	});
 
 	test("should not flag when exclusiveMinimum < minimum and range is valid", () => {
@@ -395,6 +435,11 @@ describe("crawlSchema", () => {
 
 	test("should skip refs with empty hostname", () => {
 		const r = crawlSchema({ $ref: "file:///etc/passwd" });
+		strictEqual(r.refs.length, 0);
+	});
+
+	test("should skip $ref that is not a valid URL and does not start with #", () => {
+		const r = crawlSchema({ $ref: "relative/path/schema.json" });
 		strictEqual(r.refs.length, 0);
 	});
 
@@ -799,5 +844,42 @@ describe("crawlSchema", () => {
 			ok(e.message.includes("elvish"));
 		}
 		ok(threw, "expected unknown lang to throw");
+	});
+
+	test("lang=[] (empty array) should skip all dangerous-name checks", () => {
+		const r = crawlSchema(
+			JSON.parse('{"properties":{"__proto__":{"type":"string"}}}'),
+			32,
+			{ lang: [] },
+		);
+		ok(!r.errors.some((e) => e.schemaPath === "#/dangerous-name"));
+	});
+
+	test("lang=['__proto__'] (array) should use array directly as denylist", () => {
+		const r = crawlSchema(
+			JSON.parse('{"properties":{"__proto__":{"type":"string"}}}'),
+			32,
+			{ lang: ["__proto__"] },
+		);
+		ok(
+			r.errors.some(
+				(e) => e.keyword === "properties" && e.params.name === "__proto__",
+			),
+		);
+	});
+
+	test("lang=['custom-key'] (array) should flag only the custom key", () => {
+		const r = crawlSchema(
+			{
+				properties: {
+					"custom-key": { type: "string" },
+					safe: { type: "string" },
+				},
+			},
+			32,
+			{ lang: ["custom-key"] },
+		);
+		ok(r.errors.some((e) => e.params.name === "custom-key"));
+		ok(!r.errors.some((e) => e.params.name === "safe"));
 	});
 });
