@@ -53,14 +53,14 @@
         "valid": true
       },
       {
-        "description": "Should fail when const is set without maxLength",
+        "description": "Should pass when const is set without maxLength (const bounds value space)",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
           "type": "string",
           "const": "fixed-value"
         },
-        "valid": false
+        "valid": true
       },
       {
         "description": "Should fail when const type does not match declared type",
@@ -94,7 +94,7 @@
         "valid": true
       },
       {
-        "description": "Should fail when enum is set without maxLength",
+        "description": "Should pass when enum is set without maxLength (enum bounds value space)",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "test",
@@ -103,7 +103,7 @@
             "test"
           ]
         },
-        "valid": false
+        "valid": true
       },
       {
         "description": "Should fail when enum is not set",
@@ -138,6 +138,16 @@
           ]
         },
         "valid": false
+      },
+      {
+        "description": "Should pass when type is [string,null] with enum and no maxLength (enum bounds value space)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": ["string", "null"],
+          "enum": ["test", null]
+        },
+        "valid": true
       }
     ]
   },
@@ -294,6 +304,16 @@
           "maxLength": 36
         },
         "valid": true
+      },
+      {
+        "description": "Should fail when pattern is set and maxLength is not set",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a-z]+$"
+        },
+        "valid": false
       },
       {
         "description": "Should fail when pattern is not set",
