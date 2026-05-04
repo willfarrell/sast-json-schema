@@ -291,7 +291,13 @@ describe("cli.", () => {
 				$ref: "https://schema.cli-ref-test.invalid/defs.json",
 			}),
 		);
-		const r = await runCli(["--ref-schema-files", refPath, "--format", "json", schemaPath]);
+		const r = await runCli([
+			"--ref-schema-files",
+			refPath,
+			"--format",
+			"json",
+			schemaPath,
+		]);
 		const errors = JSON.parse(r.stdout);
 		ok(
 			!errors.some((e) => e.keyword === "ssrf"),
