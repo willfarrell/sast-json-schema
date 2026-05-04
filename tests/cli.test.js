@@ -28,7 +28,7 @@ describe("cli.", () => {
 		strictEqual(r.code, 0);
 		ok(r.stdout.includes("Usage: sast-json-schema"));
 		ok(r.stdout.includes("--offline"));
-		ok(r.stdout.includes("--ref"));
+		ok(r.stdout.includes("--ref-schema-files"));
 		ok(r.stdout.includes("--format"));
 	});
 
@@ -269,7 +269,7 @@ describe("cli.", () => {
 		strictEqual(r.code, 1);
 	});
 
-	test("--ref treats the ref schema's $id hostname as safe (no ssrf error)", async () => {
+	test("--ref-schema-files treats the ref schema's $id hostname as safe (no ssrf error)", async () => {
 		const { writeFile, mkdtemp } = await import("node:fs/promises");
 		const { tmpdir } = await import("node:os");
 		const { join } = await import("node:path");
@@ -291,11 +291,11 @@ describe("cli.", () => {
 				$ref: "https://schema.cli-ref-test.invalid/defs.json",
 			}),
 		);
-		const r = await runCli(["--ref", refPath, "--format", "json", schemaPath]);
+		const r = await runCli(["--ref-schema-files", refPath, "--format", "json", schemaPath]);
 		const errors = JSON.parse(r.stdout);
 		ok(
 			!errors.some((e) => e.keyword === "ssrf"),
-			`ssrf error must not be raised for --ref hostname, got: ${JSON.stringify(errors)}`,
+			`ssrf error must not be raised for --ref-schema-files hostname, got: ${JSON.stringify(errors)}`,
 		);
 	});
 
