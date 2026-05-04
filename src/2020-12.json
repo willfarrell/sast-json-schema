@@ -82,7 +82,7 @@
 				"$vocabulary": false
 			},
 			"dependentRequired": {
-				"properties": ["required", "maxProperties"]
+				"properties": ["required", "additionalProperties"]
 			},
 			"dependentSchemas": {
 				"contains": {
@@ -93,6 +93,9 @@
 				},
 				"prefixItems": {
 					"$ref": "#/$defs/dependentSchemas.prefixItems"
+				},
+				"properties": {
+					"$ref": "#/$defs/dependentSchemas.properties"
 				},
 				"additionalProperties": {
 					"$ref": "#/$defs/dependentSchemas.additionalProperties"

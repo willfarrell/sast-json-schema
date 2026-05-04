@@ -819,9 +819,22 @@
 			}
 		}
 	},
+	"dependentSchemas.properties": {
+		"$comment": "When properties is present without additionalProperties: false (i.e. the object is open), require maxProperties to bound the key count. With additionalProperties: false the set of allowed keys is statically known, so maxProperties is redundant.",
+		"if": {
+			"not": {
+				"properties": {
+					"additionalProperties": { "const": false }
+				},
+				"required": ["additionalProperties"]
+			}
+		},
+		"then": {
+			"required": ["maxProperties"]
+		}
+	},
 	"dependentSchemas.additionalProperties": {
-		"$comment": "When additionalProperties is a typed schema (i.e. not the literal `false`), require a sibling propertyNames so the schema author has explicitly bounded the keyspace shape (length + pattern via the existing string-strictness rule). additionalProperties: false alone is unaffected.",
-		"required": ["maxProperties"],
+		"$comment": "When additionalProperties is a typed schema (i.e. not the literal `false`), require sibling maxProperties and propertyNames to bound both key count and key shape. additionalProperties: false closes the object, so neither is required.",
 		"properties": {
 			"type": {
 				"$ref": "#/$defs/typeObject"
@@ -847,7 +860,7 @@
 			"required": ["additionalProperties"]
 		},
 		"then": {
-			"required": ["propertyNames"]
+			"required": ["maxProperties", "propertyNames"]
 		}
 	},
 	"dependentSchemas.unevaluatedProperties": {

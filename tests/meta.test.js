@@ -60,6 +60,7 @@ const STUBBED_DEPENDENT_SCHEMA_RULES = [
 	"items",
 	"prefixItems",
 	"contains",
+	"properties",
 	"additionalProperties",
 	"pattern",
 	"propertyNames",

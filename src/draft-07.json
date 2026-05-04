@@ -83,9 +83,12 @@
 				"$vocabulary": false
 			},
 			"dependentRequired": {
-				"properties": ["required", "maxProperties"]
+				"properties": ["required", "additionalProperties"]
 			},
 			"dependentSchemas": {
+				"properties": {
+					"$ref": "#/$defs/dependentSchemas.properties"
+				},
 				"additionalProperties": {
 					"$ref": "#/$defs/dependentSchemas.additionalProperties"
 				},
