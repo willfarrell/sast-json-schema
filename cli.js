@@ -982,7 +982,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
 				offline: { type: "boolean", default: false },
 				lang: { type: "string", default: DEFAULT_LANG },
 				format: { type: "string", default: "human" },
-				ref: { type: "string", multiple: true, short: "r" },
+				"ref-schema-files": { type: "string", multiple: true, short: "r" },
 				version: { type: "boolean", short: "v", default: false },
 				help: { type: "boolean", short: "h", default: false },
 			},
@@ -1000,7 +1000,7 @@ Options:
   --override-max-properties <n>    Override max properties limit (default: 1024)
   --ignore <instancePath>          Suppress errors by instancePath or instancePath:keyword (repeatable)
   --offline                        Skip SSRF DNS resolution for remote $ref URLs
-  --ref <file>                     Load a reference schema; its $id hostname is treated as safe
+  -r, --ref-schema-files <file>    Load a reference schema; its $id hostname is treated as safe
                                    and skipped during SSRF DNS checks (repeatable)
   --lang <default|js|py|rb|rs|java|kotlin|clojure|cs|vb|fsharp|php|objc|swift|ex|lua>
                                    Downstream language whose deserialization-vector names
@@ -1053,11 +1053,11 @@ Exit codes:
 	const schema = await readJsonFile(filePath, `file "${input}"`);
 
 	const safeHostnames = new Set();
-	if (values.ref) {
-		for (const refFile of values.ref) {
+	if (values["ref-schema-files"]) {
+		for (const refFile of values["ref-schema-files"]) {
 			const refSchema = await readJsonFile(
 				resolve(refFile),
-				`--ref file "${refFile}"`,
+				`--ref-schema-files file "${refFile}"`,
 			);
 			if (typeof refSchema.$id === "string") {
 				try {
