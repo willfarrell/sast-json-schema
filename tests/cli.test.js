@@ -32,6 +32,121 @@ describe("cli.", () => {
 		ok(r.stdout.includes("--format"));
 	});
 
+	test("--help documents the new resource-limit flags", async () => {
+		const r = await runCli(["--help"]);
+		strictEqual(r.code, 0);
+		ok(r.stdout.includes("--max-schema-size"));
+		ok(r.stdout.includes("--analysis-timeout-ms"));
+		ok(r.stdout.includes("--max-ssrf-hostnames"));
+		ok(r.stdout.includes("--dns-total-timeout-ms"));
+	});
+
+	test("--max-schema-size below schema size exits 2 with size error", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+				maxLength: 10,
+				pattern: "^[a-z]+$",
+			}),
+		);
+		const r = await runCli(["--offline", "--max-schema-size", "5", path]);
+		strictEqual(r.code, 2);
+		ok(r.stderr.includes("size"));
+	});
+
+	test("--max-schema-size is applied to the file-size check, not just analyze()", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "padded.json");
+		// A clean schema whose compact serialization is tiny, padded with
+		// trailing whitespace so the FILE is far larger than the schema. With a
+		// limit between the two, only a file-size check (not the serialized-size
+		// check inside analyze) will reject it.
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "test",
+			type: "string",
+			maxLength: 10,
+			pattern: "^[a-z]+$",
+		};
+		await writeFile(path, `${JSON.stringify(schema)}${" ".repeat(5000)}`);
+		const r = await runCli(["--offline", "--max-schema-size", "1000", path]);
+		strictEqual(r.code, 2);
+		ok(r.stderr.includes("exceeds"));
+	});
+
+	test("--max-schema-size with a non-integer reports a validation error, not a file-size error", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+				maxLength: 10,
+				pattern: "^[a-z]+$",
+			}),
+		);
+		const r = await runCli(["--offline", "--max-schema-size", "3.5", path]);
+		strictEqual(r.code, 2);
+		ok(r.stderr.includes("non-negative integer"));
+		ok(!r.stderr.includes("byte size limit"));
+	});
+
+	test("--analysis-timeout-ms 0 reports a timeout finding (exit 1)", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+				maxLength: 10,
+				pattern: "^[a-z]+$",
+			}),
+		);
+		const r = await runCli(["--offline", "--analysis-timeout-ms", "0", path]);
+		strictEqual(r.code, 1);
+	});
+
+	test("--max-ssrf-hostnames with non-integer exits 2", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+				maxLength: 10,
+				pattern: "^[a-z]+$",
+			}),
+		);
+		const r = await runCli(["--offline", "--max-ssrf-hostnames", "abc", path]);
+		strictEqual(r.code, 2);
+	});
+
 	test("--help documents exit codes", async () => {
 		const r = await runCli(["--help"]);
 		strictEqual(r.code, 0);
@@ -39,6 +154,8 @@ describe("cli.", () => {
 		ok(/0\b.*no issues/i.test(r.stdout));
 		ok(/1\b.*issues/i.test(r.stdout));
 		ok(/2\b.*(usage|tool)/i.test(r.stdout));
+		// exit-code descriptions name the resource-limit conditions (matches README)
+		ok(/depth-exceeded/i.test(r.stdout));
 	});
 
 	test("--version prints a semver-looking string", async () => {
@@ -57,6 +174,35 @@ describe("cli.", () => {
 		const r = await runCli(["--offline", "/tmp/does-not-exist-xyz.json"]);
 		strictEqual(r.code, 2);
 		ok(r.stderr.includes("cannot read file"));
+	});
+
+	test("nonexistent --ref-schema-files exits 2", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "schema.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+				maxLength: 10,
+				pattern: "^[a-z]+$",
+			}),
+		);
+		// The main <file> is gated by stat() first; ref files are read directly,
+		// so a missing ref file is the only path that reaches readJsonFile's
+		// readFile error branch.
+		const r = await runCli([
+			"--offline",
+			"-r",
+			"/tmp/does-not-exist-ref-xyz.json",
+			path,
+		]);
+		strictEqual(r.code, 2);
+		ok(r.stderr.includes("cannot read --ref-schema-files file"));
 	});
 
 	test("oversized file is rejected before being read", async () => {
@@ -202,6 +348,26 @@ describe("cli.", () => {
 		const r = await runCli(["--offline", path]);
 		strictEqual(r.code, 0);
 		ok(r.stdout.includes("has no issues"));
+	});
+
+	test("schema with issues prints human-format header and exits 1", async () => {
+		const { writeFile, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		const path = join(dir, "insecure.json");
+		await writeFile(
+			path,
+			JSON.stringify({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				$id: "test",
+				type: "string",
+				pattern: "^(a+)+$",
+			}),
+		);
+		const r = await runCli(["--offline", path]);
+		strictEqual(r.code, 1);
+		ok(r.stdout.includes("has issues"));
 	});
 
 	test("--override-max-depth with non-integer exits 2", async () => {

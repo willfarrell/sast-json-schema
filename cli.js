@@ -24,6 +24,8 @@ const DEFAULT_VERSION = "2020-12";
 
 export const DNS_TIMEOUT_MS = 5_000;
 export const DNS_CONCURRENCY = 10;
+export const MAX_SSRF_HOSTNAMES = 256;
+export const DNS_TOTAL_TIMEOUT_MS = 30_000;
 
 // Pre-compiled SAST meta-schema validators, keyed by draft version. Compiled
 // once at module load so every sast() / analyze() call reuses the same
@@ -65,6 +67,7 @@ export const MAX_SCHEMA_SIZE = 64 * 1024 * 1024; // 64 MiB
 // fail-closed (reported as unsafe with reason "timedOut") to keep total
 // scan time bounded on adversarial input.
 export const REDOS_TIMEOUT_MS = 1_000;
+export const ANALYSIS_TIMEOUT_MS = 60_000;
 
 // Property names that act as deserialization / type-confusion vectors in
 // each downstream language ecosystem. Selected at the analyze() / CLI layer
@@ -361,6 +364,8 @@ const checkNumericRange = (current, path) => {
 	};
 };
 
+const INSTANCE_DATA_KEYS = new Set(["const", "enum", "default", "examples"]);
+
 // RFC 6901 JSON Pointer token escaping: ~ → ~0, / → ~1.
 // https://datatracker.ietf.org/doc/html/rfc6901#section-3
 const escapeJsonPointer = (token) =>
@@ -373,8 +378,16 @@ const escapeJsonPointer = (token) =>
 // properties, a, properties, b). With MAX_DEPTH=32 this corresponds to roughly
 // 16 levels of real schema nesting.
 export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
-	const result = { depth: 0, depthExceeded: false, errors: [], refs: [] };
+	const result = {
+		depth: 0,
+		depthExceeded: false,
+		timedOut: false,
+		errors: [],
+		refs: [],
+	};
 	if (typeof obj !== "object" || obj === null) return result;
+
+	const deadline = options.deadline;
 
 	const denylist = resolveDangerousNames(options.lang);
 	const denySet = new Set(denylist);
@@ -385,6 +398,18 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 	const stack = [[obj, "", 1]];
 
 	while (stack.length > 0) {
+		if (deadline != null && Date.now() > deadline) {
+			result.errors.push({
+				instancePath: "",
+				schemaPath: "#/timeout",
+				keyword: "timeout",
+				params: {},
+				message: "schema analysis exceeded time budget",
+			});
+			result.timedOut = true;
+			return result;
+		}
+
 		const [current, path, currentDepth] = stack.pop();
 
 		const currentType = current.type;
@@ -574,7 +599,29 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				!Array.isArray(current.patternProperties)
 			) {
 				for (const patternKey of Object.keys(current.patternProperties)) {
+					let patternSafe = true;
 					try {
+						const patternResult = isSafePattern(patternKey, {
+							timeout: REDOS_TIMEOUT_MS,
+						});
+						if (!patternResult.safe) {
+							patternSafe = false;
+							result.errors.push({
+								instancePath: `${path}/patternProperties/${escapeJsonPointer(patternKey)}`,
+								schemaPath: "#/redos",
+								keyword: "patternProperties",
+								params: {
+									pattern: patternKey,
+									reason: patternResult.error ?? "hitMaxScore",
+								},
+								message: `patternProperties key "${patternKey}" is vulnerable to ReDoS`,
+							});
+						}
+					} catch {
+					}
+					if (!patternSafe) continue;
+					try {
+						// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
 						const re = new RegExp(patternKey);
 						const matches = denylist.filter((n) => re.test(n));
 						if (matches.length > 0) {
@@ -617,7 +664,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		}
 
 		for (const key in current) {
-			if (Object.hasOwn(current, key)) {
+			if (Object.hasOwn(current, key) && !INSTANCE_DATA_KEYS.has(key)) {
 				const value = current[key];
 				if (
 					typeof value === "object" &&
@@ -642,10 +689,10 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 
 // RFC 1918 + loopback + link-local + CGN + TEST-NETs + multicast + reserved.
 // Used to block $ref URLs whose hostname resolves to an internal/private IP.
-// Fail-closed: malformed IPv6 (e.g. invalid hex groups, wrong group count)
-// returns false, but the upstream DNS lookup will already have rejected such
-// addresses; we only see well-formed IPs here. Tests in cli.ip.test.js pin
-// the boundary cases.
+// Fail-closed: malformed IPv6 (e.g. invalid hex groups, wrong group count) is
+// treated as private (returns true) so it is blocked rather than allowed
+// through as a forged public address. Tests in cli.ip.test.js pin the
+// boundary cases.
 export const isPrivateIP = (ip) => {
 	const parts = ip.split(".").map(Number);
 	if (
@@ -709,6 +756,9 @@ export const isPrivateIP = (ip) => {
 			if (normalized.startsWith("0:0:0:0:0:ffff:")) {
 				const hi = Number.parseInt(groups[6], 16);
 				const lo = Number.parseInt(groups[7], 16);
+				// Fail-closed: invalid hex parses as NaN, and NaN bit-math would
+				// forge 0.0.0.0-style public-looking IPv4. Block instead.
+				if (Number.isNaN(hi) || Number.isNaN(lo)) return true;
 				const mappedIP = `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
 				return isPrivateIP(mappedIP);
 			}
@@ -756,9 +806,44 @@ export const resolveSSRFRefs = async (refs, options = {}) => {
 		hostnameMap.get(entry.hostname).push(entry);
 	}
 
+	const maxHostnames = options.maxHostnames ?? MAX_SSRF_HOSTNAMES;
+	if (hostnameMap.size > maxHostnames) {
+		return [
+			{
+				instancePath: "",
+				schemaPath: "#/ssrf",
+				keyword: "ssrf",
+				params: { hostnames: hostnameMap.size, limit: maxHostnames },
+				message: `too many distinct remote $ref hostnames (${hostnameMap.size}); refusing SSRF DNS resolution above ${maxHostnames}`,
+			},
+		];
+	}
+
+	const totalMs =
+		options.dnsTotalTimeoutMs != null
+			? Number(options.dnsTotalTimeoutMs)
+			: DNS_TOTAL_TIMEOUT_MS;
+	const overallDeadline = totalMs <= 0 ? 0 : Date.now() + totalMs;
+
 	const results = [];
 	const batches = [...hostnameMap.entries()];
 	for (let i = 0; i < batches.length; i += concurrency) {
+		if (Date.now() > overallDeadline) {
+			for (const [hostname, entries] of batches.slice(i)) {
+				for (const { ref, path } of entries) {
+					results.push([
+						{
+							instancePath: path,
+							schemaPath: "#/ssrf",
+							keyword: "ssrf",
+							params: { ref, hostname },
+							message: `$ref hostname "${hostname}" not checked: SSRF DNS budget exceeded`,
+						},
+					]);
+				}
+			}
+			break;
+		}
 		const batch = batches.slice(i, i + concurrency);
 		const batchResults = await Promise.all(
 			batch.map(([hostname, entries]) =>
@@ -770,7 +855,7 @@ export const resolveSSRFRefs = async (refs, options = {}) => {
 	return results.flat();
 };
 
-const resolveInstancePath = (obj, pointer) => {
+export const resolveInstancePath = (obj, pointer) => {
 	if (typeof obj !== "object" || obj === null) return undefined;
 	if (!pointer) return obj;
 	const parts = pointer
@@ -781,6 +866,12 @@ const resolveInstancePath = (obj, pointer) => {
 	for (const part of parts) {
 		if (typeof current !== "object" || current === null) return undefined;
 		if (!Object.hasOwn(current, part)) return undefined;
+		// Read-only walk: this never assigns INTO current, and the Object.hasOwn
+		// guard above keeps it on own properties, so inherited prototype keys are
+		// never traversed. Prototype pollution requires a write; there is none.
+		// Resolution of own keys named constructor/__proto__ is covered by the
+		// "own-property read" tests in tests/cli.analyze.test.js.
+		// nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
 		current = current[part];
 	}
 	return current;
@@ -809,6 +900,61 @@ export const analyze = async (schema, options = {}) => {
 			);
 		}
 	}
+	if (options.maxSchemaSize != null) {
+		const n = Number(options.maxSchemaSize);
+		if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+			throw new TypeError("maxSchemaSize must be a non-negative integer");
+		}
+	}
+	if (options.analysisTimeoutMs != null) {
+		const n = Number(options.analysisTimeoutMs);
+		if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+			throw new TypeError("analysisTimeoutMs must be a non-negative integer");
+		}
+	}
+	if (options.maxHostnames != null) {
+		const n = Number(options.maxHostnames);
+		if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+			throw new TypeError("maxHostnames must be a non-negative integer");
+		}
+	}
+	if (options.dnsTotalTimeoutMs != null) {
+		const n = Number(options.dnsTotalTimeoutMs);
+		if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+			throw new TypeError("dnsTotalTimeoutMs must be a non-negative integer");
+		}
+	}
+
+	const applyIgnore = (errs) => {
+		if (Array.isArray(options.ignore) && options.ignore.length && errs.length) {
+			const ignore = new Set(options.ignore);
+			return errs.filter(
+				(err) =>
+					!ignore.has(err.instancePath) &&
+					!ignore.has(`${err.instancePath}:${err.keyword}`),
+			);
+		}
+		return errs;
+	};
+
+	const sizeLimit =
+		options.maxSchemaSize != null
+			? Number(options.maxSchemaSize)
+			: MAX_SCHEMA_SIZE;
+	let serialized;
+	try {
+		serialized = JSON.stringify(schema);
+	} catch (err) {
+		throw new TypeError(
+			`schema must be JSON-serializable (circular reference?): ${err.message}`,
+		);
+	}
+	if (
+		typeof serialized === "string" &&
+		Buffer.byteLength(serialized) > sizeLimit
+	) {
+		throw new RangeError(`schema exceeds ${sizeLimit} byte size limit`);
+	}
 
 	const maxDepth =
 		options.overrideMaxDepth != null
@@ -817,8 +963,20 @@ export const analyze = async (schema, options = {}) => {
 
 	resolveDangerousNames(options.lang); // throws on unknown lang
 
-	const crawl = crawlSchema(schema, maxDepth, { lang: options.lang });
+	let deadline;
+	if (options.analysisTimeoutMs != null) {
+		const ms = Number(options.analysisTimeoutMs);
+		deadline = ms <= 0 ? 0 : Date.now() + ms;
+	} else {
+		deadline = Date.now() + ANALYSIS_TIMEOUT_MS;
+	}
 
+	const crawl = crawlSchema(schema, maxDepth, { lang: options.lang, deadline });
+
+	// Depth and timeout signal INCOMPLETE analysis: the crawl bailed early and
+	// AJV validation plus SSRF checks were skipped. They are deliberately NOT
+	// passed through applyIgnore, because suppressing them would falsely report
+	// a partially-analyzed schema as clean (empty errors, exit 0).
 	if (crawl.depthExceeded) {
 		return [
 			{
@@ -829,6 +987,10 @@ export const analyze = async (schema, options = {}) => {
 				message: `must NOT have depth greater than ${maxDepth}`,
 			},
 		];
+	}
+
+	if (crawl.timedOut) {
+		return crawl.errors;
 	}
 
 	let errors = [];
@@ -842,6 +1004,8 @@ export const analyze = async (schema, options = {}) => {
 			dnsTimeoutMs: options.dnsTimeoutMs,
 			dnsConcurrency: options.dnsConcurrency,
 			safeHostnames: options.safeHostnames,
+			maxHostnames: options.maxHostnames,
+			dnsTotalTimeoutMs: options.dnsTotalTimeoutMs,
 		});
 		errors.push(...ssrfErrors);
 	}
@@ -861,22 +1025,16 @@ export const analyze = async (schema, options = {}) => {
 		errors = errors.filter((err) => {
 			if (err.schemaPath === SCHEMA_PATH_MAX_PROPERTIES) {
 				const obj = resolveInstancePath(schema, err.instancePath);
-				if (typeof obj !== "object" || obj === null) return true;
-				return Object.keys(obj).length > limit;
+				return (
+					typeof obj !== "object" ||
+					obj === null ||
+					Object.keys(obj).length > limit
+				);
 			}
 			return true;
 		});
 	}
-	if (Array.isArray(options.ignore) && options.ignore.length && errors.length) {
-		const ignore = new Set(options.ignore);
-		errors = errors.filter((err) => {
-			const pathKey = err.instancePath;
-			const keywordKey = `${err.instancePath}:${err.keyword}`;
-			return !ignore.has(pathKey) && !ignore.has(keywordKey);
-		});
-	}
-
-	return errors;
+	return applyIgnore(errors);
 };
 
 // Maps the analyze() error array to SARIF 2.1.0. Designed for GitHub
@@ -978,6 +1136,10 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
 				"override-max-items": { type: "string" },
 				"override-max-depth": { type: "string" },
 				"override-max-properties": { type: "string" },
+				"max-schema-size": { type: "string" },
+				"analysis-timeout-ms": { type: "string" },
+				"max-ssrf-hostnames": { type: "string" },
+				"dns-total-timeout-ms": { type: "string" },
 				ignore: { type: "string", multiple: true },
 				offline: { type: "boolean", default: false },
 				lang: { type: "string", default: DEFAULT_LANG },
@@ -998,7 +1160,12 @@ Options:
   --override-max-items <n>         Override max items limit (default: 1024)
   --override-max-depth <n>         Override max depth limit (default: 32)
   --override-max-properties <n>    Override max properties limit (default: 1024)
-  --ignore <instancePath>          Suppress errors by instancePath or instancePath:keyword (repeatable)
+  --max-schema-size <bytes>        Max serialized schema size in bytes (default: 67108864 = 64 MiB)
+  --analysis-timeout-ms <ms>       Wall-clock budget for the schema crawl (default: 60000)
+  --max-ssrf-hostnames <n>         Max distinct remote $ref hostnames resolved for SSRF (default: 256)
+  --dns-total-timeout-ms <ms>      Total budget for all SSRF DNS lookups (default: 30000)
+  --ignore <instancePath>          Suppress errors by instancePath or instancePath:keyword (repeatable).
+                                   Depth and timeout findings cannot be suppressed (they mean analysis was incomplete)
   --offline                        Skip SSRF DNS resolution for remote $ref URLs
   -r, --ref-schema-files <file>    Load a reference schema; its $id hostname is treated as safe
                                    and skipped during SSRF DNS checks (repeatable)
@@ -1013,8 +1180,8 @@ Options:
 
 Exit codes:
   0    no issues found
-  1    schema has issues
-  2    usage / tool error`);
+  1    schema has issues, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget findings
+  2    usage / tool error: bad args, unreadable file, invalid JSON, unsupported $schema, oversized schema, or non-JSON-serializable (circular) schema`);
 		process.exit(0);
 	}
 
@@ -1047,8 +1214,22 @@ Exit codes:
 	} catch (err) {
 		die(`cannot read file "${input}": ${err.message}`);
 	}
-	if (fileStat.size > MAX_SCHEMA_SIZE) {
-		die(`schema file exceeds ${MAX_SCHEMA_SIZE} byte limit: "${input}"`);
+	// Only enforce --max-schema-size at the file gate when it parses to a valid
+	// non-negative integer. For invalid values (e.g. 3.5 or a negative), fall
+	// back to the default here and let analyze() raise the proper validation
+	// error instead of a misleading "file exceeds N byte" message.
+	const parsedMaxSchemaSize =
+		values["max-schema-size"] != null
+			? Number(values["max-schema-size"])
+			: null;
+	const fileSizeLimit =
+		parsedMaxSchemaSize != null &&
+		Number.isInteger(parsedMaxSchemaSize) &&
+		parsedMaxSchemaSize >= 0
+			? parsedMaxSchemaSize
+			: MAX_SCHEMA_SIZE;
+	if (fileStat.size > fileSizeLimit) {
+		die(`schema file exceeds ${fileSizeLimit} byte size limit: "${input}"`);
 	}
 	const schema = await readJsonFile(filePath, `file "${input}"`);
 
@@ -1075,6 +1256,14 @@ Exit codes:
 		options.overrideMaxDepth = values["override-max-depth"];
 	if (values["override-max-properties"] != null)
 		options.overrideMaxProperties = values["override-max-properties"];
+	if (values["max-schema-size"] != null)
+		options.maxSchemaSize = values["max-schema-size"];
+	if (values["analysis-timeout-ms"] != null)
+		options.analysisTimeoutMs = values["analysis-timeout-ms"];
+	if (values["max-ssrf-hostnames"] != null)
+		options.maxHostnames = values["max-ssrf-hostnames"];
+	if (values["dns-total-timeout-ms"] != null)
+		options.dnsTotalTimeoutMs = values["dns-total-timeout-ms"];
 	if (values.ignore) options.ignore = values.ignore;
 	options.safeHostnames = safeHostnames;
 

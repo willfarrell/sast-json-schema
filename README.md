@@ -66,7 +66,13 @@ if (!isSchemaSecure(schema)) {
 }
 ```
 
-Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<spec>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
+Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. These are JSON exports, so they require an import attribute:
+
+```javascript
+import schema2020 from "sast-json-schema/2020-12" with { type: "json" }
+```
+
+Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<spec>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
 
 ### CLI
 
@@ -78,10 +84,15 @@ Options:
 - `--override-max-depth <n>`: Override max depth limit (default: 32)
 - `--override-max-items <n>`: Override max items limit (default: 1024)
 - `--override-max-properties <n>`: Override max properties limit (default: 1024)
-- `--ignore <instancePath>`: Suppress errors by instancePath or instancePath:keyword (repeatable). Paths use [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901) JSON Pointer encoding (`~` to `~0`, `/` to `~1`)
+- `--ignore <instancePath>`: Suppress errors by instancePath or instancePath:keyword (repeatable). Paths use [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901) JSON Pointer encoding (`~` to `~0`, `/` to `~1`). Depth-exceeded and timeout findings cannot be suppressed, since they indicate the schema was not fully analyzed
 - `--offline`: Skip SSRF DNS resolution for remote `$ref` URLs (useful in airgapped CI)
+- `-r, --ref-schema-files <file>`: Load a reference schema; its `$id` hostname is treated as safe and skipped during SSRF DNS checks (repeatable)
 - `--lang <code>`: Downstream language whose deserialization-vector names to deny in property keys. Default is `default` (union of every named language). See [language coverage](#language-coverage) below
 - `--format <human|json|sarif>`: Output format. `json` emits a JSON array of error objects on stdout; `sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code-scanning, SonarQube, Semgrep and other security pipelines; `human` is the default
+- `--max-schema-size <bytes>`: Maximum serialized schema size in bytes. Default 67108864 (64 MiB). Larger schemas are rejected as a tool error (exit 2)
+- `--analysis-timeout-ms <ms>`: Wall-clock budget for the schema crawl. Default 60000. Exceeding it produces a `timeout` finding (exit 1)
+- `--max-ssrf-hostnames <n>`: Maximum distinct remote `$ref` hostnames resolved during SSRF checks. Default 256. Above this, DNS resolution is refused and reported as a finding
+- `--dns-total-timeout-ms <ms>`: Total wall-clock budget for all SSRF DNS lookups. Default 30000. Hosts not checked within the budget are reported (fail-closed)
 - `-v, --version`: Show version
 - `-h, --help`: Show this help
 
@@ -90,8 +101,12 @@ Options:
 | Code | Meaning |
 |------|---------|
 | `0`  | No issues found |
-| `1`  | Schema has security issues |
-| `2`  | Usage/tool error (bad args, unreadable file, invalid JSON, unsupported `$schema`) |
+| `1`  | Schema has security findings, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget conditions (a schema too expensive or unsafe to fully analyze is itself a finding) |
+| `2`  | Usage/tool error: bad args, unreadable file, invalid JSON, unsupported `$schema`, an oversized schema (over `--max-schema-size`), or a non-JSON-serializable (circular) schema |
+
+Exit 1 means a problem was found in the schema, including the resource-limit conditions above; exit 2 means the tool could not analyze the input at all.
+
+The `--max-schema-size`, `--analysis-timeout-ms`, `--max-ssrf-hostnames`, and `--dns-total-timeout-ms` flags, together with the existing `--override-max-*` limits, are the tool's resource budgets.
 
 Also available via [`ajv-cmd`](https://github.com/willfarrell/ajv-cmd):
 

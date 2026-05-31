@@ -101,4 +101,12 @@ describe("isPrivateIP IPv6 extended", () => {
 	test("IPv4-mapped dotted with zone ID classified private", () => {
 		strictEqual(isPrivateIP("::ffff:192.168.1.1%eth0"), true);
 	});
+
+	test("IPv4-mapped hex with invalid hex groups classified private (fail-closed)", () => {
+		strictEqual(isPrivateIP("0:0:0:0:0:ffff:0808:gggg"), true);
+	});
+
+	test("IPv4-mapped hex with valid hex still classified private", () => {
+		strictEqual(isPrivateIP("0:0:0:0:0:ffff:7f00:1"), true);
+	});
 });

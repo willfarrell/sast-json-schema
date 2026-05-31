@@ -582,6 +582,96 @@ describe("crawlSchema", () => {
 		ok(Array.isArray(r.errors));
 	});
 
+	test("should flag ReDoS-vulnerable patternProperties key before denylist matching", () => {
+		const r = crawlSchema({
+			patternProperties: { "^(a+)+$": { type: "string" } },
+		});
+		const err = r.errors.find(
+			(e) => e.keyword === "patternProperties" && e.schemaPath === "#/redos",
+		);
+		ok(err, "expected a patternProperties ReDoS error");
+		strictEqual(err.params.reason, "hitMaxScore");
+		strictEqual(err.params.pattern, "^(a+)+$");
+		ok(err.message.includes("^(a+)+$"));
+		ok(err.instancePath.includes("/patternProperties/"));
+	});
+
+	test("unsafe patternProperties key is never matched via RegExp (short-circuits first)", () => {
+		// new RegExp(patternKey) in cli.js is reached only AFTER isSafePattern
+		// clears the key (the `if (!patternSafe) continue;` guard). An unsafe key
+		// must therefore yield a ReDoS finding and NO denylist-match finding,
+		// proving the dynamic RegExp never runs on a catastrophic pattern. This
+		// is the justification for the detect-non-literal-regexp nosemgrep.
+		const r = crawlSchema({
+			patternProperties: {
+				"^(a+)+$": { type: "string" },
+				"^(\\w+)*$": { type: "string" },
+			},
+		});
+		const redos = r.errors.filter(
+			(e) => e.keyword === "patternProperties" && e.schemaPath === "#/redos",
+		);
+		const matched = r.errors.filter(
+			(e) => e.keyword === "patternProperties" && e.params?.matches,
+		);
+		strictEqual(redos.length, 2, "both unsafe keys must be flagged as ReDoS");
+		strictEqual(matched.length, 0, "no denylist match may run on unsafe keys");
+	});
+
+	// --- instance-data keywords are not analyzed as schemas ---
+	// const/enum/default/examples hold literal instance values, never
+	// subschemas. The crawler must not descend into them, or it reports
+	// false positives on data that merely looks like a schema.
+	test("should not run ReDoS analysis on a pattern inside const", () => {
+		const r = crawlSchema({ const: { pattern: "^(a+)+$" } });
+		ok(!r.errors.some((e) => e.keyword === "pattern"));
+	});
+
+	test("should not flag a numeric range inside default", () => {
+		const r = crawlSchema({
+			type: "object",
+			default: { type: "integer", minimum: 100, maximum: 1 },
+		});
+		ok(!r.errors.some((e) => e.keyword === "minimum"));
+	});
+
+	test("should not flag dangerous property names inside enum values", () => {
+		const r = crawlSchema(
+			JSON.parse('{"enum":[{"properties":{"__proto__":{"type":"string"}}}]}'),
+		);
+		ok(!r.errors.some((e) => e.schemaPath === "#/dangerous-name"));
+	});
+
+	test("should not flag dangerous property names inside examples values", () => {
+		const r = crawlSchema(
+			JSON.parse(
+				'{"examples":[{"properties":{"__proto__":{"type":"string"}}}]}',
+			),
+		);
+		ok(!r.errors.some((e) => e.schemaPath === "#/dangerous-name"));
+	});
+
+	test("should still analyze real subschemas alongside instance-data keywords", () => {
+		// A genuine sibling subschema (in properties) must still be crawled even
+		// when const/default/examples are present and skipped.
+		const r = crawlSchema(
+			JSON.parse(
+				'{"properties":{"bad":{"type":"string","minLength":10,"maxLength":5}},"default":{"pattern":"^(a+)+$"}}',
+			),
+		);
+		ok(r.errors.some((e) => e.keyword === "minLength"));
+		ok(!r.errors.some((e) => e.keyword === "pattern"));
+	});
+
+	// --- analysis time budget (deadline) ---
+	test("should fail closed with a timeout error when deadline already passed", () => {
+		const r = crawlSchema({ type: "string", pattern: "^[a-z]+$" }, 32, {
+			deadline: 0,
+		});
+		ok(r.errors.some((e) => e.keyword === "timeout"));
+		strictEqual(r.timedOut, true);
+	});
+
 	// --- dangerous-name detection across all property-key sites (default lang=js) ---
 	// Schemas come from JSON.parse in real usage. Object literals like
 	// `{ __proto__: x }` set the prototype rather than adding a key, so we

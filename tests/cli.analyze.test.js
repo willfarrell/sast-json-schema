@@ -1,7 +1,12 @@
-import { ok, strictEqual } from "node:assert";
+import { deepStrictEqual, ok, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
 import schema202012 from "../2020-12.json" with { type: "json" };
-import { analyze, formatSarif, resolveSSRFRefs } from "../cli.js";
+import {
+	analyze,
+	formatSarif,
+	resolveInstancePath,
+	resolveSSRFRefs,
+} from "../cli.js";
 
 test("analyze should filter errors matching options.ignore by instancePath", async () => {
 	const schema = {
@@ -230,6 +235,143 @@ describe("analyze options validation", () => {
 			ok(err.message.includes("non-negative integer"));
 		}
 	});
+
+	test("should throw TypeError for non-numeric maxHostnames", async () => {
+		try {
+			await analyze(
+				{ type: "string", maxLength: 10 },
+				{ offline: true, maxHostnames: "abc" },
+			);
+			ok(false, "should have thrown");
+		} catch (err) {
+			ok(err instanceof TypeError);
+			ok(err.message.includes("maxHostnames"));
+			ok(err.message.includes("non-negative integer"));
+		}
+	});
+
+	test("should throw TypeError for negative dnsTotalTimeoutMs", async () => {
+		try {
+			await analyze(
+				{ type: "string", maxLength: 10 },
+				{ offline: true, dnsTotalTimeoutMs: -1 },
+			);
+			ok(false, "should have thrown");
+		} catch (err) {
+			ok(err instanceof TypeError);
+			ok(err.message.includes("dnsTotalTimeoutMs"));
+			ok(err.message.includes("non-negative integer"));
+		}
+	});
+
+	test("should throw TypeError for non-integer maxSchemaSize", async () => {
+		try {
+			await analyze(
+				{ type: "string", maxLength: 10 },
+				{ offline: true, maxSchemaSize: 3.5 },
+			);
+			ok(false, "should have thrown");
+		} catch (err) {
+			ok(err instanceof TypeError);
+			ok(err.message.includes("maxSchemaSize"));
+			ok(err.message.includes("non-negative integer"));
+		}
+	});
+
+	test("should throw TypeError for negative analysisTimeoutMs", async () => {
+		try {
+			await analyze(
+				{ type: "string", maxLength: 10 },
+				{ offline: true, analysisTimeoutMs: -1 },
+			);
+			ok(false, "should have thrown");
+		} catch (err) {
+			ok(err instanceof TypeError);
+			ok(err.message.includes("analysisTimeoutMs"));
+			ok(err.message.includes("non-negative integer"));
+		}
+	});
+});
+
+// --- analyze size guard ---
+
+describe("analyze size guard", () => {
+	test("should reject schema exceeding maxSchemaSize with a RangeError", async () => {
+		try {
+			await analyze(
+				{ type: "string", maxLength: 10, pattern: "^[a-z]+$" },
+				{ offline: true, maxSchemaSize: 5 },
+			);
+			ok(false, "should have thrown");
+		} catch (err) {
+			ok(err instanceof RangeError);
+			ok(err.message.includes("size"));
+		}
+	});
+
+	test("should resolve to an array when within maxSchemaSize", async () => {
+		const errors = await analyze(
+			{ type: "string", maxLength: 10, pattern: "^[a-z]+$" },
+			{ offline: true, maxSchemaSize: 1_000_000 },
+		);
+		ok(Array.isArray(errors));
+	});
+
+	test("should throw TypeError for a circular schema", async () => {
+		const o = { type: "object" };
+		o.self = o;
+		try {
+			await analyze(o, { offline: true });
+			ok(false, "should have thrown");
+		} catch (err) {
+			ok(err instanceof TypeError);
+			ok(err.message.includes("JSON-serializable"));
+		}
+	});
+});
+
+// --- analyze time budget ---
+
+describe("analyze time budget", () => {
+	test("analysisTimeoutMs=0 should emit a timeout error", async () => {
+		const errors = await analyze(
+			{ type: "string", maxLength: 10, pattern: "^[a-z]+$" },
+			{ offline: true, analysisTimeoutMs: 0 },
+		);
+		const timeout = errors.find((e) => e.keyword === "timeout");
+		ok(timeout, "expected a timeout error");
+		strictEqual(timeout.schemaPath, "#/timeout");
+		strictEqual(timeout.instancePath, "");
+		strictEqual(timeout.message, "schema analysis exceeded time budget");
+		deepStrictEqual(timeout.params, {});
+	});
+
+	test("ignore must NOT suppress the timeout finding (incomplete analysis stays visible)", async () => {
+		const errors = await analyze(
+			{ type: "string", maxLength: 10, pattern: "^[a-z]+$" },
+			{ offline: true, analysisTimeoutMs: 0, ignore: [":timeout", ""] },
+		);
+		ok(
+			errors.some((e) => e.keyword === "timeout"),
+			"timeout finding must remain even when explicitly ignored",
+		);
+	});
+
+	test("ignore must NOT suppress the depth finding", async () => {
+		const errors = await analyze(
+			{
+				type: "object",
+				properties: {
+					a: { type: "string", maxLength: 10, pattern: "^[a-z]+$" },
+				},
+			},
+			{ offline: true, overrideMaxDepth: 0, ignore: [":depth", ""] },
+		);
+		ok(
+			errors.some((e) => e.keyword === "depth"),
+			"depth finding must remain even when explicitly ignored",
+		);
+	});
 });
 
 // --- regression: filter schemaPaths must match what AJV actually emits ---
@@ -426,6 +568,32 @@ describe("resolveSSRFRefs", () => {
 		});
 		strictEqual(errors.length, 0);
 	});
+
+	test("should refuse DNS above maxHostnames cap (no DNS performed)", async () => {
+		const refs = Array.from({ length: 60 }, (_, i) => ({
+			hostname: `h${i}.invalid`,
+			ref: `https://h${i}.invalid/schema.json`,
+			path: `/$ref/${i}`,
+		}));
+		const errors = await resolveSSRFRefs(refs, { maxHostnames: 50 });
+		strictEqual(errors.length, 1);
+		strictEqual(errors[0].keyword, "ssrf");
+		ok(errors[0].message.includes("too many"));
+	});
+
+	test("should fail closed when dnsTotalTimeoutMs budget is exceeded (no DNS performed)", async () => {
+		const refs = [
+			{
+				hostname: "h.invalid",
+				ref: "https://h.invalid/schema.json",
+				path: "/$ref",
+			},
+		];
+		const errors = await resolveSSRFRefs(refs, { dnsTotalTimeoutMs: 0 });
+		strictEqual(errors.length, 1);
+		strictEqual(errors[0].keyword, "ssrf");
+		ok(errors[0].message.includes("budget"));
+	});
 });
 
 // --- resolveInstancePath (via analyze overrides) ---
@@ -484,6 +652,124 @@ describe("resolveInstancePath via overrides", () => {
 			offline: true,
 		});
 		ok(errors.some((e) => e.keyword === "maxItems"));
+	});
+
+	test("resolves an instancePath segment named 'constructor' (own-property read)", async () => {
+		// resolveInstancePath walks /properties/constructor/enum. The "constructor"
+		// segment must resolve via a guarded own-property read; if the walk were
+		// blocked or diverted onto the prototype, the maxItems error could not be
+		// suppressed and the first assertion would fail. Backs the
+		// prototype-pollution-loop nosemgrep in cli.js (the walk is a read, never
+		// a write, and Object.hasOwn keeps it on own properties).
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "test",
+			type: "object",
+			properties: {
+				constructor: {
+					type: "string",
+					maxLength: 50,
+					enum: Array.from({ length: 2000 }, (_, i) => `s${i}`),
+				},
+			},
+			required: ["constructor"],
+			unevaluatedProperties: false,
+			maxProperties: 5,
+		};
+		const within = await analyze(schema, {
+			overrideMaxItems: 2000,
+			offline: true,
+		});
+		ok(!within.some((e) => e.keyword === "maxItems"));
+		const below = await analyze(schema, {
+			overrideMaxItems: 1500,
+			offline: true,
+		});
+		ok(below.some((e) => e.keyword === "maxItems"));
+	});
+
+	test("resolves an instancePath segment named '__proto__' (own-property read)", async () => {
+		// JSON.parse makes "__proto__" a real own data property (not the prototype
+		// setter), mirroring how a hostile schema reaches the tool. The walk must
+		// read it as own data and never traverse the real prototype chain.
+		const enumJson = JSON.stringify(
+			Array.from({ length: 2000 }, (_, i) => `s${i}`),
+		);
+		const schema = JSON.parse(
+			`{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"test","type":"object","properties":{"__proto__":{"type":"string","maxLength":50,"enum":${enumJson}}},"required":["__proto__"],"unevaluatedProperties":false,"maxProperties":5}`,
+		);
+		const within = await analyze(schema, {
+			overrideMaxItems: 2000,
+			offline: true,
+		});
+		ok(!within.some((e) => e.keyword === "maxItems"));
+		const below = await analyze(schema, {
+			overrideMaxItems: 1500,
+			offline: true,
+		});
+		ok(below.some((e) => e.keyword === "maxItems"));
+	});
+});
+
+// --- resolveInstancePath (direct) ---
+// The override filters only ever hand resolveInstancePath a JSON pointer that
+// AJV emitted for a real array/object location, so they never exercise its
+// defensive guards. These cover the helper directly: a non-walkable root, an
+// empty pointer, a mid-walk descent into a non-object, and a missing segment.
+describe("resolveInstancePath direct", () => {
+	test("returns undefined when the root is not a walkable object", () => {
+		strictEqual(resolveInstancePath(null, "/a"), undefined);
+		strictEqual(resolveInstancePath(42, "/a"), undefined);
+		strictEqual(resolveInstancePath("string", "/a"), undefined);
+	});
+
+	test("returns the root object for an empty pointer", () => {
+		const root = { a: 1 };
+		strictEqual(resolveInstancePath(root, ""), root);
+	});
+
+	test("returns undefined when a mid-walk segment is not an object", () => {
+		strictEqual(resolveInstancePath({ a: 5 }, "/a/b"), undefined);
+	});
+
+	test("returns undefined when a segment is not an own property", () => {
+		strictEqual(resolveInstancePath({ a: {} }, "/a/missing"), undefined);
+	});
+
+	test("walks own properties, unescaping ~1 and ~0 segments", () => {
+		const root = { "a/b": { "c~d": 7 } };
+		strictEqual(resolveInstancePath(root, "/a~1b/c~0d"), 7);
+	});
+});
+
+// --- allErrors completeness ---
+// The meta-schema validators compile with allErrors:true so a single pass
+// surfaces EVERY violation, not just the first. This locks in that behavior,
+// which is the justification for the ajv-allerrors-true nosemgrep in cli.js:
+// dropping allErrors would silently hide findings from a security report.
+describe("analyze allErrors completeness", () => {
+	test("reports violations from multiple sibling properties in one pass", async () => {
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "test",
+			type: "object",
+			properties: {
+				a: { type: "string" },
+				b: { type: "string" },
+			},
+			required: ["a", "b"],
+			unevaluatedProperties: false,
+			maxProperties: 5,
+		};
+		const errors = await analyze(schema, { offline: true });
+		ok(
+			errors.some((e) => e.instancePath === "/properties/a"),
+			"expected a violation for property a",
+		);
+		ok(
+			errors.some((e) => e.instancePath === "/properties/b"),
+			"expected a violation for property b",
+		);
 	});
 });
 

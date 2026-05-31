@@ -15,6 +15,7 @@
 		"LICENSE",
 		".license.template",
 		"**/.gitignore",
+		"**/.npmignore",
 		"**/*.fuzz.js",
 		"**/*.perf.js",
 		"**/*.test.js",

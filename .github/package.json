@@ -3,7 +3,7 @@
 	"version": "0.0.1",
 	"private": true,
 	"engines": {
-		"node": ">=22.0"
+		"node": ">=24"
 	},
 	"devDependencies": {
 		"lockfile-lint": "5.0.0"
