@@ -12,6 +12,7 @@
 		".husky/**/*",
 		"tests/fixtures/*",
 		"commitlint.config.cjs",
+		"stryker.config.*",
 		"LICENSE",
 		".license.template",
 		"**/.gitignore",

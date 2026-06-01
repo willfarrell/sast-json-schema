@@ -617,8 +617,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 								message: `patternProperties key "${patternKey}" is vulnerable to ReDoS`,
 							});
 						}
-					} catch {
-					}
+					} catch {}
 					if (!patternSafe) continue;
 					try {
 						// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
