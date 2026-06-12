@@ -2,6 +2,12 @@ name: Tests (lint)
 
 on:
   pull_request:
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: 24.x

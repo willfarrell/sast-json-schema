@@ -1,6 +1,6 @@
-import { ok, strictEqual } from "node:assert";
+import { ok, strictEqual, throws } from "node:assert";
 import { describe, test } from "node:test";
-import sast, { analyze, MAX_SCHEMA_SIZE } from "../cli.js";
+import sast, { analyze, crawlSchema, MAX_SCHEMA_SIZE } from "../cli.js";
 
 test("sast should return a validate function", () => {
 	const validate = sast();
@@ -241,6 +241,40 @@ describe("sast validate vs analyze consistency", () => {
 		ok(
 			errors.some((e) => e.keyword === "minimum"),
 			"crawler must catch impossible range",
+		);
+	});
+});
+
+describe("sast() $schema URL normalization", () => {
+	test("a trailing '#' on the $schema URL still resolves the draft", () => {
+		// kills the `.replace(/#$/, "")` step
+		const validate = sast({
+			$schema: "https://json-schema.org/draft/2020-12/schema#",
+		});
+		strictEqual(typeof validate, "function");
+	});
+
+	test("a protocol-relative $schema URL still resolves the draft", () => {
+		// kills the `.replace(/^(?:https?:)?\/\//, "")` step
+		const validate = sast({
+			$schema: "//json-schema.org/draft/2020-12/schema",
+		});
+		strictEqual(typeof validate, "function");
+	});
+
+	test("an unsupported $schema throws naming the value", () => {
+		throws(
+			() => sast({ $schema: "http://bogus.example/v1" }),
+			/Unsupported \$schema: http:\/\/bogus\.example\/v1/,
+		);
+	});
+});
+
+describe("resolveDangerousNames unknown language", () => {
+	test("an unknown lang throws listing the valid options comma-separated", () => {
+		throws(
+			() => crawlSchema({ type: "object" }, 32, { lang: "klingon" }),
+			/unknown lang "klingon", expected one of: js, py, /,
 		);
 	});
 });
