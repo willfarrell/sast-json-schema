@@ -146,7 +146,7 @@ test("fuzz: crawlSchema() never throws and honours its result contract", () => {
 					`crawlSchema threw ${err?.constructor?.name}: ${err?.message} for ${JSON.stringify(schema)}`,
 				);
 			}
-			if (result === null || typeof result !== "object") {
+			if (!result || typeof result !== "object") {
 				throw new Error(
 					`crawlSchema did not return an object for ${JSON.stringify(schema)}`,
 				);

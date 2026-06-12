@@ -1,4 +1,4 @@
-import { strictEqual, throws } from "node:assert";
+import { doesNotThrow, strictEqual, throws } from "node:assert";
 import { describe, test } from "node:test";
 import { verifyRefs } from "../bin/build.js";
 
@@ -13,7 +13,7 @@ describe("verifyRefs", () => {
 				x: { $ref: "#/$defs/b" },
 			},
 		};
-		strictEqual(verifyRefs(schema, "ok.json"), undefined);
+		doesNotThrow(() => verifyRefs(schema, "ok.json"));
 	});
 
 	test("throws naming the dangling pointer", () => {
@@ -48,7 +48,7 @@ describe("verifyRefs", () => {
 				y: { $ref: "#/properties/x" },
 			},
 		};
-		strictEqual(verifyRefs(schema, "ignore.json"), undefined);
+		doesNotThrow(() => verifyRefs(schema, "ignore.json"));
 	});
 
 	test("resolves #/definitions/ pointers against definitions", () => {
@@ -56,7 +56,7 @@ describe("verifyRefs", () => {
 			definitions: { a: { type: "string" } },
 			properties: { x: { $ref: "#/definitions/a" } },
 		};
-		strictEqual(verifyRefs(ok, "defs-ok.json"), undefined);
+		doesNotThrow(() => verifyRefs(ok, "defs-ok.json"));
 		const bad = {
 			definitions: { a: { type: "string" } },
 			properties: { x: { $ref: "#/definitions/missing" } },

@@ -115,7 +115,7 @@ describe("B1: recursive value size limits (2020-12)", () => {
 			// bounded by AJV's own runtime recursion limit: a 2000-level value is
 			// never accepted, it fails closed (validate returns false or throws a
 			// RangeError during validation). Either way it is not treated as safe.
-			let accepted = true;
+			let accepted;
 			try {
 				accepted = validate(wrap2020(keyword, buildDeep(2000)));
 			} catch {
