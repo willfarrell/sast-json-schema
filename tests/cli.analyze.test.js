@@ -1384,6 +1384,139 @@ describe("resolveSSRFRefs error shapes and boundaries", () => {
 	});
 });
 
+// --- injectable monotonic clock: total-budget deadline at a batch index > 0 ---
+// resolveSSRFRefs reads the clock through options.now (defaulting to Date.now),
+// mirroring crawlSchema. With dnsConcurrency:1 each distinct host is its own batch,
+// so an injected clock can let the FIRST batch resolve and then expire the budget
+// before a LATER batch. That makes batches.slice(i) a proper subset (i > 0) and
+// lets us pin the deadline boundary exactly. The hosts are RFC 6761 `.invalid`
+// names that never resolve, so the few lookups that do run fail fast and offline.
+describe("resolveSSRFRefs injected clock (budget at batch index > 0)", () => {
+	const ref = (hostname, path = "/$ref") => ({
+		hostname,
+		ref: `https://${hostname}/schema.json`,
+		path,
+	});
+	const stepClock = (...values) => {
+		let i = 0;
+		return () => values[Math.min(i++, values.length - 1)];
+	};
+
+	// D-(i): the budget expires at batch index 1, not 0. now() reads: #1 sets the
+	// deadline (0 + 100 = 100); #2 (i=0) = 0 -> under, so host0 is resolved via DNS;
+	// #3 (i=1) = 200 -> over, so the loop bails with batches.slice(1). Only host1
+	// (the second batch) is reported budget-exceeded; host0 got a real DNS finding.
+	// Kills the MethodExpression: slice() / slice(0) would mark BOTH hosts as
+	// budget-exceeded (and never DNS-resolve host0).
+	test("budget expiring at batch index 1 only skips the LATER batch (slice(i) subset)", async () => {
+		const errors = await resolveSSRFRefs(
+			[
+				ref("first-host-aaa.invalid", "/a/$ref"),
+				ref("second-host-bbb.invalid", "/b/$ref"),
+			],
+			{
+				dnsConcurrency: 1,
+				dnsTimeoutMs: 100,
+				dnsTotalTimeoutMs: 100,
+				now: stepClock(0, 0, 200),
+			},
+		);
+		strictEqual(errors.length, 2, "one finding per host");
+		const first = errors.find(
+			(e) => e.params.hostname === "first-host-aaa.invalid",
+		);
+		const second = errors.find(
+			(e) => e.params.hostname === "second-host-bbb.invalid",
+		);
+		ok(first, "the first host must have a finding");
+		ok(second, "the second host must have a finding");
+		// host0 was resolved (DNS ran): a `.invalid` host does not resolve, so it is a
+		// "does not resolve" finding WITHOUT the incomplete marker.
+		ok(
+			first.message.includes("does not resolve"),
+			"the first batch must have been DNS-resolved, not skipped",
+		);
+		strictEqual(
+			first.params.incomplete,
+			undefined,
+			"resolved host is not incomplete",
+		);
+		// host1 was skipped because the budget expired: budget-exceeded + incomplete.
+		ok(
+			second.message.includes("SSRF DNS budget exceeded"),
+			"the later batch must be skipped as budget-exceeded",
+		);
+		strictEqual(
+			second.params.incomplete,
+			true,
+			"skipped host is marked incomplete",
+		);
+	});
+
+	// D-(ii): the budget boundary is EXCLUSIVE. now() reads: #1 sets the deadline
+	// (0 + 100 = 100); every later read returns EXACTLY 100, so `100 > 100` is false
+	// and the loop NEVER bails. Both `.invalid` hosts are therefore DNS-resolved (no
+	// budget-exceeded findings). Kills the EqualityOperator `>`->`>=` (which would
+	// bail at the boundary and mark both hosts budget-exceeded).
+	test("a clock exactly at the overall deadline does not bail (> is exclusive)", async () => {
+		const errors = await resolveSSRFRefs(
+			[ref("boundary-aaa.invalid"), ref("boundary-bbb.invalid")],
+			{
+				dnsConcurrency: 1,
+				dnsTimeoutMs: 100,
+				dnsTotalTimeoutMs: 100,
+				now: stepClock(0, 100, 100, 100),
+			},
+		);
+		strictEqual(errors.length, 2, "both hosts produce a finding");
+		ok(
+			errors.every((e) => e.message.includes("does not resolve")),
+			"at the exclusive boundary both hosts must be DNS-resolved, none skipped",
+		);
+		ok(
+			!errors.some((e) => e.params.incomplete === true),
+			"no host may be marked budget-exceeded at the boundary",
+		);
+	});
+
+	// analyze() threads options.now through to BOTH crawlSchema and resolveSSRFRefs.
+	// A monotonic counter clock is injected: crawlSchema reads it during its crawl
+	// (its deadline is the real Date.now()+60s, so these tiny readings never trip the
+	// crawl timeout), and resolveSSRFRefs then reads the SAME injected clock for the
+	// SSRF budget. With dnsTotalTimeoutMs:0 the overall deadline is 0, and by the time
+	// the SSRF loop runs the counter has already advanced past 0, so `now() > 0` is
+	// true and both remote hosts are skipped as budget-exceeded. A forced-constant
+	// (equivalent) clock could not produce this, proving options.now flows end to end.
+	test("analyze threads options.now into the SSRF budget end to end", async () => {
+		let tick = 0;
+		const schema = {
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "test",
+			$defs: {
+				a: { $ref: "https://e2e-first-aaa.invalid/s.json" },
+				b: { $ref: "https://e2e-second-bbb.invalid/s.json" },
+			},
+		};
+		const errors = await analyze(schema, {
+			dnsConcurrency: 1,
+			dnsTimeoutMs: 100,
+			dnsTotalTimeoutMs: 0,
+			now: () => ++tick,
+		});
+		ok(tick > 0, "the injected clock must have been read");
+		const remote = errors.filter((e) => e.params?.incomplete === true);
+		strictEqual(
+			remote.length,
+			2,
+			"both remote hosts are skipped as budget-exceeded",
+		);
+		ok(
+			remote.every((e) => e.message.includes("SSRF DNS budget exceeded")),
+			"both must be budget-exceeded via the injected clock",
+		);
+	});
+});
+
 // Additional resolveInstancePath guards the existing direct tests miss: an empty
 // pointer with a non-object root (the root guard must win over the !pointer
 // shortcut), and a null encountered mid-walk (the guard must return before

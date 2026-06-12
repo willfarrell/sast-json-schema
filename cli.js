@@ -423,6 +423,10 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 	if (typeof obj !== "object" || obj === null) return result;
 
 	const deadline = options.deadline;
+	// Injectable monotonic clock (defaults to the real wall clock). Reading the
+	// clock through this indirection lets tests drive the deadline branches
+	// deterministically (the same pattern as options.memoryUsage below).
+	const now = typeof options.now === "function" ? options.now : Date.now;
 
 	const denylist = resolveDangerousNames(options.lang);
 	const denySet = new Set(denylist);
@@ -455,12 +459,18 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		});
 		result.timedOut = true;
 	};
-	// True when a deadline is configured and has passed.
-	// Stryker disable next-line ConditionalExpression,EqualityOperator: a missing
-	// deadline makes Date.now() > undefined false anyway (so forcing the guard true
-	// is equivalent), and Date.now() is never exactly the deadline, so > vs >=
-	// cannot differ. Timing-only boundary.
-	const deadlinePassed = () => deadline != null && Date.now() > deadline;
+	// True when a deadline is configured and has passed. The `> deadline` boundary
+	// is exclusive (a clock reading EXACTLY at the deadline does NOT bail), pinned by
+	// the injected-clock deadline tests in cli.crawl.test.js, which also kill the
+	// whole-condition ConditionalExpression mutant (expired clock bails, future clock
+	// does not). The `deadline != null` guard sits on its own line so ONLY its
+	// genuinely-equivalent mutant is disabled.
+	const deadlineConfigured = () =>
+		// Stryker disable next-line ConditionalExpression: forcing this `!= null` guard
+		// true is equivalent; when deadline is absent, now() > undefined is false anyway
+		// (deadlinePassed short-circuits the same way), so no input distinguishes it.
+		deadline != null;
+	const deadlinePassed = () => deadlineConfigured() && now() > deadline;
 
 	// Returns true (and emits one #/redos-budget finding the first time) when the
 	// total-pattern cap has been exceeded, so callers can skip further analysis.
@@ -614,12 +624,9 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		) {
 			// Check the deadline BEFORE the (potentially expensive) analysis: the
 			// once-per-pop check above is not enough when one stack frame holds many
-			// patterns. Bail to the timeout path on an expired deadline.
-			// Stryker disable next-line ConditionalExpression,BlockStatement: this guard
-			// only fires when a REAL isSafePattern() call between the once-per-pop check
-			// and here is slow; time cannot deterministically pass in a fast test, so the
-			// block is NoCoverage and the conditional is equivalent (timing-only). The
-			// original deadline check carried the same disable before deadlinePassed().
+			// patterns. Bail to the timeout path on an expired deadline. Exercised
+			// deterministically by an injected clock that is under-deadline at the
+			// once-per-pop check and over it here (see cli.crawl.test.js).
 			if (deadlinePassed()) {
 				timeoutBail();
 				return result;
@@ -760,11 +767,9 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				const keyPath = `${path}/patternProperties/${escapeJsonPointer(patternKey)}`;
 				// Check the deadline before each key: a single object can carry many
 				// patternProperties keys, all analyzed in ONE stack frame, so the
-				// once-per-pop check above never fires between them.
-				// Stryker disable next-line ConditionalExpression,BlockStatement: fires only
-				// when a REAL per-key isSafePattern() call is slow; time cannot pass between
-				// the once-per-pop check and here in a fast test, so the block is NoCoverage
-				// and the conditional is equivalent (timing-only), matching the convention.
+				// once-per-pop check above never fires between them. Exercised with an
+				// injected clock that crosses the deadline before a later key (see
+				// cli.crawl.test.js).
 				if (deadlinePassed()) {
 					timeoutBail();
 					return result;
@@ -1073,18 +1078,23 @@ export const resolveSSRFRefs = async (refs, options = {}) => {
 		options.dnsTotalTimeoutMs != null
 			? Number(options.dnsTotalTimeoutMs)
 			: DNS_TOTAL_TIMEOUT_MS;
-	const overallDeadline = totalMs <= 0 ? 0 : Date.now() + totalMs;
+	// Injectable monotonic clock (defaults to the real wall clock), mirroring
+	// crawlSchema's options.now so the total-budget deadline can be crossed
+	// deterministically in tests, including at a batch index > 0.
+	const now = typeof options.now === "function" ? options.now : Date.now;
+	const overallDeadline = totalMs <= 0 ? 0 : now() + totalMs;
 
 	const results = [];
 	const batches = [...hostnameMap.entries()];
 	// Stryker disable next-line EqualityOperator: < vs <= only adds one empty
 	// trailing batch (slice past the end), so it is an equivalent mutant.
 	for (let i = 0; i < batches.length; i += concurrency) {
-		// Stryker disable next-line EqualityOperator: Date.now() is never exactly the
-		// deadline, so > vs >= cannot differ here.
-		if (Date.now() > overallDeadline) {
-			// Stryker disable next-line MethodExpression: the budget is only ever hit
-			// at i=0 in tests, where slice(i) === the whole array.
+		// The budget boundary is exclusive; pinned by an injected-clock test that
+		// puts now() exactly at overallDeadline (no bail).
+		if (now() > overallDeadline) {
+			// slice(i) skips the batches already resolved; an injected clock that
+			// expires the budget at a batch index > 0 makes this a proper subset,
+			// pinned by a test in cli.analyze.test.js.
 			for (const [hostname, entries] of batches.slice(i)) {
 				for (const { ref, path } of entries) {
 					results.push([
@@ -1252,7 +1262,11 @@ export const analyze = async (schema, options = {}) => {
 		deadline = ms <= 0 ? 0 : Date.now() + ms;
 	}
 
-	const crawl = crawlSchema(schema, maxDepth, { lang: options.lang, deadline });
+	const crawl = crawlSchema(schema, maxDepth, {
+		lang: options.lang,
+		deadline,
+		now: options.now,
+	});
 
 	// Depth and timeout signal INCOMPLETE analysis: the crawl bailed early and
 	// AJV validation plus SSRF checks were skipped. They are deliberately NOT
@@ -1293,6 +1307,7 @@ export const analyze = async (schema, options = {}) => {
 			safeHostnames: options.safeHostnames,
 			maxHostnames: options.maxHostnames,
 			dnsTotalTimeoutMs: options.dnsTotalTimeoutMs,
+			now: options.now,
 		});
 		errors.push(...ssrfErrors);
 	}

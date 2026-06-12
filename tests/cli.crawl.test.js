@@ -2102,3 +2102,144 @@ describe("crawlSchema collected-refs cap (A4)", () => {
 		);
 	});
 });
+
+// --- injectable monotonic clock: deterministic deadline branches ---
+// crawlSchema reads the clock through options.now (defaulting to Date.now), the
+// same injection pattern as options.memoryUsage. That makes every deadline branch
+// reachable in a fast test: we can return a value UNDER the deadline on one read
+// and OVER it on the next, so the per-pattern / per-key bails (which fire only
+// between the once-per-pop check and the next check) are exercised deterministically.
+describe("crawlSchema injected clock (deadline branches)", () => {
+	// Returns a clock that yields the given values in order, repeating the last
+	// value once the sequence is exhausted.
+	const stepClock = (...values) => {
+		let i = 0;
+		return () => values[Math.min(i++, values.length - 1)];
+	};
+
+	// C: deadlinePassed semantics. A clock UNDER the deadline must NOT bail, so a
+	// clean schema is analyzed normally (no timeout finding). Kills the whole-
+	// condition ConditionalExpression forced-true (which would bail wrongly).
+	test("a clock under the deadline does not bail (no timeout finding)", () => {
+		const r = crawlSchema({ type: "string", minLength: 1, maxLength: 5 }, 32, {
+			deadline: 5_000,
+			now: () => 1_000,
+		});
+		strictEqual(
+			r.timedOut,
+			false,
+			"must not time out when clock is under deadline",
+		);
+		ok(!r.errors.some((e) => e.keyword === "timeout"), "no timeout finding");
+	});
+
+	// C: a clock OVER the deadline bails on the first pop. Kills the whole-condition
+	// ConditionalExpression forced-false (which would never bail).
+	test("a clock over the deadline bails on the first pop", () => {
+		const r = crawlSchema({ type: "string", minLength: 5, maxLength: 1 }, 32, {
+			deadline: 1_000,
+			now: () => 2_000,
+		});
+		ok(
+			r.errors.some((e) => e.keyword === "timeout"),
+			"must emit the timeout finding",
+		);
+		strictEqual(r.timedOut, true);
+		ok(
+			!r.errors.some((e) => e.keyword === "minLength"),
+			"must bail before the structural check",
+		);
+	});
+
+	// C: the deadline boundary is EXCLUSIVE. A clock reading EXACTLY at the deadline
+	// must NOT bail. Kills the EqualityOperator `>`->`>=` (which would bail at the
+	// boundary and lose the structural finding).
+	test("a clock exactly at the deadline does not bail (> is exclusive)", () => {
+		const r = crawlSchema({ type: "string", minLength: 5, maxLength: 1 }, 32, {
+			deadline: 1_000,
+			now: () => 1_000,
+		});
+		strictEqual(r.timedOut, false, "exactly at the deadline must not bail");
+		ok(
+			!r.errors.some((e) => e.keyword === "timeout"),
+			"no timeout finding at the boundary",
+		);
+		ok(
+			r.errors.some((e) => e.keyword === "minLength"),
+			"the structural check still runs at the boundary",
+		);
+	});
+
+	// A: per-pattern deadline bail in the top-level `pattern` block. The clock is
+	// UNDER the deadline at the once-per-pop check (call #1) and OVER it at the
+	// per-pattern check (call #2), so the per-pattern guard fires. Kills both the
+	// ConditionalExpression (if(false) would skip the bail and analyze the pattern)
+	// and the BlockStatement (an empty block would neither push the finding nor
+	// return, so analysis would continue).
+	test("per-pattern deadline bail fires between the once-per-pop and per-pattern checks", () => {
+		// Two reads per pop on the single node: top-of-loop (under) then per-pattern
+		// (over). A safe pattern is used so, absent the bail, NO pattern finding
+		// would appear and the crawl would complete cleanly.
+		const r = crawlSchema({ type: "string", pattern: "^[a-z]+$" }, 32, {
+			deadline: 1_000,
+			now: stepClock(100, 2_000),
+		});
+		ok(
+			r.errors.some((e) => e.keyword === "timeout"),
+			"the per-pattern check must bail to the timeout path",
+		);
+		strictEqual(r.timedOut, true);
+		ok(
+			!r.errors.some((e) => e.schemaPath === "#/redos"),
+			"the per-pattern bail must occur before any ReDoS analysis",
+		);
+		strictEqual(r.errors.length, 1, "only the timeout finding is emitted");
+	});
+
+	// B: per-key deadline bail in the patternProperties loop. The patternProperties
+	// values are BOOLEAN subschemas (true), so they are never pushed as further nodes
+	// to crawl. That is deliberate: the ONLY nodes popped are the root and the
+	// patternProperties object itself, and the clock stays UNDER the deadline on every
+	// top-of-loop read. The only read that can go OVER is the per-key check on the
+	// SECOND key. So the timeout finding can ONLY come from the per-key guard:
+	//   - real code:        #1 root top-of-loop (100, under), #2 key "^aaa$" per-key
+	//                       (200, under), #3 key "^bbb$" per-key (2000, OVER) -> bail.
+	//   - if(false) mutant: the per-key reads vanish, leaving #1 root (100) and #2
+	//                       patternProperties-object top-of-loop (200), both UNDER ->
+	//                       no timeout -> this test fails, killing the mutant.
+	//   - empty-block mutant: the per-key reads still run (#2 200, #3 2000) but never
+	//                       bail; the clock then returns UNDER once more (#4 100) for
+	//                       the patternProperties-object top-of-loop read, so no
+	//                       timeout is produced -> killed. The clock returns OVER only
+	//                       ONCE (the bbb per-key read) and then drops back under,
+	//                       which is what lets it kill BOTH mutants at once.
+	// Kills both the ConditionalExpression and the BlockStatement for the per-key guard.
+	test("per-key deadline bail fires before a later patternProperties key", () => {
+		const r = crawlSchema(
+			{ patternProperties: { "^aaa$": true, "^bbb$": true } },
+			32,
+			{ deadline: 1_000, now: stepClock(100, 200, 2_000, 100) },
+		);
+		ok(
+			r.errors.some((e) => e.keyword === "timeout"),
+			"the per-key check must bail to the timeout path",
+		);
+		strictEqual(r.timedOut, true);
+	});
+
+	// A safe top-level pattern with an under-deadline clock on BOTH reads must be
+	// analyzed normally (no timeout): proves the per-pattern guard does NOT bail when
+	// the clock stays under, complementing the bail test above so the conditional is
+	// pinned on both sides.
+	test("per-pattern guard does not bail when the clock stays under the deadline", () => {
+		const r = crawlSchema({ type: "string", pattern: "^(a+)+$" }, 32, {
+			deadline: 1_000,
+			now: stepClock(100, 200),
+		});
+		strictEqual(r.timedOut, false, "must not bail when the clock stays under");
+		ok(
+			r.errors.some((e) => e.schemaPath === "#/redos"),
+			"the pattern is analyzed and flagged when no bail occurs",
+		);
+	});
+});
