@@ -143,26 +143,6 @@
 				}
 			}
 		},
-		"dependentSchemas.id": {
-			"$comment": "Draft-04 used `id` as the identifier keyword; draft-06+ renamed it to $id. Same URL/local-ref rules apply.",
-			"properties": {
-				"id": {
-					"oneOf": [
-						{
-							"$ref": "#/$defs/safeIdUrl"
-						},
-						{
-							"$ref": "#/$defs/safeUrn"
-						},
-						{
-							"type": "string",
-							"maxLength": 1024,
-							"pattern": "^[a-zA-Z0-9_-]+$"
-						}
-					]
-				}
-			}
-		},
 		"schemaBase": {
 			"properties": {
 				"additionalItems": {
@@ -240,7 +220,7 @@
 					"$ref": "#/$defs/dependentSchemas.properties"
 				},
 				"additionalProperties": {
-					"$ref": "#/$defs/dependentSchemas.additionalProperties"
+					"$ref": "#/$defs/dependentSchemas.additionalProperties.draft-04"
 				},
 				"items": {
 					"$ref": "#/$defs/dependentSchemas.items"

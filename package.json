@@ -1,6 +1,6 @@
 {
 	"name": "sast-json-schema",
-	"version": "0.4.1",
+	"version": "0.5.0",
 	"description": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
 	"type": "module",
 	"engines": {
@@ -27,6 +27,7 @@
 		"2020-12.json",
 		"src/$defs.json",
 		"cli.js",
+		"package.json",
 		"SECURITY.md"
 	],
 	"publishConfig": {
@@ -43,15 +44,29 @@
 		"prepublishOnly": "npm run build && npm test",
 		"lint": "biome check --write --no-errors-on-unmatched",
 		"pretest": "npm run build",
-		"test": "npm run test:lint && npm run test:unit && npm run test:sast && npm run test:perf && npm run test:dast",
+		"test": "npm run test:lint && npm run test:unit && npm run test:mutation && npm run test:sast && npm run test:perf && npm run test:dast",
 		"test:lint": "biome ci --no-errors-on-unmatched",
 		"test:lint:staged": "biome check --staged --no-errors-on-unmatched",
 		"test:unit": "node --test --experimental-test-coverage --test-coverage-include=cli.js --test-coverage-lines=80 --test-coverage-branches=70 --test-coverage-functions=80 ./tests/*.test.js",
+		"test:mutation": "stryker run",
 		"test:perf": "node --test --test-concurrency=1 ./tests/*.perf.js",
 		"test:dast": "npm run test:dast:fuzz",
 		"test:dast:fuzz": "node --test ./tests/*.fuzz.js",
-		"test:sast": "npm run test:sast:license",
-		"test:sast:license": "license-check-and-add check -f .license.config.json"
+		"rm": "npm run rm:macos && npm run rm:node_modules && npm run rm:lock",
+		"rm:macos": "find . -name '.DS_Store' -type f -delete",
+		"rm:lock": "find . -name 'package-lock.json' -type f -delete",
+		"rm:node_modules": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +",
+		"test:sast": "npm run test:sast:license && npm run test:sast:lockfile && npm run test:sast:semgrep && npm run test:sast:trufflehog && npm run test:sast:gitleaks && npm run test:sast:actionlint && npm run test:sast:zizmor && npm run test:sast:trivy",
+		"test:sast:actionlint": "actionlint",
+		"test:sast:gitleaks": "npm run test:sast:gitleaks:dir && npm run test:sast:gitleaks:git",
+		"test:sast:gitleaks:dir": "gitleaks dir . --redact --no-banner",
+		"test:sast:gitleaks:git": "gitleaks git . --redact --no-banner",
+		"test:sast:license": "license-check-and-add check -f .license.config.json",
+		"test:sast:lockfile": "lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https",
+		"test:sast:semgrep": "semgrep scan --config auto --error",
+		"test:sast:trivy": "trivy fs --scanners vuln,license --include-dev-deps --ignored-licenses 0BSD,Apache-2.0,BSD-1-Clause,BSD-2-Clause,BSD-3-Clause,CC0-1.0,CC-BY-4.0,ISC,MIT,Python-2.0,LGPL-3.0-or-later,MPL-2.0,BlueOak-1.0.0,Unlicense --exit-code 1 --skip-files '**/bun.lock' --disable-telemetry .",
+		"test:sast:trufflehog": "trufflehog filesystem --only-verified --log-level=-1 ./",
+		"test:sast:zizmor": "zizmor .github"
 	},
 	"keywords": [
 		"JSON",
@@ -87,12 +102,16 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.0.0",
 		"@commitlint/cli": "^21.0.0",
-		"@commitlint/config-conventional": "^21.0.1",
+		"@commitlint/config-conventional": "^21.0.0",
+		"@stryker-mutator/core": "^9.0.0",
 		"ajv-cmd": "^0.13.0",
 		"fast-check": "^4.0.0",
 		"husky": "^9.0.0",
 		"json-schema-test-esm": "^3.0.0",
 		"license-check-and-add": "^4.0.0",
 		"tinybench": "^6.0.0"
+	},
+	"overrides": {
+		"qs": "^6.15.2"
 	}
 }

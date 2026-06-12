@@ -8,7 +8,7 @@ This document outlines security procedures and general policies for the sast-jso
 * [Disclosure Policy](#disclosure-policy)
 
 ## Security Goals
-Our goal is to ensure OSS follows secure design principles and meets security best practices as outlined by the following [OWASP ASVS v5.0 Level 3](https://github.com/OWASP/ASVS/tree/master/5.0/en).
+Our goal is to ensure OSS follows secure design principles and meets security best practices as outlined by the following [OWASP ASVS 5.0.0 Level 3](https://github.com/OWASP/ASVS/tree/master/5.0/en).
 
 Standards are evaluated using automated scans (Linting, Unit tests, SAST, SCA, DAST, Perf) and manual self-audits. 3rd party audits are welcome.
 

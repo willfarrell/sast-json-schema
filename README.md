@@ -66,7 +66,13 @@ if (!isSchemaSecure(schema)) {
 }
 ```
 
-Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<spec>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
+Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. These are JSON exports, so they require an import attribute:
+
+```javascript
+import schema2020 from "sast-json-schema/2020-12" with { type: "json" }
+```
+
+Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<spec>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
 
 ### CLI
 
@@ -78,10 +84,15 @@ Options:
 - `--override-max-depth <n>`: Override max depth limit (default: 32)
 - `--override-max-items <n>`: Override max items limit (default: 1024)
 - `--override-max-properties <n>`: Override max properties limit (default: 1024)
-- `--ignore <instancePath>`: Suppress errors by instancePath or instancePath:keyword (repeatable). Paths use [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901) JSON Pointer encoding (`~` to `~0`, `/` to `~1`)
+- `--ignore <instancePath>`: Suppress errors by instancePath or instancePath:keyword (repeatable). Paths use [RFC 6901](https://datatracker.ietf.org/doc/html/rfc6901) JSON Pointer encoding (`~` to `~0`, `/` to `~1`). Depth-exceeded and timeout findings cannot be suppressed, since they indicate the schema was not fully analyzed
 - `--offline`: Skip SSRF DNS resolution for remote `$ref` URLs (useful in airgapped CI)
+- `-r, --ref-schema-files <file>`: Load a reference schema; its `$id` hostname is treated as safe and skipped during SSRF DNS checks (repeatable)
 - `--lang <code>`: Downstream language whose deserialization-vector names to deny in property keys. Default is `default` (union of every named language). See [language coverage](#language-coverage) below
 - `--format <human|json|sarif>`: Output format. `json` emits a JSON array of error objects on stdout; `sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code-scanning, SonarQube, Semgrep and other security pipelines; `human` is the default
+- `--max-schema-size <bytes>`: Maximum serialized schema size in bytes. Default 67108864 (64 MiB). Larger schemas are rejected as a tool error (exit 2)
+- `--analysis-timeout-ms <ms>`: Wall-clock budget for the schema crawl. Default 60000. Exceeding it produces a `timeout` finding (exit 1)
+- `--max-ssrf-hostnames <n>`: Maximum distinct remote `$ref` hostnames resolved during SSRF checks. Default 256. Above this, DNS resolution is refused and reported as a finding
+- `--dns-total-timeout-ms <ms>`: Total wall-clock budget for all SSRF DNS lookups. Default 30000. Hosts not checked within the budget are reported (fail-closed)
 - `-v, --version`: Show version
 - `-h, --help`: Show this help
 
@@ -90,8 +101,12 @@ Options:
 | Code | Meaning |
 |------|---------|
 | `0`  | No issues found |
-| `1`  | Schema has security issues |
-| `2`  | Usage/tool error (bad args, unreadable file, invalid JSON, unsupported `$schema`) |
+| `1`  | Schema has security findings, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget conditions (a schema too expensive or unsafe to fully analyze is itself a finding) |
+| `2`  | Usage/tool error: bad args, unreadable file, invalid JSON, unsupported `$schema`, an oversized schema (over `--max-schema-size`), or a non-JSON-serializable (circular) schema |
+
+Exit 1 means a problem was found in the schema, including the resource-limit conditions above; exit 2 means the tool could not analyze the input at all.
+
+The `--max-schema-size`, `--analysis-timeout-ms`, `--max-ssrf-hostnames`, and `--dns-total-timeout-ms` flags, together with the existing `--override-max-*` limits, are the tool's resource budgets.
 
 Also available via [`ajv-cmd`](https://github.com/willfarrell/ajv-cmd):
 
@@ -111,8 +126,9 @@ ajv sast --fail path/to/schema.json
 - **Prototype-pollution denylist does not cover `patternProperties` keys.** The meta-schema rejects `__proto__`, `constructor`, and `prototype` as literal keys in `properties`, `$defs`, `definitions`, `dependentSchemas`, `dependentRequired`, and `required`. It does NOT reject these names when introduced via a `patternProperties` regex key, because any literal denylist (`^__proto__$`) is trivially bypassed by equivalent regexes (`^_{2}proto_{2}$`, `^[_][_]proto__$`, `^.{9}$`). Enforced by the CLI: `crawlSchema` compiles each `patternProperties` key and tests it against the denylisted names. Consumers using the meta-schema standalone (without `cli.js` / `analyze()`) get property-key protection but not `patternProperties` protection.
 - **Language-specific deserialization-vector names are not in the meta-schema.** Only `__proto__`, `constructor`, `prototype` are rejected at the meta-schema layer (the universal baseline). Names like `@type` (Java), `$type` (.NET), `__class__` (Python), `isa` (Objective-C), `__struct__` (Elixir), or PHP magic methods are enforced only at the CLI / `analyze()` layer via `--lang`. See [Language coverage](#language-coverage).
 - **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default). Enforced by the CLI, see `--override-max-depth`.
+- **`const` / `default` / `enum` / `examples` value sizes are bounded recursively, but value nesting depth is a runtime concern.** The meta-schema bounds nested string length (`maxLength`), array length (`maxItems`), and object property counts (`maxProperties`) at every level of a literal value, so an oversized nested string, array, or object is rejected (ASVS 1.3.3). It does NOT cap the nesting *depth* of a literal value: a value nested thousands of levels deep is not given a clean rejection by the meta-schema rule itself (it fails closed via the validator's own recursion limit). Schema-nesting depth is enforced by the CLI, see `--override-max-depth`.
 - **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced by the CLI.
-- **`pattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Bare alternation at the top level (`^a|b$`) is rejected, but alternation across sibling groups (`^(a)|(b)$`) is not detected at the meta-schema level (it is enforced by the CLI). The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). Use runtime ReDoS checking for full protection.
+- **`pattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, a bounded quantifier wrapped around a group with an unbounded inner quantifier like `(a+){1,5}`, absurd quantifier upper bounds (5+ digits, e.g. `a{1,1000000}` or `[a-z]{10000}`), backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Bare alternation at the top level (`^a|b$`) is rejected, but alternation across sibling groups (`^(a)|(b)$`) is not detected at the meta-schema level (it is enforced by the CLI). The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). It also does NOT reject a bounded quantifier wrapped around a group whose inner quantifier is itself bounded with a large product (e.g. `(a{1,1000}){1,1000}`); this nested-bounded-quantifier shape is caught by the CLI runtime (`redos-detector`) but not by the standalone meta-schema. Use runtime ReDoS checking for full protection.
 - **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref` to `#` (local) or `https://` URLs and blocks private IP ranges (dotted-decimal, hex `0x`, and decimal representations), but DNS-based bypasses (domains resolving to internal IPs) cannot be detected at the schema level. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended. Enforced by the CLI.
 
 ## Language coverage
@@ -172,7 +188,7 @@ All meta-schemas reject keywords not listed in their respective JSON Schema spec
 | `$defs`                | n/a | n/a | n/a | ✓ | ✓ | |
 | `title`, `description`, `default` | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | `const`                | n/a | ✓ | ✓ | ✓ | ✓ | Type-locked to declared `type` |
-| `contains`             | n/a | ✓ | ✓ | ✓ | ✓ | Requires `maxContains` + `uniqueItems` |
+| `contains`             | n/a | ✓ | ✓ | ✓ | ✓ | draft-06/07 require `maxItems` + `uniqueItems`; 2019-09/2020-12 additionally require `maxContains` + `unevaluatedItems` |
 | `propertyNames`        | n/a | ✓ | ✓ | ✓ | ✓ | |
 | `if`/`then`/`else`     | n/a | n/a | ✓ | ✓ | ✓ | |
 | `contentMediaType`, `contentEncoding` | n/a | n/a | ✓ | ✓ | ✓ | Allow-listed per RFC 6838 / RFC-standard |

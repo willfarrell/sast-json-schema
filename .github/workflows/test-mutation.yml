@@ -1,9 +1,7 @@
-name: Tests (unit)
+name: Tests (mutation)
 
 on:
   pull_request:
-  push:
-    branches: [main, develop]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,9 +14,10 @@ permissions:
   contents: read
 
 jobs:
-  unit:
-    name: Tests (unit)
+  mutation:
+    name: Tests (mutation)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Harden runner
@@ -27,7 +26,7 @@ jobs:
           egress-policy: audit
           disable-telemetry: true
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: Setup Node.js ${{ env.NODE_VERSION }}
@@ -39,9 +38,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci --ignore-scripts
-      - name: Build
+      - name: Mutation tests
         run: |
-          npm run build
-      - name: Unit tests
-        run: |
-          npm run test:unit
+          npm run test:mutation

@@ -1,0 +1,17 @@
+{
+	"$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+	"packageManager": "npm",
+	"testRunner": "command",
+	"commandRunner": {
+		"command": "node bin/build.js && node --test ./tests/*.test.js"
+	},
+	"coverageAnalysis": "off",
+	"tempDirName": "/tmp/stryker/sast-json-schema",
+	"mutate": ["cli.js"],
+	"reporters": ["progress", "clear-text"],
+	"thresholds": {
+		"high": 100,
+		"low": 100,
+		"break": 100
+	}
+}

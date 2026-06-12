@@ -91,9 +91,6 @@
 				"items": {
 					"$ref": "#/$defs/dependentSchemas.items"
 				},
-				"prefixItems": {
-					"$ref": "#/$defs/dependentSchemas.prefixItems"
-				},
 				"properties": {
 					"$ref": "#/$defs/dependentSchemas.properties"
 				},
