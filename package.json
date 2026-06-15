@@ -111,5 +111,8 @@
 		"license-check-and-add": "^4.0.0",
 		"tinybench": "^6.0.0"
 	},
-	"overrides": {}
+	"overrides": {
+		"js-yaml": ">=4.2.0",
+		"qs": ">=6.15.2"
+	}
 }
