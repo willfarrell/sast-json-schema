@@ -867,6 +867,26 @@ describe("crawlSchema", () => {
 		);
 	});
 
+	// Adversarial input: a non-array dependentRequired value has no .entries(),
+	// so the Array.isArray guard is what keeps the crawl from throwing.
+	test("a non-array dependentRequired value is skipped without throwing", () => {
+		const r = crawlSchema({
+			dependentRequired: { trigger: "not-an-array", other: ["__proto__"] },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "dependentRequired" &&
+					e.params.name === "__proto__" &&
+					e.instancePath.endsWith("/other/0"),
+			),
+		);
+		ok(
+			!r.errors.some((e) => e.instancePath.includes("/trigger/")),
+			"the malformed entry must produce no findings",
+		);
+	});
+
 	test("should flag __proto__ in required array entries", () => {
 		const r = crawlSchema({
 			required: ["name", "__proto__"],
@@ -1769,6 +1789,25 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 			1,
 			"heap-budget finding is present regardless of ignore",
 		);
+	});
+
+	// An explicit 0 budget is honored as a real (instantly-tripping) limit and
+	// must not fall back to the 128 MiB default (kills the
+	// `?? REDOS_HEAP_BUDGET_BYTES` fallback mutants).
+	test("explicit zero heap budget trips on the first retained byte", () => {
+		const patternProperties = { "^a$": { type: "string" }, "^b$": {} };
+		let calls = 0;
+		const memoryUsage = () => 100 + calls++; // 100 baseline, then 101, 102...
+		const r = crawlSchema({ patternProperties }, 32, {
+			memoryUsage,
+			redosHeapBudgetBytes: 0,
+			forceGc: () => true,
+		});
+		const budget = r.errors.filter(
+			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
+		);
+		strictEqual(budget.length, 1, "breaker must trip with a 0 budget");
+		strictEqual(budget[0].params.budget, 0);
 	});
 
 	// Boundary pin for Stryker: exactly AT the budget (current-baseline == budget)

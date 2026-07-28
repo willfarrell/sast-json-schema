@@ -136,6 +136,17 @@ describe("run() file handling", () => {
 		ok(r.error.join("\n").includes("schema file exceeds 10 byte size limit"));
 	});
 
+	// 0 is a valid gate limit and must not fall back to the 64 MiB default (the
+	// `>= 0` bound in the gate's validity check is what admits it).
+	test("--max-schema-size 0 rejects at the file gate with the gate message", async () => {
+		const r = await runCli(["s.json", "--max-schema-size", "0"], {
+			files: { "s.json": CLEAN },
+			sizes: { "s.json": 10 },
+		});
+		strictEqual(r.code, 2);
+		ok(r.error.join("\n").includes("schema file exceeds 0 byte size limit"));
+	});
+
 	test("an invalid --max-schema-size defers to analyze (no misleading gate error)", async () => {
 		// 3.5 is invalid; the file gate falls back to the default and lets analyze()
 		// raise the TypeError, surfaced as an "analyzing schema" error.

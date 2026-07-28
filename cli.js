@@ -310,13 +310,11 @@ const SCHEMA_PATH_MAX_PROPERTIES =
 // compiling it on first use (memoized in compiledSchemas). Defaults to
 // 2020-12 when $schema is absent.
 export const sast = (schema) => {
-	const version = schemaVersion(schema?.$schema);
+	const url = schema?.$schema;
+	const version = schemaVersion(url);
 	const metaSchema = metaSchemas.get(version);
 	if (!metaSchema) {
-		// Stryker disable next-line OptionalChaining: reaching this throw requires a
-		// non-null schema object (a null schema resolves to the default and validates),
-		// so schema?.$schema and schema.$schema are equivalent here.
-		throw new Error(`Unsupported $schema: ${schema?.$schema}`);
+		throw new Error(`Unsupported $schema: ${url}`);
 	}
 	let validate = compiledSchemas.get(version);
 	if (!validate) {
@@ -469,18 +467,12 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		});
 		result.timedOut = true;
 	};
-	// True when a deadline is configured and has passed. The `> deadline` boundary
-	// is exclusive (a clock reading EXACTLY at the deadline does NOT bail), pinned by
-	// the injected-clock deadline tests in cli.crawl.test.js, which also kill the
-	// whole-condition ConditionalExpression mutant (expired clock bails, future clock
-	// does not). The `deadline != null` guard sits on its own line so ONLY its
-	// genuinely-equivalent mutant is disabled.
-	const deadlineConfigured = () =>
-		// Stryker disable next-line ConditionalExpression: forcing this `!= null` guard
-		// true is equivalent; when deadline is absent, now() > undefined is false anyway
-		// (deadlinePassed short-circuits the same way), so no input distinguishes it.
-		deadline != null;
-	const deadlinePassed = () => deadlineConfigured() && now() > deadline;
+	// True when a configured deadline has passed. Without a deadline the option
+	// is undefined and `now() > undefined` is false, so no guard is needed. The
+	// `>` boundary is exclusive (a clock reading EXACTLY at the deadline does
+	// NOT bail), pinned by the injected-clock deadline tests in
+	// cli.crawl.test.js.
+	const deadlinePassed = () => now() > deadline;
 
 	// Returns true (and emits one #/redos-budget finding the first time) when the
 	// total-pattern cap has been exceeded, so callers can skip further analysis.
@@ -510,11 +502,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 			? options.memoryUsage
 			: () => process.memoryUsage().heapUsed;
 	const redosHeapBudgetBytes =
-		// Stryker disable next-line ConditionalExpression: when absent the default
-		// const is used; any test exercising the override passes it explicitly.
-		options.redosHeapBudgetBytes != null
-			? options.redosHeapBudgetBytes
-			: REDOS_HEAP_BUDGET_BYTES;
+		options.redosHeapBudgetBytes ?? REDOS_HEAP_BUDGET_BYTES;
 	// GC hook for the breaker's confirm step; injectable for deterministic tests
 	// (same pattern as options.memoryUsage above).
 	const runGc =
@@ -671,10 +659,8 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 						timeout: REDOS_TIMEOUT_MS,
 					});
 					if (!patternResult.safe) {
-						// Stryker disable next-line LogicalOperator,StringLiteral: redos-detector
-						// always reports error:"hitMaxScore" for these, so the ?? fallback is
-						// defensive dead-weight here.
-						const reason = patternResult.error ?? "hitMaxScore";
+						// redos-detector always sets error (hitMaxScore) on unsafe verdicts.
+						const reason = patternResult.error;
 						// timedOut/hitMaxSteps reasons only arise on a real library timeout,
 						// which cannot be triggered deterministically in a fast test.
 						// Stryker disable ConditionalExpression,StringLiteral
@@ -704,73 +690,63 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				}
 			}
 		}
-
-		// Stryker disable next-line ConditionalExpression,EqualityOperator: this only
-		// skips the dangerous-name loops when the denylist is empty; entering with an
-		// empty denySet matches nothing, so it is a pure (equivalent) optimization.
-		if (denylist.length > 0) {
-			for (const siteKey of [
-				"properties",
-				"$defs",
-				"definitions",
-				"dependentSchemas",
-				"dependentRequired",
-			]) {
-				const site = current[siteKey];
-				if (typeof site === "object" && site !== null && !Array.isArray(site)) {
-					for (const name of Object.keys(site)) {
-						if (denySet.has(name)) {
-							result.errors.push({
-								instancePath: `${path}/${siteKey}/${escapeJsonPointer(name)}`,
-								schemaPath: "#/dangerous-name",
-								keyword: siteKey,
-								params: { name, lang: options.lang ?? DEFAULT_LANG },
-								message: `${siteKey} key "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
-							});
-						}
-					}
-				}
-			}
-
-			if (Array.isArray(current.required)) {
-				for (const [i, name] of current.required.entries()) {
-					// Stryker disable next-line ConditionalExpression: denySet only holds
-					// strings, so denySet.has(non-string) is already false.
-					if (typeof name === "string" && denySet.has(name)) {
+		for (const siteKey of [
+			"properties",
+			"$defs",
+			"definitions",
+			"dependentSchemas",
+			"dependentRequired",
+		]) {
+			const site = current[siteKey];
+			if (typeof site === "object" && site !== null && !Array.isArray(site)) {
+				for (const name of Object.keys(site)) {
+					if (denySet.has(name)) {
 						result.errors.push({
-							instancePath: `${path}/required/${i}`,
+							instancePath: `${path}/${siteKey}/${escapeJsonPointer(name)}`,
 							schemaPath: "#/dangerous-name",
-							keyword: "required",
+							keyword: siteKey,
 							params: { name, lang: options.lang ?? DEFAULT_LANG },
-							message: `required entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
+							message: `${siteKey} key "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
 						});
 					}
 				}
 			}
+		}
 
-			if (
-				typeof current.dependentRequired === "object" &&
-				current.dependentRequired !== null &&
-				!Array.isArray(current.dependentRequired)
-			) {
-				for (const [trigger, deps] of Object.entries(
-					current.dependentRequired,
-				)) {
-					// Stryker disable next-line ConditionalExpression: a non-array deps has
-					// no length, so the loop below simply never runs.
-					if (Array.isArray(deps)) {
-						for (const [i, name] of deps.entries()) {
-							// Stryker disable next-line ConditionalExpression,LogicalOperator: denySet
-							// only holds strings, so has(non-string) is already false.
-							if (typeof name === "string" && denySet.has(name)) {
-								result.errors.push({
-									instancePath: `${path}/dependentRequired/${escapeJsonPointer(trigger)}/${i}`,
-									schemaPath: "#/dangerous-name",
-									keyword: "dependentRequired",
-									params: { name, lang: options.lang ?? DEFAULT_LANG },
-									message: `dependentRequired entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
-								});
-							}
+		if (Array.isArray(current.required)) {
+			for (const [i, name] of current.required.entries()) {
+				// denySet only holds strings, so has(non-string) is already false.
+				if (denySet.has(name)) {
+					result.errors.push({
+						instancePath: `${path}/required/${i}`,
+						schemaPath: "#/dangerous-name",
+						keyword: "required",
+						params: { name, lang: options.lang ?? DEFAULT_LANG },
+						message: `required entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
+					});
+				}
+			}
+		}
+
+		if (
+			typeof current.dependentRequired === "object" &&
+			current.dependentRequired !== null &&
+			!Array.isArray(current.dependentRequired)
+		) {
+			for (const [trigger, deps] of Object.entries(current.dependentRequired)) {
+				// A malformed (non-array) deps value has no .entries(); skipping it
+				// keeps adversarial input from throwing (pinned by a crawl test).
+				if (Array.isArray(deps)) {
+					for (const [i, name] of deps.entries()) {
+						// denySet only holds strings, so has(non-string) is already false.
+						if (denySet.has(name)) {
+							result.errors.push({
+								instancePath: `${path}/dependentRequired/${escapeJsonPointer(trigger)}/${i}`,
+								schemaPath: "#/dangerous-name",
+								keyword: "dependentRequired",
+								params: { name, lang: options.lang ?? DEFAULT_LANG },
+								message: `dependentRequired entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
+							});
 						}
 					}
 				}
@@ -818,9 +794,8 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 							keyword: "patternProperties",
 							params: {
 								pattern: patternKey,
-								// Stryker disable next-line LogicalOperator,StringLiteral: redos-detector
-								// always reports error:"hitMaxScore"; the ?? fallback is dead-weight.
-								reason: patternResult.error ?? "hitMaxScore",
+								// redos-detector always sets error (hitMaxScore) on unsafe verdicts.
+								reason: patternResult.error,
 							},
 							message: `patternProperties key "${patternKey}" is vulnerable to ReDoS`,
 						});
@@ -903,9 +878,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				) {
 					visited.add(value);
 					const newDepth = currentDepth + 1;
-					// Stryker disable next-line ConditionalExpression,EqualityOperator: this only
-					// tracks the max depth seen; > vs >= and always-assign reach the same maximum.
-					if (newDepth > result.depth) result.depth = newDepth;
+					result.depth = Math.max(result.depth, newDepth);
 					if (result.depth > maxDepth) {
 						result.depthExceeded = true;
 						return result;
@@ -1069,12 +1042,7 @@ export const resolveSSRFRefs = async (refs, options = {}) => {
 		];
 	}
 
-	const totalMs =
-		// Stryker disable next-line ConditionalExpression: with the option absent the
-		// default branch and Number(undefined)=NaN both yield "never time out".
-		options.dnsTotalTimeoutMs != null
-			? Number(options.dnsTotalTimeoutMs)
-			: DNS_TOTAL_TIMEOUT_MS;
+	const totalMs = Number(options.dnsTotalTimeoutMs ?? DNS_TOTAL_TIMEOUT_MS);
 	// Injectable monotonic clock (defaults to the real wall clock), mirroring
 	// crawlSchema's options.now so the total-budget deadline can be crossed
 	// deterministically in tests, including at a batch index > 0.
@@ -1123,9 +1091,7 @@ export const resolveSSRFRefs = async (refs, options = {}) => {
 
 export const resolveInstancePath = (obj, pointer) => {
 	if (typeof obj !== "object" || obj === null) return undefined;
-	// Stryker disable next-line ConditionalExpression: an empty pointer also yields
-	// zero parts below, so returning obj early vs falling through is equivalent.
-	if (!pointer) return obj;
+	// An empty pointer splits to zero parts, so the loop below returns obj as-is.
 	const parts = pointer
 		.split("/")
 		.slice(1)
@@ -1165,36 +1131,22 @@ export const analyze = async (schema, options = {}) => {
 		}
 	}
 
-	const applyIgnore = (errs) => {
-		// Stryker disable next-line ConditionalExpression,LogicalOperator: the
-		// length checks are short-circuit guards; filtering with an empty/no ignore
-		// set is a no-op, so dropping them yields the same returned array.
-		if (Array.isArray(options.ignore) && options.ignore.length && errs.length) {
-			const ignore = new Set(options.ignore);
-			return errs.filter(
-				(err) =>
-					// Findings marked incomplete (SSRF hostname-cap / DNS-budget) mean
-					// analysis was NOT completed, so they are never suppressible by
-					// --ignore, exactly like the depth/timeout findings.
-					// Stryker disable next-line OptionalChaining: every finding that reaches
-					// applyIgnore (AJV errors, crawl findings, SSRF findings) carries a
-					// `params` object, so `?.` and a plain access are equivalent here; the
-					// guard is defensive against a hypothetical param-less finding only.
-					err.params?.incomplete === true ||
-					(!ignore.has(err.instancePath) &&
-						!ignore.has(`${err.instancePath}:${err.keyword}`)),
-			);
-		}
-		return errs;
-	};
+	// new Set(undefined) is empty, so an absent --ignore list makes this filter
+	// keep everything; no guard branch is needed.
+	const ignore = new Set(options.ignore);
+	const applyIgnore = (errs) =>
+		errs.filter(
+			(err) =>
+				// Findings marked incomplete (SSRF hostname-cap / DNS-budget) mean
+				// analysis was NOT completed, so they are never suppressible by
+				// --ignore, exactly like the depth/timeout findings. Every finding
+				// (AJV, crawl, SSRF) carries a params object.
+				err.params.incomplete === true ||
+				(!ignore.has(err.instancePath) &&
+					!ignore.has(`${err.instancePath}:${err.keyword}`)),
+		);
 
-	const sizeLimit =
-		// Stryker disable next-line ConditionalExpression: when absent, Number(undefined)
-		// = NaN, and `bytes > NaN` is false, matching the MAX_SCHEMA_SIZE default for any
-		// schema small enough to test.
-		options.maxSchemaSize != null
-			? Number(options.maxSchemaSize)
-			: MAX_SCHEMA_SIZE;
+	const sizeLimit = Number(options.maxSchemaSize ?? MAX_SCHEMA_SIZE);
 	let serialized;
 	try {
 		serialized = JSON.stringify(schema);
@@ -1220,16 +1172,10 @@ export const analyze = async (schema, options = {}) => {
 
 	resolveDangerousNames(options.lang); // throws on unknown lang
 
-	// Default budget first, then narrow it if the caller set one (avoids an else
-	// branch whose only job is the default).
-	let deadline = Date.now() + ANALYSIS_TIMEOUT_MS;
-	// Stryker disable next-line ConditionalExpression: without the option,
-	// Number(undefined)=NaN gives a NaN deadline that never fires, the same
-	// observable result (no timeout) as the default budget within a fast test.
-	if (options.analysisTimeoutMs != null) {
-		const ms = Number(options.analysisTimeoutMs);
-		deadline = ms <= 0 ? 0 : Date.now() + ms;
-	}
+	// The default budget is observable with an injected clock jumped past it
+	// (see the default-analysis-budget test in cli.analyze.test.js).
+	const budgetMs = Number(options.analysisTimeoutMs ?? ANALYSIS_TIMEOUT_MS);
+	const deadline = budgetMs <= 0 ? 0 : Date.now() + budgetMs;
 
 	const crawl = crawlSchema(schema, maxDepth, {
 		lang: options.lang,
@@ -1267,9 +1213,7 @@ export const analyze = async (schema, options = {}) => {
 		// Notify the caller (e.g. run(), to print a STDERR notice) of the remote
 		// refs about to be DNS-resolved, BEFORE any lookup happens. Opt-in: absent
 		// callback means no-op, keeping analyze() pure for library consumers.
-		// Stryker disable next-line OptionalChaining: with no callback the ?. and a
-		// plain call are equivalent (no observable effect) for library callers.
-		options.onRemoteRefs?.(crawl.refs);
+		if (options.onRemoteRefs) options.onRemoteRefs(crawl.refs);
 		const ssrfErrors = await resolveSSRFRefs(crawl.refs, {
 			dnsTimeoutMs: options.dnsTimeoutMs,
 			dnsConcurrency: options.dnsConcurrency,
@@ -1283,36 +1227,25 @@ export const analyze = async (schema, options = {}) => {
 
 	if (options.overrideMaxItems != null && errors.length) {
 		const limit = Number(options.overrideMaxItems);
-		errors = errors.filter((err) => {
-			// Stryker disable next-line ConditionalExpression: treating a non-maxItems
-			// error as maxItems still resolves a non-array instance, so !Array.isArray
-			// keeps it — the same outcome as the `return true` fall-through.
-			if (err.schemaPath === SCHEMA_PATH_MAX_ITEMS) {
-				const arr = resolveInstancePath(schema, err.instancePath);
-				return !Array.isArray(arr) || arr.length > limit;
-			}
-			return true;
-		});
+		// A safeArrayItemsLimits/maxItems finding always resolves to an array
+		// (its schemaPath is pinned by regression tests); it is dropped when the
+		// array is within the overridden limit. Other findings pass through.
+		errors = errors.filter(
+			(err) =>
+				err.schemaPath !== SCHEMA_PATH_MAX_ITEMS ||
+				resolveInstancePath(schema, err.instancePath).length > limit,
+		);
 	}
 	if (options.overrideMaxProperties != null && errors.length) {
 		const limit = Number(options.overrideMaxProperties);
-		errors = errors.filter((err) => {
-			// Stryker disable next-line ConditionalExpression: as above, a non-target
-			// error resolves to a non-object instance and is kept either way.
-			if (err.schemaPath === SCHEMA_PATH_MAX_PROPERTIES) {
-				const obj = resolveInstancePath(schema, err.instancePath);
-				// a real maxProperties finding always resolves to a non-null object, so
-				// these two defensive guards are false and the length check decides.
-				return (
-					// Stryker disable next-line ConditionalExpression,LogicalOperator
-					typeof obj !== "object" ||
-					// Stryker disable next-line ConditionalExpression
-					obj === null ||
-					Object.keys(obj).length > limit
-				);
-			}
-			return true;
-		});
+		// A safeObjectPropertiesLimits/maxProperties finding always resolves to a
+		// non-null object; it is dropped when within the overridden limit.
+		errors = errors.filter(
+			(err) =>
+				err.schemaPath !== SCHEMA_PATH_MAX_PROPERTIES ||
+				Object.keys(resolveInstancePath(schema, err.instancePath)).length >
+					limit,
+		);
 	}
 	return applyIgnore(errors);
 };
@@ -1407,9 +1340,7 @@ export const formatSarif = (errors, inputPath, cwd = process.cwd()) => {
 // calling process.exit (which would make the entrypoint untestable in-process).
 class CliExit extends Error {
 	constructor(code) {
-		// Stryker disable next-line StringLiteral: this sentinel's message is never
-		// read (only .code is), so its exact text is unobservable.
-		super(`cli exit ${code}`);
+		super();
 		this.code = code;
 	}
 }
@@ -1434,9 +1365,8 @@ export const run = async (argv, io = {}) => {
 	const readJsonFile = async (filePath, label) => {
 		let content;
 		try {
-			// Stryker disable next-line StringLiteral: JSON.parse coerces a Buffer the
-			// same as a string, so the "utf8" encoding hint is not observable here.
-			content = await readFileFn(filePath, "utf8");
+			// No encoding argument: JSON.parse coerces the returned Buffer itself.
+			content = await readFileFn(filePath);
 		} catch (err) {
 			die(`cannot read ${label}: ${err.message}`);
 		}
@@ -1531,21 +1461,13 @@ Exit codes:
 		if (positionals.length === 0) die("missing required argument <file>");
 
 		// Only enforce --max-schema-size at the file gate when it parses to a valid
-		// non-negative integer. For invalid values (e.g. 3.5 or a negative), fall
-		// back to the default here and let analyze() raise the proper validation
-		// error instead of a misleading "file exceeds N byte" message.
-		const parsedMaxSchemaSize =
-			// Stryker disable next-line ConditionalExpression: when absent, Number(undefined)
-			// = NaN, which the !Number.isInteger guard below rejects to MAX just like null does.
-			values["max-schema-size"] != null
-				? Number(values["max-schema-size"])
-				: null;
+		// non-negative integer. For invalid values (e.g. 3.5 or a negative) and for
+		// an absent flag (Number(undefined) is NaN), fall back to the default here
+		// and let analyze() raise the proper validation error instead of a
+		// misleading "file exceeds N byte" message.
+		const parsedMaxSchemaSize = Number(values["max-schema-size"]);
 		const fileSizeLimit =
-			// Stryker disable next-line ConditionalExpression: the != null head is
-			// redundant with Number.isInteger(null) === false on the next line.
-			parsedMaxSchemaSize != null &&
-			Number.isInteger(parsedMaxSchemaSize) &&
-			parsedMaxSchemaSize >= 0
+			Number.isInteger(parsedMaxSchemaSize) && parsedMaxSchemaSize >= 0
 				? parsedMaxSchemaSize
 				: MAX_SCHEMA_SIZE;
 
@@ -1556,16 +1478,12 @@ Exit codes:
 					resolve(refFile),
 					`--ref-schema-files file "${refFile}"`,
 				);
-				// Stryker disable next-line ConditionalExpression: a non-string $id makes
-				// `new URL` throw into the catch below, so skipping vs trying is the same.
-				if (typeof refSchema.$id === "string") {
-					try {
-						const url = new URL(refSchema.$id);
-						// Stryker disable next-line ConditionalExpression: an empty hostname
-						// is never a real $ref host, so adding "" to the safe set is a no-op.
-						if (url.hostname) safeHostnames.add(url.hostname);
-					} catch {}
-				}
+				try {
+					// A non-string or non-URL $id throws into the catch; adding an empty
+					// hostname (e.g. a mailto: $id) to the safe set is a harmless no-op,
+					// since "" is never a real $ref host.
+					safeHostnames.add(new URL(refSchema.$id).hostname);
+				} catch {}
 			}
 		}
 

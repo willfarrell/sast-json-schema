@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import schema202012 from "../2020-12.json" with { type: "json" };
 import {
+	ANALYSIS_TIMEOUT_MS,
 	analyze,
 	formatSarif,
 	resolveInstancePath,
@@ -112,6 +113,15 @@ describe("analyze overrides", () => {
 
 		const within = await analyze(schema, { overrideMaxProperties: 1200 });
 		ok(!within.some((e) => e.keyword === "maxProperties"));
+
+		// Exact-boundary pins: the filter keeps a finding only when the resolved
+		// object has MORE properties than the limit, so a limit equal to the
+		// property count suppresses it and one below keeps it.
+		const atLimit = await analyze(schema, { overrideMaxProperties: 1100 });
+		ok(!atLimit.some((e) => e.keyword === "maxProperties"));
+
+		const belowLimit = await analyze(schema, { overrideMaxProperties: 1099 });
+		ok(belowLimit.some((e) => e.keyword === "maxProperties"));
 	});
 
 	test("overrideMaxDepth should control depth limit", async () => {
@@ -317,6 +327,29 @@ describe("analyze size guard", () => {
 			{ offline: true, maxSchemaSize: 1_000_000 },
 		);
 		ok(Array.isArray(errors));
+	});
+
+	// Pins that an explicit 0 is honored as a real limit rather than falling
+	// back to the default (kills the `?? MAX_SCHEMA_SIZE` fallback mutants).
+	test("maxSchemaSize 0 rejects any schema with a RangeError", async () => {
+		try {
+			await analyze({ type: "string" }, { offline: true, maxSchemaSize: 0 });
+			ok(false, "should have thrown");
+		} catch (err) {
+			ok(err instanceof RangeError);
+			ok(err.message.includes("0 byte"));
+		}
+	});
+
+	// The default 60s analysis budget is real, not just a fallback constant: an
+	// injected clock already past it must produce a timeout finding without
+	// analysisTimeoutMs being set (kills the `?? ANALYSIS_TIMEOUT_MS` mutants).
+	test("the default analysis time budget is enforced (injected clock)", async () => {
+		const errors = await analyze(
+			{ type: "string", maxLength: 10, pattern: "^[a-z]+$" },
+			{ offline: true, now: () => Date.now() + ANALYSIS_TIMEOUT_MS + 1000 },
+		);
+		ok(errors.some((e) => e.keyword === "timeout"));
 	});
 
 	test("should throw TypeError for a circular schema", async () => {
