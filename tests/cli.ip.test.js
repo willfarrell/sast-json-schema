@@ -72,9 +72,18 @@ describe("isPrivateIP IPv6 extended", () => {
 		strictEqual(isPrivateIP("::ffff:8.8.8.8"), false);
 	});
 
-	test("empty and single-colon strings are not private", () => {
+	test("empty string is not private (no colon, not an address)", () => {
 		strictEqual(isPrivateIP(""), false);
-		strictEqual(isPrivateIP(":"), false);
+	});
+
+	// Malformed colon-containing strings are fail-closed: they look like IPv6
+	// but do not parse, so they are blocked rather than allowed through.
+	test("single-colon string classified private (fail-closed)", () => {
+		strictEqual(isPrivateIP(":"), true);
+	});
+
+	test("two-group malformed IPv6 (fc00:1) classified private (fail-closed)", () => {
+		strictEqual(isPrivateIP("fc00:1"), true);
 	});
 
 	test("NAT64 well-known prefix 64:ff9b:: not treated as private", () => {
@@ -112,9 +121,9 @@ describe("isPrivateIP IPv6 extended", () => {
 });
 
 // Each address sits just outside one reserved range, so it is public only while
-// that range's bounds are intact. They lock the exact CIDR edges: broadening any
-// single conjunct (an octet test flipped to always-true) would misclassify one of
-// these as private, which is an SSRF allow-list hole.
+// that range's CIDR bounds are intact. Broadening any range (a corrupted subnet
+// entry, a malformed-input gate flipped to always-block) would misclassify one
+// of these as private, which is an SSRF allow-list hole.
 describe("isPrivateIP near-miss public addresses", () => {
 	const nearMissPublic = [
 		["10.2.3.999", "octet above 255 voids the dotted-quad match"],
@@ -144,7 +153,6 @@ describe("isPrivateIP near-miss public addresses", () => {
 		["8.18.0.1", "b in benchmark range but a!=198"],
 		["8.51.100.1", "b=51 third=100 but a!=198 (not TEST-NET-2)"],
 		["8.0.113.1", "b=0 third=113 but a!=203 (not TEST-NET-3)"],
-		["fc00:1", "two-group malformed IPv6 is not expanded to a ULA"],
 		["::ffff:0808:0808", "IPv4-mapped hex resolving to public 8.8.8.8"],
 	];
 	for (const [ip, desc] of nearMissPublic) {
@@ -154,21 +162,20 @@ describe("isPrivateIP near-miss public addresses", () => {
 	}
 });
 
-// Addresses sitting exactly on an inclusive CIDR edge: tightening a `<=`/`>=` to a
-// strict comparison, or breaking IPv6 leading-zero/`::` normalization, would drop
-// them from the private set.
+// Addresses sitting exactly on an inclusive CIDR edge, plus IPv6 forms whose
+// classification depends on leading-zero/`::` canonicalization. Narrowing a
+// subnet or breaking canonicalization would drop them from the private set.
 describe("isPrivateIP inclusive boundaries and IPv6 normalization", () => {
 	const boundaryPrivate = [
 		["100.127.0.1", "CGN upper bound b<=127"],
 		["172.31.0.1", "172.16.0.0/12 upper bound b<=31"],
 		["::0001", "compressed loopback with leading-zero group"],
 		["::0:1", "compressed loopback via right-hand groups"],
-		// Compressed IPv4-mapped loopback: the per-group zero strip in the `::`
-		// branch must be anchored (^), or "7f00" loses an interior zero and the
-		// mapped IPv4 decodes to a public address.
+		// Compressed IPv4-mapped loopback in hex-group form: must decode the
+		// embedded 7f00:1 as 127.0.0.1, not match it as a plain IPv6 address.
 		["::ffff:7f00:1", "compressed IPv4-mapped loopback (::ffff:7f00:1)"],
-		// Malformed 5-hex-digit link-local group: an over-long group parses to a
-		// value > 0xffff, which the first-group guard rejects fail-closed.
+		// Malformed 5-hex-digit link-local group: over-long groups make the
+		// address invalid IPv6, which is fail-closed to private.
 		["fe800::1", "malformed fe80-prefixed group still private (fail-closed)"],
 	];
 	for (const [ip, desc] of boundaryPrivate) {
@@ -217,8 +224,8 @@ describe("isPrivateIP IPv6 extended ranges", () => {
 		});
 	}
 
-	// Fail-closed: malformed hex in the embedded NAT64/6to4 IPv4 groups parses to
-	// NaN; bit-math on NaN would forge a public-looking IPv4, so block instead.
+	// Fail-closed: malformed hex in the embedded NAT64/6to4 IPv4 groups makes
+	// the whole address invalid IPv6, which is blocked instead of decoded.
 	test("NAT64 with malformed embedded hex is private (fail-closed)", () => {
 		strictEqual(isPrivateIP("64:ff9b::zzzz:1"), true);
 	});
@@ -227,33 +234,24 @@ describe("isPrivateIP IPv6 extended ranges", () => {
 		strictEqual(isPrivateIP("2002:zzzz:1::"), true);
 	});
 
-	// Full-form (no `::`) addresses with leading-zero groups exercise the non-`::`
-	// per-group leading-zero strip. The strip must be anchored `^0+(?=.)` (keep at
-	// least one digit) so an interior group like "0db8" normalizes to "db8":
-	//   - mutating the regex to `^0+(?!.)` or the replacement to a literal leaves
-	//     "0db8" intact, so the 2001:db8 documentation match fails and the address
-	//     is misclassified as PUBLIC. Asserting it is PRIVATE kills both mutants.
-	test("full-form 2001:0db8 documentation address (no ::) is private after leading-zero strip", () => {
+	// Full-form (no `::`) addresses with leading-zero groups: classification
+	// must be canonical-form-insensitive, so "2001:0db8" still matches the
+	// 2001:db8::/32 documentation range.
+	test("full-form 2001:0db8 documentation address (no ::) is private", () => {
 		strictEqual(isPrivateIP("2001:0db8:0000:0000:0000:0000:0000:0001"), true);
 	});
 
-	// A full-form PUBLIC address whose first group is NOT 2001 (and second not db8)
-	// must stay public. Forcing the `groups[0] === "2001" && groups[1] === "db8"`
-	// documentation conjunct to `true` would misclassify it as private; asserting
-	// public kills that ConditionalExpression mutant.
-	test("full-form public IPv6 (2606:4700:..) is not private (kills 2001/db8 conditional)", () => {
+	// Full-form PUBLIC addresses near the documentation range must stay public:
+	// neither a non-2001 first group nor a db8 second group alone may match.
+	test("full-form public IPv6 (2606:4700:..) is not private", () => {
 		strictEqual(isPrivateIP("2606:4700:4700:0000:0000:0000:0000:1111"), false);
 	});
 
-	// The documentation match requires BOTH conjuncts: a public address whose
-	// SECOND group is "db8" but whose FIRST group is NOT 2001 (here 2003) must stay
-	// public. Mutating the left conjunct `groups[0] === "2001"` to `true` would
-	// classify it private on the db8 second group alone; asserting public kills it.
-	test("full-form db8 second group but non-2001 first group stays public (kills left conjunct)", () => {
+	test("full-form db8 second group but non-2001 first group stays public", () => {
 		strictEqual(isPrivateIP("2003:0db8:0000:0000:0000:0000:0000:0001"), false);
 	});
 
-	// Non-hex first group (not fc/fd/ff) parses to NaN; fail-closed to private.
+	// Non-hex first group is invalid IPv6; fail-closed to private.
 	test("malformed non-hex first group is private (fail-closed)", () => {
 		strictEqual(isPrivateIP("gggg::1"), true);
 	});

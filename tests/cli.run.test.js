@@ -19,8 +19,9 @@ const DIRTY = JSON.stringify({
 	type: "string",
 });
 
-// files: map matched by path suffix -> file content; sizes: suffix -> byte size.
-const runCli = async (argv, { files = {}, sizes = {} } = {}) => {
+// files: map matched by path suffix -> file content; sizes: suffix -> byte size;
+// glob: optional async-generator stand-in for io.glob.
+const runCli = async (argv, { files = {}, sizes = {}, glob } = {}) => {
 	const out = { log: [], error: [], write: [] };
 	const match = (map, p) => {
 		const key = Object.keys(map).find((k) => p.endsWith(k));
@@ -48,6 +49,7 @@ const runCli = async (argv, { files = {}, sizes = {} } = {}) => {
 			return { size: s };
 		},
 	};
+	if (glob) io.glob = glob;
 	const code = await run(argv, io);
 	return { code, ...out };
 };
@@ -56,7 +58,9 @@ describe("run() argument handling", () => {
 	test("--help prints usage and exits 0", async () => {
 		const r = await runCli(["--help"]);
 		strictEqual(r.code, 0);
-		ok(r.log.join("\n").includes("Usage: sast-json-schema [options] <file>"));
+		ok(
+			r.log.join("\n").includes("Usage: sast-json-schema [options] <file...>"),
+		);
 		ok(r.log.join("\n").includes("--format <human|json|sarif>"));
 	});
 
@@ -210,6 +214,91 @@ describe("run() output formats", () => {
 		const sarif = JSON.parse(r.write.join(""));
 		strictEqual(sarif.runs[0].results.length, 0);
 		strictEqual(r.error.length, 0);
+	});
+});
+
+// One invocation may analyze many schema files (the per-run fixed cost of Node
+// startup + validator compile is paid once). Single-file invocations keep the
+// exact historical output shapes; the multi-file shapes are additive.
+describe("run() multiple files", () => {
+	test("analyzes every file and exits 1 when any has issues (human)", async () => {
+		const r = await runCli(["--offline", "clean.json", "dirty.json"], {
+			files: { "clean.json": CLEAN, "dirty.json": DIRTY },
+		});
+		strictEqual(r.code, 1);
+		ok(r.log.join("\n").includes("clean.json has no issues"));
+		ok(r.log.join("\n").includes("dirty.json has issues"));
+	});
+
+	test("exits 0 when every file is clean", async () => {
+		const r = await runCli(["--offline", "a.json", "b.json"], {
+			files: { "a.json": CLEAN, "b.json": CLEAN },
+		});
+		strictEqual(r.code, 0);
+		ok(r.log.join("\n").includes("a.json has no issues"));
+		ok(r.log.join("\n").includes("b.json has no issues"));
+	});
+
+	test("json format with multiple files writes one object keyed by input path", async () => {
+		const r = await runCli(
+			["--offline", "--format", "json", "clean.json", "dirty.json"],
+			{ files: { "clean.json": CLEAN, "dirty.json": DIRTY } },
+		);
+		strictEqual(r.code, 1);
+		const parsed = JSON.parse(r.write.join(""));
+		ok(!Array.isArray(parsed));
+		strictEqual(parsed["clean.json"].length, 0);
+		ok(parsed["dirty.json"].length > 0);
+		ok(r.error.join("\n").includes("dirty.json has"));
+	});
+
+	test("sarif format with multiple files writes one log with a run per file", async () => {
+		const r = await runCli(
+			["--offline", "--format", "sarif", "clean.json", "dirty.json"],
+			{ files: { "clean.json": CLEAN, "dirty.json": DIRTY } },
+		);
+		strictEqual(r.code, 1);
+		const sarif = JSON.parse(r.write.join(""));
+		strictEqual(sarif.version, "2.1.0");
+		strictEqual(sarif.runs.length, 2);
+		strictEqual(sarif.runs[0].results.length, 0);
+		ok(sarif.runs[1].results.length > 0);
+	});
+
+	test("an unreadable file among several is a tool error (exit 2)", async () => {
+		const r = await runCli(["--offline", "clean.json", "missing.json"], {
+			files: { "clean.json": CLEAN },
+		});
+		strictEqual(r.code, 2);
+		ok(r.error.join("\n").includes('cannot read file "missing.json"'));
+	});
+});
+
+// A positional that does not stat (a glob the shell passed through unexpanded:
+// quoted, Windows, or bash without globstar) falls back to Node's fs.glob.
+describe("run() glob fallback", () => {
+	test("an unexpanded pattern is expanded with glob, matches sorted", async () => {
+		const r = await runCli(["--offline", "schemas/**/*.json"], {
+			files: { "g0.json": CLEAN, "g1.json": DIRTY },
+			// deliberately out of order to pin the sort
+			glob: async function* () {
+				yield "g1.json";
+				yield "g0.json";
+			},
+		});
+		strictEqual(r.code, 1);
+		const logText = r.log.join("\n");
+		ok(logText.includes("g0.json has no issues"));
+		ok(logText.includes("g1.json has issues"));
+		ok(logText.indexOf("g0.json") < logText.indexOf("g1.json"));
+	});
+
+	test("a pattern with no matches keeps the cannot-read error (exit 2)", async () => {
+		const r = await runCli(["--offline", "schemas/**/*.json"], {
+			glob: async function* () {},
+		});
+		strictEqual(r.code, 2);
+		ok(r.error.join("\n").includes('cannot read file "schemas/**/*.json"'));
 	});
 });
 

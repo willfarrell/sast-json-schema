@@ -12,6 +12,16 @@ test("sast should default to 2020-12 when schema is undefined", () => {
 	ok(typeof validate === "function");
 });
 
+// Validators are compiled lazily on first use and memoized; repeated calls for
+// the same draft must return the SAME validator instance, not a recompile.
+test("sast returns the same memoized validator across calls", () => {
+	strictEqual(sast(), sast());
+	strictEqual(
+		sast({ $schema: "http://json-schema.org/draft-07/schema#" }),
+		sast({ $schema: "http://json-schema.org/draft-07/schema#" }),
+	);
+});
+
 test("sast validate should return boolean", () => {
 	const validate = sast();
 	const schema = {

@@ -13,5 +13,7 @@
 		"high": 100,
 		"low": 100,
 		"break": 100
-	}
+	},
+	"timeoutMS": 20000,
+	"timeoutFactor": 6
 }

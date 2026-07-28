@@ -2,10 +2,14 @@
 // Copyright 2026 will Farrell, and sast-json-schema contributors.
 // SPDX-License-Identifier: MIT
 import { lookup as dnsLookup } from "node:dns/promises";
-import { readFile, stat } from "node:fs/promises";
+import { realpathSync } from "node:fs";
+import { glob, readFile, stat } from "node:fs/promises";
+import { BlockList, isIP } from "node:net";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import Ajv from "ajv/dist/2020.js";
 import { isSafePattern } from "redos-detector";
 import schema201909 from "./2019-09.json" with { type: "json" };
@@ -27,25 +31,18 @@ export const DNS_CONCURRENCY = 10;
 export const MAX_SSRF_HOSTNAMES = 256;
 export const DNS_TOTAL_TIMEOUT_MS = 30_000;
 
-// Pre-compiled SAST meta-schema validators, keyed by draft version. Compiled
-// once at module load so every sast() / analyze() call reuses the same
-// validator.
-const builtSchemas = new Map(
-	[
-		["2020-12", schema202012],
-		["2019-09", schema201909],
-		["draft-07", schemaDraft07],
-		["draft-06", schemaDraft06],
-		["draft-04", schemaDraft04],
-	].map(([version, metaSchema]) => [
-		version,
-		// allErrors:true is required so a single pass surfaces EVERY meta-schema
-		// violation for the security report; the schemas are trusted, not attacker
-		// input, so unbounded error allocation is not a DoS vector here.
-		// nosemgrep: javascript.ajv.security.audit.ajv-allerrors-true.ajv-allerrors-true
-		new Ajv(defaultOptions).compile(metaSchema),
-	]),
-);
+// SAST meta-schemas keyed by draft version. Validators are compiled lazily in
+// sast() below and memoized: any single run uses exactly one draft, and eager
+// compilation of all five cost ~0.4s of every CLI invocation (including
+// --help/--version, which use none).
+const metaSchemas = new Map([
+	["2020-12", schema202012],
+	["2019-09", schema201909],
+	["draft-07", schemaDraft07],
+	["draft-06", schemaDraft06],
+	["draft-04", schemaDraft04],
+]);
+const compiledSchemas = new Map();
 
 // Known $schema URLs mapped to their draft version. URLs are stored in
 // normalised form (no protocol, no trailing #) so callers can pass any
@@ -88,14 +85,61 @@ export const REDOS_TIMEOUT_MS = 1_000;
 // 600MB heap) also wrongly fail-closes legitimate complex-but-safe patterns
 // (e.g. semver is reported hitMaxSteps at maxSteps<=250 but is SAFE at the
 // library default). So we drop maxSteps and instead read the live heap before
-// each pattern: once it has grown beyond this budget above the phase baseline,
-// analysis STOPS and one fail-closed (incomplete) finding is emitted. Chosen at
-// 128MB: a single catastrophic pattern grows the heap by ~270MB at the default,
-// so the breaker fires after the FIRST evil pattern (delta ~270MB > 128MB) and
-// before the second, keeping peak well under --max-old-space-size=600; meanwhile
-// realistic schemas with many SIMPLE patterns retain almost nothing and never
-// approach 128MB. Injectable via crawlSchema options for deterministic testing.
+// each pattern against a baseline captured at the first pattern. Raw heapUsed
+// counts garbage, and GC timing under parallel load made that reading trip on
+// provably safe schemas, so an apparent exceedance is CONFIRMED before it
+// fires: force a full GC (see forceGc below), re-read, and trip only when
+// growth above the ORIGINAL baseline survives collection, i.e. is retained.
+// The forced GC also reclaims the garbage itself, so catastrophic patterns'
+// ~270MB transients are collected between patterns instead of accumulating,
+// while their ~7MB retained residue still trips the breaker after ~19 evil
+// patterns (well before OOM at --max-old-space-size=600). When no GC can be
+// obtained the raw reading trips as before (fail closed). On trip, analysis
+// STOPS and one fail-closed (incomplete) finding is emitted. Injectable via
+// crawlSchema options (memoryUsage, forceGc, redosHeapBudgetBytes) for
+// deterministic testing.
 export const REDOS_HEAP_BUDGET_BYTES = 128 * 1024 * 1024;
+
+// Forces a full V8 GC so the heap breaker measures RETAINED growth instead of
+// GC-timing-dependent garbage. Uses globalThis.gc when the process runs with
+// --expose-gc; otherwise enables the flag at runtime and captures gc from a
+// throwaway context (the standard expose-gc trick; the already-created main
+// context is unaffected). Returns false when no gc handle could be obtained,
+// letting callers fail closed.
+let cachedGc;
+// Stryker disable ConditionalExpression,BlockStatement: the branches below only
+// diverge on runtimes where gc is pre-exposed (--expose-gc, covered by a
+// subprocess test that per-test coverage cannot attribute) or where the flag
+// capture fails (not drivable on stock Node); on a plain run every surviving
+// branch yields the same working handle. The plain-run test pins the capture
+// path; the --expose-gc subprocess test pins the pre-exposed path.
+export const forceGc = () => {
+	// Stryker disable next-line EqualityOperator: inverting the cache check only
+	// re-resolves the handle on every call; memoization is a pure optimization.
+	if (cachedGc === undefined) {
+		// Stryker disable next-line StringLiteral: mutating "function" sends the
+		// pre-exposed case down the runtime capture, which yields an equally
+		// working handle, so no test can observe the difference.
+		if (typeof globalThis.gc === "function") {
+			cachedGc = globalThis.gc;
+		} else {
+			try {
+				setFlagsFromString("--expose-gc");
+				const gc = runInNewContext("gc");
+				cachedGc = typeof gc === "function" ? gc : null;
+			} catch {
+				cachedGc = null;
+			}
+		}
+	}
+	// Stryker disable next-line BooleanLiteral: the null branch is reachable only
+	// when the flag capture fails, which stock Node cannot be driven to do, so
+	// this return value is unobservable in tests; callers fail closed on false.
+	if (!cachedGc) return false;
+	cachedGc();
+	return true;
+};
+// Stryker restore ConditionalExpression,BlockStatement
 // Defense in depth: a hard cap on the TOTAL number of regex patterns crawlSchema
 // will ReDoS-analyze in a single crawl. The heap circuit breaker above is the
 // primary memory control; this is an independent backstop against an adversary
@@ -143,12 +187,22 @@ export const ANALYSIS_TIMEOUT_MS = 60_000;
 // prototype universally, so the narrowest opt-out is --lang js (which adds
 // no extras over the meta-schema baseline). For per-path false positives,
 // use --ignore <instancePath>.
+const JS_NAMES = ["__proto__", "constructor", "prototype"];
+const JVM_NAMES = [...JS_NAMES, "@type", "@class"];
+const DOTNET_NAMES = [...JS_NAMES, "$type", "__type", "@odata.type"];
+const OBJC_NAMES = [
+	...JS_NAMES,
+	"isa",
+	"class",
+	"superclass",
+	"description",
+	"init",
+	"_cmd",
+];
 export const DANGEROUS_NAMES_BY_LANG = {
-	js: ["__proto__", "constructor", "prototype"],
+	js: JS_NAMES,
 	py: [
-		"__proto__",
-		"constructor",
-		"prototype",
+		...JS_NAMES,
 		"__class__",
 		"__init__",
 		"__globals__",
@@ -160,47 +214,22 @@ export const DANGEROUS_NAMES_BY_LANG = {
 		"__mro__",
 	],
 	rb: [
-		"__proto__",
-		"constructor",
-		"prototype",
+		...JS_NAMES,
 		"__send__",
 		"json_class",
 		"instance_eval",
 		"instance_variable_set",
 		"singleton_class",
 	],
-	rs: ["__proto__", "constructor", "prototype"],
-	java: ["__proto__", "constructor", "prototype", "@type", "@class"],
-	kotlin: ["__proto__", "constructor", "prototype", "@type", "@class"],
-	clojure: ["__proto__", "constructor", "prototype", "@type", "@class"],
-	cs: [
-		"__proto__",
-		"constructor",
-		"prototype",
-		"$type",
-		"__type",
-		"@odata.type",
-	],
-	vb: [
-		"__proto__",
-		"constructor",
-		"prototype",
-		"$type",
-		"__type",
-		"@odata.type",
-	],
-	fsharp: [
-		"__proto__",
-		"constructor",
-		"prototype",
-		"$type",
-		"__type",
-		"@odata.type",
-	],
+	rs: JS_NAMES,
+	java: JVM_NAMES,
+	kotlin: JVM_NAMES,
+	clojure: JVM_NAMES,
+	cs: DOTNET_NAMES,
+	vb: DOTNET_NAMES,
+	fsharp: DOTNET_NAMES,
 	php: [
-		"__proto__",
-		"constructor",
-		"prototype",
+		...JS_NAMES,
 		"__construct",
 		"__destruct",
 		"__wakeup",
@@ -219,40 +248,11 @@ export const DANGEROUS_NAMES_BY_LANG = {
 		"__clone",
 		"__debugInfo",
 	],
-	objc: [
-		"__proto__",
-		"constructor",
-		"prototype",
-		"isa",
-		"class",
-		"superclass",
-		"description",
-		"init",
-		"_cmd",
-	],
-	swift: [
-		"__proto__",
-		"constructor",
-		"prototype",
-		"isa",
-		"class",
-		"superclass",
-		"description",
-		"init",
-		"_cmd",
-	],
-	ex: [
-		"__proto__",
-		"constructor",
-		"prototype",
-		"__struct__",
-		"__exception__",
-		"__protocol__",
-	],
+	objc: OBJC_NAMES,
+	swift: OBJC_NAMES,
+	ex: [...JS_NAMES, "__struct__", "__exception__", "__protocol__"],
 	lua: [
-		"__proto__",
-		"constructor",
-		"prototype",
+		...JS_NAMES,
 		"__index",
 		"__newindex",
 		"__call",
@@ -306,16 +306,26 @@ const SCHEMA_PATH_MAX_ITEMS = "#/$defs/safeArrayItemsLimits/maxItems";
 const SCHEMA_PATH_MAX_PROPERTIES =
 	"#/$defs/safeObjectPropertiesLimits/maxProperties";
 
-// Returns the pre-compiled SAST validator for the draft declared by
-// `schema.$schema`. Defaults to 2020-12 when $schema is absent.
+// Returns the SAST validator for the draft declared by `schema.$schema`,
+// compiling it on first use (memoized in compiledSchemas). Defaults to
+// 2020-12 when $schema is absent.
 export const sast = (schema) => {
 	const version = schemaVersion(schema?.$schema);
-	const validate = builtSchemas.get(version);
-	if (!validate) {
+	const metaSchema = metaSchemas.get(version);
+	if (!metaSchema) {
 		// Stryker disable next-line OptionalChaining: reaching this throw requires a
 		// non-null schema object (a null schema resolves to the default and validates),
 		// so schema?.$schema and schema.$schema are equivalent here.
 		throw new Error(`Unsupported $schema: ${schema?.$schema}`);
+	}
+	let validate = compiledSchemas.get(version);
+	if (!validate) {
+		// allErrors:true is required so a single pass surfaces EVERY meta-schema
+		// violation for the security report; the schemas are trusted, not attacker
+		// input, so unbounded error allocation is not a DoS vector here.
+		// nosemgrep: javascript.ajv.security.audit.ajv-allerrors-true.ajv-allerrors-true
+		validate = new Ajv(defaultOptions).compile(metaSchema);
+		compiledSchemas.set(version, validate);
 	}
 	return validate;
 };
@@ -505,15 +515,27 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		options.redosHeapBudgetBytes != null
 			? options.redosHeapBudgetBytes
 			: REDOS_HEAP_BUDGET_BYTES;
+	// GC hook for the breaker's confirm step; injectable for deterministic tests
+	// (same pattern as options.memoryUsage above).
+	const runGc =
+		typeof options.forceGc === "function" ? options.forceGc : forceGc;
 	let redosHeapBaseline = null;
 	let redosHeapReported = false;
 	// Returns true (and emits one #/redos-budget heap finding the first time) when
-	// the heap has grown more than the budget above the baseline. The first call
-	// captures the baseline (delta 0, never trips), so the breaker only fires once
-	// a real allocation has crossed the budget.
+	// RETAINED heap growth exceeds the budget above the baseline. The first call
+	// captures the baseline (delta 0, never trips). An apparent exceedance may be
+	// uncollected garbage (raw heapUsed depends on GC timing, which false-tripped
+	// safe schemas under parallel load), so it is confirmed with one forced GC and
+	// a re-read before it fires. The baseline is deliberately NOT reset by a
+	// confirm, so retained growth is always measured against the first-pattern
+	// reading and repeated confirms cannot ratchet past the budget. When no GC is
+	// available the raw reading trips as before (fail closed).
 	const redosHeapExceeded = (path) => {
-		const current = memoryUsage();
+		let current = memoryUsage();
 		if (redosHeapBaseline === null) redosHeapBaseline = current;
+		if (current - redosHeapBaseline > redosHeapBudgetBytes && runGc()) {
+			current = memoryUsage();
+		}
 		if (current - redosHeapBaseline <= redosHeapBudgetBytes) return false;
 		if (!redosHeapReported) {
 			redosHeapReported = true;
@@ -897,117 +919,92 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 	return result;
 };
 
+// Private/reserved ranges blocked for $ref hostname DNS results. IPv4:
 // RFC 1918 + loopback + link-local + CGN + TEST-NETs + multicast + reserved.
-// IPv6 covered: :: and ::1, unique-local fc00::/7, link-local fe80::/10 and
-// site-local fec0::/10 (combined fe80-feff), multicast ff00::/8, IPv4-mapped
-// ::ffff:0:0/96, NAT64 64:ff9b::/96, 6to4 2002::/16, and documentation
-// 2001:db8::/32. NAT64/6to4/IPv4-mapped recurse on their embedded IPv4.
+// IPv6: unspecified/loopback ::/127, unique-local fc00::/7, link-local
+// fe80::/10 + site-local fec0::/10 (combined fe80::/9), multicast ff00::/8,
+// and documentation 2001:db8::/32. Embedded-IPv4 carriers (IPv4-mapped
+// ::ffff:0:0/96, NAT64 64:ff9b::/96, 6to4 2002::/16) classify by their
+// embedded IPv4 instead; BlockList checks ::ffff forms against the IPv4
+// rules natively, and isPrivateIP below decodes NAT64/6to4.
+const privateRanges = new BlockList();
+for (const [subnet, prefix] of [
+	["0.0.0.0", 8], // "this" network
+	["10.0.0.0", 8], // private
+	["100.64.0.0", 10], // CGN
+	["127.0.0.0", 8], // loopback
+	["169.254.0.0", 16], // link-local
+	["172.16.0.0", 12], // private
+	["192.0.0.0", 24], // IETF Protocol Assignments
+	["192.0.2.0", 24], // TEST-NET-1
+	["192.168.0.0", 16], // private
+	["198.18.0.0", 15], // benchmark
+	["198.51.100.0", 24], // TEST-NET-2
+	["203.0.113.0", 24], // TEST-NET-3
+	["224.0.0.0", 4], // multicast
+	["240.0.0.0", 4], // reserved + broadcast
+]) {
+	privateRanges.addSubnet(subnet, prefix, "ipv4");
+}
+for (const [subnet, prefix] of [
+	["::", 127], // unspecified :: and loopback ::1
+	["fc00::", 7], // unique local
+	["fe80::", 9], // link-local fe80::/10 + site-local fec0::/10
+	["ff00::", 8], // multicast
+	["2001:db8::", 32], // documentation
+]) {
+	privateRanges.addSubnet(subnet, prefix, "ipv6");
+}
+
 // Used to block $ref URLs whose hostname resolves to an internal/private IP.
-// Fail-closed: malformed IPv6 (e.g. invalid hex groups, wrong group count) is
-// treated as private (returns true) so it is blocked rather than allowed
-// through as a forged public address. Tests in cli.ip.test.js pin the
-// boundary cases.
+// Fail-closed: malformed colon-containing input (invalid hex groups, wrong
+// group count, over-long groups) is treated as private (returns true) so it
+// is blocked rather than allowed through as a forged public address;
+// colon-less non-IP strings are not addresses at all and pass. Tests in
+// cli.ip.test.js pin the boundary cases.
 export const isPrivateIP = (ip) => {
-	const parts = ip.split(".").map(Number);
-	if (
-		parts.length === 4 &&
-		parts.every((p) => Number.isInteger(p) && p >= 0 && p <= 255)
-	) {
-		const [a, b] = parts;
-		if (a === 0) return true; // 0.0.0.0/8 "this" network
-		if (a === 10) return true; // 10.0.0.0/8 private
-		if (a === 127) return true; // 127.0.0.0/8 loopback
-		if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 CGN
-		if (a === 169 && b === 254) return true; // 169.254.0.0/16 link-local
-		if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12 private
-		if (a === 192 && b === 0 && parts[2] === 0) return true; // 192.0.0.0/24 IETF
-		if (a === 192 && b === 0 && parts[2] === 2) return true; // 192.0.2.0/24 TEST-NET-1
-		if (a === 192 && b === 168) return true; // 192.168.0.0/16 private
-		if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15 benchmark
-		if (a === 198 && b === 51 && parts[2] === 100) return true; // 198.51.100.0/24 TEST-NET-2
-		if (a === 203 && b === 0 && parts[2] === 113) return true; // 203.0.113.0/24 TEST-NET-3
-		// Stryker disable next-line ConditionalExpression: octets are validated to
-		// 0-255 and 240-255 is already private via the next line, so the `a <= 239`
-		// bound is redundant; dropping it is an equivalent mutant (no input changes).
-		if (a >= 224 && a <= 239) return true; // 224.0.0.0/4 multicast
-		if (a >= 240) return true; // 240.0.0.0/4 reserved + 255.255.255.255 broadcast
-	}
+	// Strip IPv6 zone ID (e.g. %eth0) before classification
+	const zoneIdx = ip.indexOf("%");
+	const addr = zoneIdx === -1 ? ip : ip.slice(0, zoneIdx);
+	const family = isIP(addr);
+	if (family === 4) return privateRanges.check(addr);
+	if (family !== 6) return addr.includes(":");
 
-	// Normalize IPv6: expand :: and remove leading zeros for consistent matching
-	const lower = ip.toLowerCase();
-	if (lower.includes(":")) {
-		// Strip IPv6 zone ID (e.g. %eth0) before further parsing
-		const zoneIdx = lower.indexOf("%");
-		const addr = zoneIdx !== -1 ? lower.slice(0, zoneIdx) : lower;
+	// Embedded-IPv4 dotted tail (e.g. ::ffff:127.0.0.1, 64:ff9b::10.0.0.1):
+	// classify by the embedded IPv4. BlockList would auto-map the ::ffff forms
+	// itself but would misread NAT64 dotted forms as plain IPv6 addresses.
+	const tail = addr.slice(addr.lastIndexOf(":") + 1);
+	if (tail.includes(".")) return isPrivateIP(tail);
 
-		// Handle IPv4-mapped forms with dotted notation (e.g. ::ffff:127.0.0.1)
-		// before general expansion since the dotted part counts as 2 groups
-		const lastColon = addr.lastIndexOf(":");
-		const tail = addr.slice(lastColon + 1);
-		if (tail.includes(".")) {
-			// Recursively check the IPv4 portion
-			return isPrivateIP(tail);
-		}
-
-		// Expand :: notation to full 8-group form
-		let groups;
-		if (addr.includes("::")) {
-			const [left, right] = addr.split("::");
-			const leftGroups = left ? left.split(":") : [];
-			const rightGroups = right ? right.split(":") : [];
-			const missing = 8 - leftGroups.length - rightGroups.length;
-			groups = [...leftGroups, ...Array(missing).fill("0"), ...rightGroups].map(
-				(g) => g.replace(/^0+(?=.)/, ""),
-			);
-		} else {
-			groups = addr.split(":").map((g) => g.replace(/^0+(?=.)/, ""));
-		}
-		if (groups.length === 8) {
-			const normalized = groups.join(":");
-			if (normalized === "0:0:0:0:0:0:0:0" || normalized === "0:0:0:0:0:0:0:1")
-				return true;
-			// Decode two normalized hex groups into a dotted IPv4 and recurse.
-			// Fail-closed: invalid hex parses as NaN, and NaN bit-math would forge a
-			// public-looking IPv4. Block (return true) instead.
-			const embeddedIPv4Private = (hiGroup, loGroup) => {
-				const hi = Number.parseInt(hiGroup, 16);
-				const lo = Number.parseInt(loGroup, 16);
-				if (Number.isNaN(hi) || Number.isNaN(lo)) return true;
-				return isPrivateIP(`${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`);
-			};
-			if (groups[0].startsWith("fc") || groups[0].startsWith("fd")) return true; // unique local fc00::/7
-			if (groups[0].startsWith("ff")) return true; // multicast ff00::/8
-			// First-group numeric ranges. Fail-closed on NaN (malformed hex) and on
-			// values > 0xffff (an over-long group such as "fe800" is malformed IPv6).
-			const g0 = Number.parseInt(groups[0], 16);
-			// Stryker disable next-line EqualityOperator: 0xffff (and above) starts with
-			// "ff" and is already returned by the multicast check, so the boundary value
-			// is unreachable here; `>` vs `>=` is an equivalent mutant.
-			if (Number.isNaN(g0) || g0 > 0xffff) return true;
-			// fe80-feff covers link-local fe80::/10 (fe80-febf) and site-local
-			// fec0::/10 (fec0-feff); the old check only matched the literal "fe80".
-			// Stryker disable next-line ConditionalExpression,EqualityOperator: the "ff"
-			// startsWith and `g0 > 0xffff` returns above already exclude every g0 above
-			// 0xfeff, so the upper-bound conjunct is always true here; dropping or
-			// loosening it is an equivalent mutant (no reachable input changes).
-			if (g0 >= 0xfe80 && g0 <= 0xfeff) return true;
-			// 2002::/16 6to4: embedded IPv4 sits in groups 1 and 2.
-			if (groups[0] === "2002")
-				return embeddedIPv4Private(groups[1], groups[2]);
-			// 2001:db8::/32 documentation (the IPv6 analog of the IPv4 TEST-NETs).
-			if (groups[0] === "2001" && groups[1] === "db8") return true;
-			// 64:ff9b::/96 NAT64 well-known prefix (RFC 6052): normalized form is
-			// 64:ff9b:0:0:0:0:X:Y with the IPv4 embedded in the last two groups.
-			if (normalized.startsWith("64:ff9b:0:0:0:0:")) {
-				return embeddedIPv4Private(groups[6], groups[7]);
-			}
-			// IPv4-mapped with hex groups (e.g. 0:0:0:0:0:ffff:7f00:1)
-			if (normalized.startsWith("0:0:0:0:0:ffff:")) {
-				return embeddedIPv4Private(groups[6], groups[7]);
-			}
-		}
-	}
-	return false;
+	// 6to4 2002::/16 and NAT64 64:ff9b::/96 embed an IPv4 that must be decoded
+	// rather than matched as IPv6: expand :: to the full 8 groups (isIP already
+	// validated the shape) and canonicalize via parseInt/toString(16).
+	const sides = addr.split("::");
+	// Stryker disable ConditionalExpression,ArrayDeclaration: an empty side only
+	// occurs for a leading/trailing "::"; forcing the ternary or stuffing the []
+	// fallback yields a non-hex (NaN) group, which can never produce a 6to4/NAT64
+	// prefix match those addresses lack anyway (nonzero leading groups), so
+	// classification falls through to the same BlockList check either way.
+	const leftGroups = sides[0] ? sides[0].split(":") : [];
+	const rightGroups = sides[1] ? sides[1].split(":") : [];
+	// Stryker restore ConditionalExpression,ArrayDeclaration
+	const groups = [
+		...leftGroups,
+		...Array(8 - leftGroups.length - rightGroups.length).fill("0"),
+		...rightGroups,
+	];
+	const g = groups.map((h) => Number.parseInt(h, 16));
+	// Decode two hex groups into a dotted IPv4 and recurse.
+	const embeddedIPv4Private = (hi, lo) =>
+		isPrivateIP(`${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`);
+	// 2002::/16 6to4: embedded IPv4 sits in groups 1 and 2.
+	if (g[0] === 0x2002) return embeddedIPv4Private(g[1], g[2]);
+	// 64:ff9b::/96 NAT64 well-known prefix (RFC 6052): canonical form is
+	// 64:ff9b:0:0:0:0:X:Y with the IPv4 embedded in the last two groups.
+	const normalized = g.map((n) => n.toString(16)).join(":");
+	if (normalized.startsWith("64:ff9b:0:0:0:0:"))
+		return embeddedIPv4Private(g[6], g[7]);
+	return privateRanges.check(addr, "ipv6");
 };
 
 const lookupHostname = async (hostname, entries, timeoutMs) => {
@@ -1151,48 +1148,20 @@ export const resolveInstancePath = (obj, pointer) => {
 // Runs a full SAST analysis on `schema`. Returns an array of AJV-style error
 // objects. Never touches the filesystem, never prints, never exits the process.
 export const analyze = async (schema, options = {}) => {
-	if (options.overrideMaxDepth != null) {
-		const n = Number(options.overrideMaxDepth);
-		if (n < 0 || !Number.isInteger(n)) {
-			throw new TypeError("overrideMaxDepth must be a non-negative integer");
-		}
-	}
-	if (options.overrideMaxItems != null) {
-		const n = Number(options.overrideMaxItems);
-		if (n < 0 || !Number.isInteger(n)) {
-			throw new TypeError("overrideMaxItems must be a non-negative integer");
-		}
-	}
-	if (options.overrideMaxProperties != null) {
-		const n = Number(options.overrideMaxProperties);
-		if (n < 0 || !Number.isInteger(n)) {
-			throw new TypeError(
-				"overrideMaxProperties must be a non-negative integer",
-			);
-		}
-	}
-	if (options.maxSchemaSize != null) {
-		const n = Number(options.maxSchemaSize);
-		if (n < 0 || !Number.isInteger(n)) {
-			throw new TypeError("maxSchemaSize must be a non-negative integer");
-		}
-	}
-	if (options.analysisTimeoutMs != null) {
-		const n = Number(options.analysisTimeoutMs);
-		if (n < 0 || !Number.isInteger(n)) {
-			throw new TypeError("analysisTimeoutMs must be a non-negative integer");
-		}
-	}
-	if (options.maxHostnames != null) {
-		const n = Number(options.maxHostnames);
-		if (n < 0 || !Number.isInteger(n)) {
-			throw new TypeError("maxHostnames must be a non-negative integer");
-		}
-	}
-	if (options.dnsTotalTimeoutMs != null) {
-		const n = Number(options.dnsTotalTimeoutMs);
-		if (n < 0 || !Number.isInteger(n)) {
-			throw new TypeError("dnsTotalTimeoutMs must be a non-negative integer");
+	for (const key of [
+		"overrideMaxDepth",
+		"overrideMaxItems",
+		"overrideMaxProperties",
+		"maxSchemaSize",
+		"analysisTimeoutMs",
+		"maxHostnames",
+		"dnsTotalTimeoutMs",
+	]) {
+		if (options[key] != null) {
+			const n = Number(options[key]);
+			if (n < 0 || !Number.isInteger(n)) {
+				throw new TypeError(`${key} must be a non-negative integer`);
+			}
 		}
 	}
 
@@ -1365,11 +1334,13 @@ export const formatSarif = (errors, inputPath, cwd = process.cwd()) => {
 	const artifactLocation = insideCwd
 		? { uri: relPath, uriBaseId: "SRCROOT" }
 		: { uri: pathToFileURL(resolve(inputPath)).href };
-	const ruleMap = new Map();
-	for (const err of errors) {
-		const ruleId = err.schemaPath
+	const ruleIdOf = (err) =>
+		err.schemaPath
 			? err.schemaPath.replace(/^#\//, "").split("/")[0] || err.keyword
 			: (err.keyword ?? "unknown");
+	const ruleMap = new Map();
+	for (const err of errors) {
+		const ruleId = ruleIdOf(err);
 		if (!ruleMap.has(ruleId)) {
 			ruleMap.set(ruleId, {
 				id: ruleId,
@@ -1401,35 +1372,30 @@ export const formatSarif = (errors, inputPath, cwd = process.cwd()) => {
 							},
 						}
 					: {}),
-				results: errors.map((err) => {
-					const ruleId = err.schemaPath
-						? err.schemaPath.replace(/^#\//, "").split("/")[0] || err.keyword
-						: (err.keyword ?? "unknown");
-					return {
-						ruleId,
-						level: "error",
-						message: { text: err.message ?? err.keyword ?? "schema issue" },
-						locations: [
-							{
-								physicalLocation: {
-									artifactLocation,
-								},
-								logicalLocations: [
-									{
-										fullyQualifiedName: err.instancePath ?? "",
-										kind: "value",
-									},
-								],
+				results: errors.map((err) => ({
+					ruleId: ruleIdOf(err),
+					level: "error",
+					message: { text: err.message ?? err.keyword ?? "schema issue" },
+					locations: [
+						{
+							physicalLocation: {
+								artifactLocation,
 							},
-						],
-						properties: {
-							instancePath: err.instancePath ?? "",
-							schemaPath: err.schemaPath ?? "",
-							keyword: err.keyword ?? "",
-							...(err.params ?? {}),
+							logicalLocations: [
+								{
+									fullyQualifiedName: err.instancePath ?? "",
+									kind: "value",
+								},
+							],
 						},
-					};
-				}),
+					],
+					properties: {
+						instancePath: err.instancePath ?? "",
+						schemaPath: err.schemaPath ?? "",
+						keyword: err.keyword ?? "",
+						...(err.params ?? {}),
+					},
+				})),
 			},
 		],
 	};
@@ -1448,16 +1414,17 @@ class CliExit extends Error {
 	}
 }
 
-// Parses argv, reads the schema file, runs analyze(), and writes the report.
+// Parses argv, reads the schema file(s), runs analyze(), and writes the report.
 // Returns the exit code (0 = no issues, 1 = issues, 2 = usage/tool error). All
-// I/O is injectable via `io` ({ log, error, write, readFile, stat }) so the whole
-// entrypoint is unit-testable without spawning a subprocess.
+// I/O is injectable via `io` ({ log, error, write, readFile, stat, glob }) so
+// the whole entrypoint is unit-testable without spawning a subprocess.
 export const run = async (argv, io = {}) => {
 	const log = io.log ?? ((m) => console.log(m));
 	const errorLog = io.error ?? ((m) => console.error(m));
 	const write = io.write ?? ((s) => process.stdout.write(s));
 	const readFileFn = io.readFile ?? readFile;
 	const statFn = io.stat ?? stat;
+	const globFn = io.glob ?? glob;
 
 	const die = (msg) => {
 		errorLog(`Error: ${msg}`);
@@ -1509,7 +1476,7 @@ export const run = async (argv, io = {}) => {
 		}
 
 		if (values.help) {
-			log(`Usage: sast-json-schema [options] <file>
+			log(`Usage: sast-json-schema [options] <file...>
 
 Options:
   --override-max-items <n>         Override max items limit (default: 1024)
@@ -1535,7 +1502,7 @@ Options:
 
 Exit codes:
   0    no issues found
-  1    schema has issues, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget findings
+  1    any schema has issues, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget findings
   2    usage / tool error: bad args, unreadable file, invalid JSON, unsupported $schema, oversized schema, or non-JSON-serializable (circular) schema`);
 			return 0;
 		}
@@ -1561,16 +1528,8 @@ Exit codes:
 			);
 		}
 
-		const input = positionals[0];
-		if (!input) die("missing required argument <file>");
+		if (positionals.length === 0) die("missing required argument <file>");
 
-		const filePath = resolve(input);
-		let fileStat;
-		try {
-			fileStat = await statFn(filePath);
-		} catch (err) {
-			die(`cannot read file "${input}": ${err.message}`);
-		}
 		// Only enforce --max-schema-size at the file gate when it parses to a valid
 		// non-negative integer. For invalid values (e.g. 3.5 or a negative), fall
 		// back to the default here and let analyze() raise the proper validation
@@ -1589,10 +1548,6 @@ Exit codes:
 			parsedMaxSchemaSize >= 0
 				? parsedMaxSchemaSize
 				: MAX_SCHEMA_SIZE;
-		if (fileStat.size > fileSizeLimit) {
-			die(`schema file exceeds ${fileSizeLimit} byte size limit: "${input}"`);
-		}
-		const schema = await readJsonFile(filePath, `file "${input}"`);
 
 		const safeHostnames = new Set();
 		if (values["ref-schema-files"]) {
@@ -1646,36 +1601,87 @@ Exit codes:
 			},
 		};
 
-		let errors;
-		try {
-			errors = await analyze(schema, options);
-		} catch (err) {
-			die(`analyzing schema "${input}": ${err.message}`);
+		// Shells usually expand globs before the CLI sees them, so an existing
+		// path passes through untouched. A pattern that reaches us unexpanded
+		// (quoted, Windows, bash without globstar) fails the stat here and falls
+		// back to Node's own glob, sorted for deterministic report order. Zero
+		// matches falls through to the historical cannot-read error, with the
+		// stat failure for the raw positional as the cause.
+		const inputs = [];
+		for (const input of positionals) {
+			try {
+				await statFn(resolve(input));
+				inputs.push(input);
+			} catch (err) {
+				const matches = [];
+				try {
+					for await (const match of globFn(input)) matches.push(match);
+				} catch {
+					// unglobbable pattern; report the stat failure below
+				}
+				if (matches.length === 0) {
+					die(`cannot read file "${input}": ${err.message}`);
+				}
+				inputs.push(...matches.sort());
+			}
 		}
 
-		if (values.format === "json") {
-			write(`${JSON.stringify(errors)}\n`);
-			if (errors.length) {
-				errorLog(`${input} has ${errors.length} issue(s)`);
-				return 1;
+		// Analyze every <file> in one invocation, so the fixed startup cost (Node
+		// boot + one lazy validator compile per draft) is paid once, not per file.
+		// Any per-file failure (unreadable, invalid JSON, oversized, analyze()
+		// throw) is a tool error and exits 2 immediately, as it did for one file.
+		const results = [];
+		for (const input of inputs) {
+			const filePath = resolve(input);
+			let fileStat;
+			try {
+				fileStat = await statFn(filePath);
+			} catch (err) {
+				die(`cannot read file "${input}": ${err.message}`);
 			}
-			return 0;
-		}
-		if (values.format === "sarif") {
-			write(`${JSON.stringify(formatSarif(errors, input))}\n`);
-			if (errors.length) {
-				errorLog(`${input} has ${errors.length} issue(s)`);
-				return 1;
+			if (fileStat.size > fileSizeLimit) {
+				die(`schema file exceeds ${fileSizeLimit} byte size limit: "${input}"`);
 			}
-			return 0;
+			const schema = await readJsonFile(filePath, `file "${input}"`);
+			try {
+				results.push([input, await analyze(schema, options)]);
+			} catch (err) {
+				die(`analyzing schema "${input}": ${err.message}`);
+			}
 		}
-		if (errors.length) {
-			log(`${input} has issues`);
-			log(JSON.stringify(errors, null, 2));
-			return 1;
+		const anyIssues = results.some(([, errors]) => errors.length > 0);
+
+		if (values.format === "json" || values.format === "sarif") {
+			if (values.format === "json") {
+				// One file keeps the historical bare-array payload; several files
+				// nest each file's array under its input path.
+				const payload =
+					results.length === 1 ? results[0][1] : Object.fromEntries(results);
+				write(`${JSON.stringify(payload)}\n`);
+			} else {
+				// SARIF 2.1.0 allows multiple runs per log: one run per input file.
+				// Merging through the first log's envelope keeps a single-file log
+				// byte-identical to the historical output.
+				const logs = results.map(([input, errors]) =>
+					formatSarif(errors, input),
+				);
+				const sarif = { ...logs[0], runs: logs.flatMap((l) => l.runs) };
+				write(`${JSON.stringify(sarif)}\n`);
+			}
+			for (const [input, errors] of results) {
+				if (errors.length) errorLog(`${input} has ${errors.length} issue(s)`);
+			}
+			return anyIssues ? 1 : 0;
 		}
-		log(`${input} has no issues`);
-		return 0;
+		for (const [input, errors] of results) {
+			if (errors.length) {
+				log(`${input} has issues`);
+				log(JSON.stringify(errors, null, 2));
+			} else {
+				log(`${input} has no issues`);
+			}
+		}
+		return anyIssues ? 1 : 0;
 	} catch (err) {
 		if (err instanceof CliExit) return err.code;
 		throw err;
@@ -1686,7 +1692,17 @@ Exit codes:
 // main-module guard and its body only run when cli.js IS the process entry, which the
 // in-process tests (which import run() directly) never are; the spawned subprocess in
 // cli.test.js exercises it but perTest cannot attribute that coverage back here.
-if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
+// realpathSync follows symlinks so the npm .bin shim (a symlink to cli.js)
+// counts as direct execution; import.meta.filename is already the realpath
+// under ESM, so comparing against resolve(argv[1]) never matched via npx and
+// the CLI silently exited 0 (the 0.5.0 no-op bug).
+let entryPath;
+try {
+	entryPath = process.argv[1] && realpathSync(process.argv[1]);
+} catch {
+	// argv[1] missing or unresolvable (e.g. "node -"); not a direct execution.
+}
+if (entryPath === import.meta.filename) {
 	process.exitCode = await run(process.argv.slice(2));
 }
 // Stryker restore all

@@ -78,6 +78,14 @@ Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<spec>` UR
 
 ```bash
 npx sast-json-schema path/to/schema.json
+
+# Many files in one invocation: the fixed startup cost (Node boot + validator
+# compile) is paid once, so this is the fast way to scan a schema directory.
+npx sast-json-schema schemas/*.json
+
+# A pattern the shell does not expand (quoted, Windows, bash without globstar)
+# is expanded by the CLI itself, so recursive scans work everywhere.
+npx sast-json-schema 'schemas/**/*.json'
 ```
 
 Options:
@@ -88,7 +96,7 @@ Options:
 - `--offline`: Skip SSRF DNS resolution for remote `$ref` URLs (useful in airgapped CI)
 - `-r, --ref-schema-files <file>`: Load a reference schema; its `$id` hostname is treated as safe and skipped during SSRF DNS checks (repeatable)
 - `--lang <code>`: Downstream language whose deserialization-vector names to deny in property keys. Default is `default` (union of every named language). See [language coverage](#language-coverage) below
-- `--format <human|json|sarif>`: Output format. `json` emits a JSON array of error objects on stdout; `sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code-scanning, SonarQube, Semgrep and other security pipelines; `human` is the default
+- `--format <human|json|sarif>`: Output format. `json` emits a JSON array of error objects on stdout (with several files: one object mapping each input path to its error array); `sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for GitHub code-scanning, SonarQube, Semgrep and other security pipelines, with one run per input file; `human` is the default
 - `--max-schema-size <bytes>`: Maximum serialized schema size in bytes. Default 67108864 (64 MiB). Larger schemas are rejected as a tool error (exit 2)
 - `--analysis-timeout-ms <ms>`: Wall-clock budget for the schema crawl. Default 60000. Exceeding it produces a `timeout` finding (exit 1)
 - `--max-ssrf-hostnames <n>`: Maximum distinct remote `$ref` hostnames resolved during SSRF checks. Default 256. Above this, DNS resolution is refused and reported as a finding
@@ -101,7 +109,7 @@ Options:
 | Code | Meaning |
 |------|---------|
 | `0`  | No issues found |
-| `1`  | Schema has security findings, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget conditions (a schema too expensive or unsafe to fully analyze is itself a finding) |
+| `1`  | Any input schema has security findings, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget conditions (a schema too expensive or unsafe to fully analyze is itself a finding) |
 | `2`  | Usage/tool error: bad args, unreadable file, invalid JSON, unsupported `$schema`, an oversized schema (over `--max-schema-size`), or a non-JSON-serializable (circular) schema |
 
 Exit 1 means a problem was found in the schema, including the resource-limit conditions above; exit 2 means the tool could not analyze the input at all.
