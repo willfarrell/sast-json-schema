@@ -205,6 +205,29 @@ describe("cli.", () => {
 		ok(r.stderr.includes("cannot read --ref-schema-files file"));
 	});
 
+	test("a literal ** pattern is expanded by the CLI itself (no shell)", async () => {
+		const { writeFile, mkdir, mkdtemp } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-test-"));
+		await mkdir(join(dir, "nested"));
+		const clean = JSON.stringify({
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			$id: "https://example.test/clean.json",
+			type: "string",
+			maxLength: 10,
+			pattern: "^[a-z]+$",
+		});
+		await writeFile(join(dir, "a.json"), clean);
+		await writeFile(join(dir, "nested", "b.json"), clean);
+		// execFile passes argv without a shell, so the pattern arrives literally,
+		// exactly like a quoted glob or a shell without globstar support.
+		const r = await runCli(["--offline", join(dir, "**", "*.json")]);
+		strictEqual(r.code, 0);
+		ok(r.stdout.includes("a.json has no issues"));
+		ok(r.stdout.includes("b.json has no issues"));
+	});
+
 	test("oversized file is rejected before being read", async () => {
 		const { mkdtemp, open } = await import("node:fs/promises");
 		const { tmpdir } = await import("node:os");
@@ -502,5 +525,19 @@ describe("cli.", () => {
 		]);
 		const errors = JSON.parse(r.stdout);
 		ok(!errors.some((e) => e.instancePath.includes("/pattern")));
+	});
+
+	test("invoked via a bin-style symlink (npm/npx shim) still runs", async () => {
+		const { mkdtemp, symlink } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+		const dir = await mkdtemp(join(tmpdir(), "sast-bin-"));
+		const shim = join(dir, "sast-json-schema");
+		await symlink(cliPath, shim);
+		const { stdout } = await execFileAsync("node", [shim, "--help"]);
+		ok(
+			stdout.includes("Usage: sast-json-schema"),
+			"CLI must run when argv[1] is a symlink to cli.js (the npm .bin shim)",
+		);
 	});
 });

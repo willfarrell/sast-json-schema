@@ -1,6 +1,6 @@
 {
 	"name": "sast-json-schema",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"description": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
 	"type": "module",
 	"engines": {
@@ -112,6 +112,8 @@
 		"tinybench": "^6.0.0"
 	},
 	"overrides": {
-		"qs": "^6.15.2"
+		"brace-expansion": ">=5.0.8",
+		"js-yaml": ">=4.2.0",
+		"qs": ">=6.15.2"
 	}
 }

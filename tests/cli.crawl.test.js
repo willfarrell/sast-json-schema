@@ -2,6 +2,7 @@ import { deepStrictEqual, ok, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
 import {
 	crawlSchema,
+	forceGc,
 	MAX_COLLECTED_REFS,
 	MAX_REDOS_PATTERNS,
 	REDOS_HEAP_BUDGET_BYTES,
@@ -866,6 +867,26 @@ describe("crawlSchema", () => {
 		);
 	});
 
+	// Adversarial input: a non-array dependentRequired value has no .entries(),
+	// so the Array.isArray guard is what keeps the crawl from throwing.
+	test("a non-array dependentRequired value is skipped without throwing", () => {
+		const r = crawlSchema({
+			dependentRequired: { trigger: "not-an-array", other: ["__proto__"] },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "dependentRequired" &&
+					e.params.name === "__proto__" &&
+					e.instancePath.endsWith("/other/0"),
+			),
+		);
+		ok(
+			!r.errors.some((e) => e.instancePath.includes("/trigger/")),
+			"the malformed entry must produce no findings",
+		);
+	});
+
 	test("should flag __proto__ in required array entries", () => {
 		const r = crawlSchema({
 			required: ["name", "__proto__"],
@@ -1719,7 +1740,8 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 
 	// HEAP CIRCUIT BREAKER (primary memory bound): an injected memoryUsage that
 	// crosses an injected budget must stop analysis early and emit exactly one
-	// incomplete #/redos-budget finding that survives --ignore.
+	// incomplete #/redos-budget finding that survives --ignore. forceGc -> false
+	// pins the fail-closed path (no GC available -> the raw reading trips).
 	test("heap budget breaker stops analysis early and emits one incomplete finding", () => {
 		const patternProperties = {};
 		for (let i = 0; i < 5; i++) {
@@ -1734,6 +1756,7 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 		const r = crawlSchema({ patternProperties }, 32, {
 			memoryUsage,
 			redosHeapBudgetBytes: 100,
+			forceGc: () => false,
 		});
 		const budget = r.errors.filter(
 			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
@@ -1754,6 +1777,7 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 				return () => 100 + 50 * c++;
 			})(),
 			redosHeapBudgetBytes: 100,
+			forceGc: () => false,
 			ignore: ["#/redos-budget"],
 		});
 		// crawlSchema itself does not apply --ignore (analyze() does), so verify the
@@ -1765,6 +1789,25 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 			1,
 			"heap-budget finding is present regardless of ignore",
 		);
+	});
+
+	// An explicit 0 budget is honored as a real (instantly-tripping) limit and
+	// must not fall back to the 128 MiB default (kills the
+	// `?? REDOS_HEAP_BUDGET_BYTES` fallback mutants).
+	test("explicit zero heap budget trips on the first retained byte", () => {
+		const patternProperties = { "^a$": { type: "string" }, "^b$": {} };
+		let calls = 0;
+		const memoryUsage = () => 100 + calls++; // 100 baseline, then 101, 102...
+		const r = crawlSchema({ patternProperties }, 32, {
+			memoryUsage,
+			redosHeapBudgetBytes: 0,
+			forceGc: () => true,
+		});
+		const budget = r.errors.filter(
+			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
+		);
+		strictEqual(budget.length, 1, "breaker must trip with a 0 budget");
+		strictEqual(budget[0].params.budget, 0);
 	});
 
 	// Boundary pin for Stryker: exactly AT the budget (current-baseline == budget)
@@ -1796,7 +1839,8 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 
 	// Companion to the boundary: delta = budget + 1 MUST trip, and the emitted heap
 	// finding's exact shape is pinned so the message StringLiteral and the
-	// incomplete BooleanLiteral mutants are killed.
+	// incomplete BooleanLiteral mutants are killed. forceGc -> false keeps this on
+	// the deterministic fail-closed path.
 	test("heap delta of budget+1 trips and emits the exact heap finding", () => {
 		let calls = 0;
 		// Read #1 (baseline) = 100; read #2 = 201 -> delta 101 = budget + 1.
@@ -1809,7 +1853,7 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 				},
 			},
 			32,
-			{ memoryUsage, redosHeapBudgetBytes: 100 },
+			{ memoryUsage, redosHeapBudgetBytes: 100, forceGc: () => false },
 		);
 		const heap = r.errors.filter(
 			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
@@ -1843,7 +1887,7 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 				},
 			},
 			32,
-			{ memoryUsage, redosHeapBudgetBytes: 100 },
+			{ memoryUsage, redosHeapBudgetBytes: 100, forceGc: () => false },
 		);
 		const heap = r.errors.filter(
 			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
@@ -1861,12 +1905,221 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 		);
 	});
 
+	// CONFIRM-WITH-GC: raw heapUsed growth can be uncollected garbage, not
+	// retained memory, so an apparent exceedance triggers one forced GC and a
+	// re-read; only growth that SURVIVES the GC trips the breaker. This is what
+	// stops safe schemas from tripping it under GC-timing variance (parallel load).
+	// Reads: #1 baseline 100, #2 raw 300 (apparent exceed) -> gc -> #3 re-read 150
+	// (delta 50 <= budget 100) -> no finding, analysis continues to the third key.
+	test("apparent exceedance that GC reveals as garbage does not trip the breaker", () => {
+		const reads = [100, 300, 150, 160];
+		let call = 0;
+		let gcCalls = 0;
+		const r = crawlSchema(
+			{
+				patternProperties: {
+					"^safe1$": { type: "string" },
+					"^safe2$": { type: "string" },
+					"^safe3$": { type: "string" },
+				},
+			},
+			32,
+			{
+				memoryUsage: () => reads[Math.min(call++, reads.length - 1)],
+				redosHeapBudgetBytes: 100,
+				forceGc: () => {
+					gcCalls++;
+					return true;
+				},
+			},
+		);
+		strictEqual(
+			r.errors.filter((e) => e.schemaPath === "#/redos-budget").length,
+			0,
+			"garbage-only growth must not trip the breaker after a confirming GC",
+		);
+		strictEqual(
+			gcCalls,
+			1,
+			"the confirm GC runs once, on the apparent exceedance",
+		);
+		strictEqual(
+			call,
+			4,
+			"all three keys must be analyzed (3 checks + 1 GC re-read)",
+		);
+	});
+
+	// Retained growth (survives the confirm GC) MUST still trip, with the exact
+	// finding shape preserved on the GC path.
+	test("growth that survives the confirm GC trips with the exact heap finding", () => {
+		const reads = [100, 300, 250];
+		let call = 0;
+		let gcCalls = 0;
+		const r = crawlSchema(
+			{
+				patternProperties: {
+					"^safe1$": { type: "string" },
+					"^safe2$": { type: "string" },
+				},
+			},
+			32,
+			{
+				memoryUsage: () => reads[Math.min(call++, reads.length - 1)],
+				redosHeapBudgetBytes: 100,
+				forceGc: () => {
+					gcCalls++;
+					return true;
+				},
+			},
+		);
+		const heap = r.errors.filter(
+			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
+		);
+		strictEqual(heap.length, 1, "retained growth must trip exactly once");
+		strictEqual(gcCalls, 1, "one confirm GC before tripping");
+		deepStrictEqual(heap[0].params, { budget: 100, incomplete: true });
+		strictEqual(
+			heap[0].message,
+			"ReDoS analysis heap budget of 100 bytes exceeded; remaining patterns not analyzed",
+		);
+	});
+
+	// NO RATCHET: the baseline is never reset by a confirming GC. Retained growth
+	// is measured against the FIRST reading, so repeated confirms cannot creep the
+	// effective budget upward. Reads: #1 baseline 100; #2 raw 250 -> gc -> #3 150
+	// (delta 50, pass); #4 raw 260 -> gc -> #5 240 (delta 140 vs ORIGINAL baseline
+	// 100 -> trip). A per-confirm re-baseline (150) would see 90 and wrongly pass.
+	test("retained growth trips against the original baseline after an earlier confirmed-garbage pass", () => {
+		const reads = [100, 250, 150, 260, 240];
+		let call = 0;
+		let gcCalls = 0;
+		const r = crawlSchema(
+			{
+				patternProperties: {
+					"^safe1$": { type: "string" },
+					"^safe2$": { type: "string" },
+					"^safe3$": { type: "string" },
+				},
+			},
+			32,
+			{
+				memoryUsage: () => reads[Math.min(call++, reads.length - 1)],
+				redosHeapBudgetBytes: 100,
+				forceGc: () => {
+					gcCalls++;
+					return true;
+				},
+			},
+		);
+		const heap = r.errors.filter(
+			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
+		);
+		strictEqual(
+			heap.length,
+			1,
+			"retained growth above the ORIGINAL baseline must trip",
+		);
+		strictEqual(gcCalls, 2, "each apparent exceedance runs one confirm GC");
+	});
+
+	// FAIL-CLOSED: when no GC can be forced (forceGc -> false) the raw reading
+	// trips exactly as before, with no re-read consumed.
+	test("fail-closed when GC is unavailable: raw exceedance trips without a re-read", () => {
+		let call = 0;
+		let gcCalls = 0;
+		const memoryUsage = () => (call++ === 0 ? 100 : 201);
+		const r = crawlSchema(
+			{
+				patternProperties: {
+					"^safe1$": { type: "string" },
+					"^safe2$": { type: "string" },
+				},
+			},
+			32,
+			{
+				memoryUsage,
+				redosHeapBudgetBytes: 100,
+				forceGc: () => {
+					gcCalls++;
+					return false;
+				},
+			},
+		);
+		strictEqual(
+			r.errors.filter(
+				(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
+			).length,
+			1,
+			"no GC available -> the raw reading must trip (fail closed)",
+		);
+		strictEqual(gcCalls, 1, "the GC attempt was made");
+		strictEqual(call, 2, "no re-read after a failed GC attempt");
+	});
+
+	// The confirm GC is gated on the exceedance check: within-budget growth
+	// (including EXACTLY at the budget) must never invoke it.
+	test("forceGc is not called while growth stays within the budget", () => {
+		let call = 0;
+		let gcCalls = 0;
+		// Read #1 baseline 100, read #2 = 200: delta exactly the budget, not above.
+		const memoryUsage = () => (call++ === 0 ? 100 : 200);
+		const r = crawlSchema(
+			{
+				patternProperties: {
+					"^safe1$": { type: "string" },
+					"^safe2$": { type: "string" },
+				},
+			},
+			32,
+			{
+				memoryUsage,
+				redosHeapBudgetBytes: 100,
+				forceGc: () => {
+					gcCalls++;
+					return true;
+				},
+			},
+		);
+		strictEqual(
+			r.errors.filter((e) => e.schemaPath === "#/redos-budget").length,
+			0,
+		);
+		strictEqual(gcCalls, 0, "no GC while growth is within the budget");
+	});
+
+	// The REAL forceGc: on a plain `node` run (no --expose-gc, which is how the
+	// test runner executes) it must obtain a gc handle via the runtime-flag
+	// capture and return true; a second call reuses the cached handle.
+	test("forceGc obtains a real gc handle without --expose-gc", () => {
+		strictEqual(forceGc(), true, "runtime-flag gc capture must succeed");
+		strictEqual(forceGc(), true, "the cached handle keeps working");
+	});
+
+	// The pre-exposed path: under --expose-gc, forceGc uses globalThis.gc.
+	// Subprocess because the flag must be set at process start.
+	test("forceGc returns true under --expose-gc (pre-exposed gc path)", async () => {
+		const { execFile } = await import("node:child_process");
+		const { promisify } = await import("node:util");
+		const cliUrl = new URL("../cli.js", import.meta.url).href;
+		const script = `const { forceGc } = await import(${JSON.stringify(cliUrl)}); console.log(typeof globalThis.gc === "function" && forceGc());`;
+		const { stdout } = await promisify(execFile)("node", [
+			"--expose-gc",
+			"--input-type=module",
+			"-e",
+			script,
+		]);
+		strictEqual(stdout.trim(), "true");
+	});
+
 	// PRIMARY (heap breaker, OOM repro): many distinct evil patternProperties keys
-	// each grow the heap by ~270MB at the library default. The heap circuit breaker
-	// (default budget) must bail after the first one so the crawl returns WITHOUT
-	// crashing, emitting one incomplete heap-budget finding. (The manual 600MB
-	// check in the PR confirms no OOM; here the larger test-process heap simply
-	// proves we return cleanly and the breaker fired.)
+	// each grow the heap by ~270MB of GARBAGE at the library default. Under the
+	// confirm-with-GC breaker each apparent exceedance forces a full GC that
+	// reclaims those transients, so the crawl returns WITHOUT crashing; whether
+	// the breaker eventually fires depends on the library's retained residue
+	// (version-dependent), so this integration test only pins "no crash, evil
+	// keys flagged" and leaves the breaker's exact firing to the deterministic
+	// injected tests above.
 	test("40 distinct evil patternProperties keys return without crashing (heap breaker)", () => {
 		const patternProperties = {};
 		for (let i = 0; i < 40; i++) {
@@ -1874,20 +2127,33 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 		}
 		const r = crawlSchema({ patternProperties });
 		strictEqual(r.timedOut, false, "must not have tripped the deadline");
-		// The heap breaker bailed: at least one evil pattern was flagged before the
-		// budget tripped, and exactly one incomplete heap-budget finding is present.
-		const heap = r.errors.filter(
-			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
-		);
-		strictEqual(heap.length, 1, "the heap breaker must fire exactly once");
-		strictEqual(heap[0].params.incomplete, true, "heap finding is incomplete");
 		const redos = r.errors.filter(
 			(e) => e.keyword === "patternProperties" && e.schemaPath === "#/redos",
 		);
 		ok(
-			redos.length >= 1 && redos.length < 40,
-			`breaker must stop early after flagging some keys; got ${redos.length}`,
+			redos.length >= 1,
+			`evil keys must be flagged as ReDoS; got ${redos.length}`,
 		);
+		// Every analyzed key must be accounted for: flagged as ReDoS, or cut off
+		// by a single incomplete breaker finding (never silently skipped).
+		const heap = r.errors.filter(
+			(e) => e.schemaPath === "#/redos-budget" && e.keyword === "heap",
+		);
+		ok(heap.length <= 1, "the heap breaker latches: at most one finding");
+		if (heap.length === 0) {
+			strictEqual(
+				redos.length,
+				40,
+				"no breaker finding -> all 40 evil keys must have been analyzed and flagged",
+			);
+		} else {
+			strictEqual(
+				heap[0].params.incomplete,
+				true,
+				"heap finding is incomplete",
+			);
+			ok(redos.length < 40, "breaker fired -> analysis stopped early");
+		}
 	});
 
 	// Layer 1 also applies to top-level `pattern`: a single evil pattern is
