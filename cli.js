@@ -409,6 +409,16 @@ const checkNumericRange = (current, path) => {
 
 const INSTANCE_DATA_KEYS = new Set(["const", "enum", "default", "examples"]);
 
+// [type, minKeyword, maxKeyword] triples whose min > max makes a schema
+// unsatisfiable. Each is only checked when the schema declares the matching
+// type, so `{minItems: 5, maxItems: 1}` on a string is not a finding.
+const MIN_MAX_PAIRS = [
+	["string", "minLength", "maxLength"],
+	["array", "minItems", "maxItems"],
+	["array", "minContains", "maxContains"],
+	["object", "minProperties", "maxProperties"],
+];
+
 // RFC 6901 JSON Pointer token escaping: ~ → ~0, / → ~1.
 // https://datatracker.ietf.org/doc/html/rfc6901#section-3
 const escapeJsonPointer = (token) =>
@@ -551,81 +561,33 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 			currentType === t ||
 			(Array.isArray(currentType) && currentType.includes(t));
 
-		if (
-			isType("string") &&
-			Object.hasOwn(current, "minLength") &&
-			Object.hasOwn(current, "maxLength") &&
-			current.minLength > current.maxLength
-		) {
-			result.errors.push({
-				instancePath: path,
-				schemaPath: "#/minLength",
-				keyword: "minLength",
-				params: {
-					minLength: current.minLength,
-					maxLength: current.maxLength,
-				},
-				message: "minLength must be less than or equal to maxLength",
-			});
+		// Unsatisfiable min/max pairs. Every pair reports identically (keyword and
+		// schemaPath are the min side), so they are driven from one table; the
+		// numeric range check below is separate because exclusive bounds make it
+		// a four-keyword comparison rather than a straight min > max.
+		for (const [type, minKey, maxKey] of MIN_MAX_PAIRS) {
+			if (
+				isType(type) &&
+				Object.hasOwn(current, minKey) &&
+				Object.hasOwn(current, maxKey) &&
+				current[minKey] > current[maxKey]
+			) {
+				result.errors.push({
+					instancePath: path,
+					schemaPath: `#/${minKey}`,
+					keyword: minKey,
+					params: {
+						[minKey]: current[minKey],
+						[maxKey]: current[maxKey],
+					},
+					message: `${minKey} must be less than or equal to ${maxKey}`,
+				});
+			}
 		}
 
 		if (isType("integer") || isType("number")) {
 			const rangeError = checkNumericRange(current, path);
 			if (rangeError) result.errors.push(rangeError);
-		}
-
-		if (
-			isType("array") &&
-			Object.hasOwn(current, "minItems") &&
-			Object.hasOwn(current, "maxItems") &&
-			current.minItems > current.maxItems
-		) {
-			result.errors.push({
-				instancePath: path,
-				schemaPath: "#/minItems",
-				keyword: "minItems",
-				params: {
-					minItems: current.minItems,
-					maxItems: current.maxItems,
-				},
-				message: "minItems must be less than or equal to maxItems",
-			});
-		}
-
-		if (
-			isType("array") &&
-			Object.hasOwn(current, "minContains") &&
-			Object.hasOwn(current, "maxContains") &&
-			current.minContains > current.maxContains
-		) {
-			result.errors.push({
-				instancePath: path,
-				schemaPath: "#/minContains",
-				keyword: "minContains",
-				params: {
-					minContains: current.minContains,
-					maxContains: current.maxContains,
-				},
-				message: "minContains must be less than or equal to maxContains",
-			});
-		}
-
-		if (
-			isType("object") &&
-			Object.hasOwn(current, "minProperties") &&
-			Object.hasOwn(current, "maxProperties") &&
-			current.minProperties > current.maxProperties
-		) {
-			result.errors.push({
-				instancePath: path,
-				schemaPath: "#/minProperties",
-				keyword: "minProperties",
-				params: {
-					minProperties: current.minProperties,
-					maxProperties: current.maxProperties,
-				},
-				message: "minProperties must be less than or equal to maxProperties",
-			});
 		}
 
 		if (
@@ -696,6 +658,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 			"definitions",
 			"dependentSchemas",
 			"dependentRequired",
+			"dependencies",
 		]) {
 			const site = current[siteKey];
 			if (typeof site === "object" && site !== null && !Array.isArray(site)) {
@@ -728,25 +691,28 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 			}
 		}
 
-		if (
-			typeof current.dependentRequired === "object" &&
-			current.dependentRequired !== null &&
-			!Array.isArray(current.dependentRequired)
-		) {
-			for (const [trigger, deps] of Object.entries(current.dependentRequired)) {
-				// A malformed (non-array) deps value has no .entries(); skipping it
-				// keeps adversarial input from throwing (pinned by a crawl test).
-				if (Array.isArray(deps)) {
-					for (const [i, name] of deps.entries()) {
-						// denySet only holds strings, so has(non-string) is already false.
-						if (denySet.has(name)) {
-							result.errors.push({
-								instancePath: `${path}/dependentRequired/${escapeJsonPointer(trigger)}/${i}`,
-								schemaPath: "#/dangerous-name",
-								keyword: "dependentRequired",
-								params: { name, lang: options.lang ?? DEFAULT_LANG },
-								message: `dependentRequired entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
-							});
+		// `dependencies` is the pre-2019-09 spelling of dependentRequired (array of
+		// property names) fused with dependentSchemas (subschema). Only the array
+		// shape names properties, and the Array.isArray guard below skips the rest.
+		for (const depKey of ["dependentRequired", "dependencies"]) {
+			const site = current[depKey];
+			if (typeof site === "object" && site !== null && !Array.isArray(site)) {
+				for (const [trigger, deps] of Object.entries(site)) {
+					// A non-array deps value (malformed, or a `dependencies` subschema)
+					// has no .entries(); skipping it keeps adversarial input from
+					// throwing (pinned by a crawl test).
+					if (Array.isArray(deps)) {
+						for (const [i, name] of deps.entries()) {
+							// denySet only holds strings, so has(non-string) is already false.
+							if (denySet.has(name)) {
+								result.errors.push({
+									instancePath: `${path}/${depKey}/${escapeJsonPointer(trigger)}/${i}`,
+									schemaPath: "#/dangerous-name",
+									keyword: depKey,
+									params: { name, lang: options.lang ?? DEFAULT_LANG },
+									message: `${depKey} entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
+								});
+							}
 						}
 					}
 				}
@@ -825,11 +791,12 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 			}
 		}
 
-		// Collect remote $ref and $dynamicRef (2020-12) URLs as SSRF fetch targets.
-		// $id is deliberately NOT collected: it declares a base URI identifier, not
-		// a fetch target, and the -r/--ref-schema-files flag uses $id hostnames as
-		// the SAFE list, so flagging $id would self-flag the user's own schema.
-		for (const refKey of ["$ref", "$dynamicRef"]) {
+		// Collect remote $ref, $dynamicRef (2020-12), and $recursiveRef (2019-09)
+		// URLs as SSRF fetch targets. $id is deliberately NOT collected: it declares
+		// a base URI identifier, not a fetch target, and the -r/--ref-schema-files
+		// flag uses $id hostnames as the SAFE list, so flagging $id would self-flag
+		// the user's own schema.
+		for (const refKey of ["$ref", "$dynamicRef", "$recursiveRef"]) {
 			const refValue = current[refKey];
 			if (
 				Object.hasOwn(current, refKey) &&
@@ -921,6 +888,7 @@ for (const [subnet, prefix] of [
 }
 for (const [subnet, prefix] of [
 	["::", 127], // unspecified :: and loopback ::1
+	["64:ff9b:1::", 48], // RFC 8215 local-use NAT64 (see isPrivateIP)
 	["fc00::", 7], // unique local
 	["fe80::", 9], // link-local fe80::/10 + site-local fec0::/10
 	["ff00::", 8], // multicast
@@ -973,7 +941,9 @@ export const isPrivateIP = (ip) => {
 	// 2002::/16 6to4: embedded IPv4 sits in groups 1 and 2.
 	if (g[0] === 0x2002) return embeddedIPv4Private(g[1], g[2]);
 	// 64:ff9b::/96 NAT64 well-known prefix (RFC 6052): canonical form is
-	// 64:ff9b:0:0:0:0:X:Y with the IPv4 embedded in the last two groups.
+	// 64:ff9b:0:0:0:0:X:Y with the IPv4 embedded in the last two groups. The
+	// sibling 64:ff9b:1::/48 (RFC 8215) is LOCAL-USE with a deployment-chosen
+	// embedding offset, so it is blocked wholesale by privateRanges instead.
 	const normalized = g.map((n) => n.toString(16)).join(":");
 	if (normalized.startsWith("64:ff9b:0:0:0:0:"))
 		return embeddedIPv4Private(g[6], g[7]);
@@ -1524,12 +1494,15 @@ Exit codes:
 		// (quoted, Windows, bash without globstar) fails the stat here and falls
 		// back to Node's own glob, sorted for deterministic report order. Zero
 		// matches falls through to the historical cannot-read error, with the
-		// stat failure for the raw positional as the cause.
+		// stat failure for the raw positional as the cause. Entries are
+		// [input, stat|null]: a positional's stat is carried forward and reused as
+		// the size gate below, so each is stat'd exactly once (no TOCTOU window
+		// between the two checks). Glob matches are never stat'd here, so they
+		// carry null and the size gate stats them itself.
 		const inputs = [];
 		for (const input of positionals) {
 			try {
-				await statFn(resolve(input));
-				inputs.push(input);
+				inputs.push([input, await statFn(resolve(input))]);
 			} catch (err) {
 				const matches = [];
 				try {
@@ -1540,7 +1513,7 @@ Exit codes:
 				if (matches.length === 0) {
 					die(`cannot read file "${input}": ${err.message}`);
 				}
-				inputs.push(...matches.sort());
+				inputs.push(...matches.sort().map((match) => [match, null]));
 			}
 		}
 
@@ -1549,13 +1522,15 @@ Exit codes:
 		// Any per-file failure (unreadable, invalid JSON, oversized, analyze()
 		// throw) is a tool error and exits 2 immediately, as it did for one file.
 		const results = [];
-		for (const input of inputs) {
+		for (const [input, knownStat] of inputs) {
 			const filePath = resolve(input);
-			let fileStat;
-			try {
-				fileStat = await statFn(filePath);
-			} catch (err) {
-				die(`cannot read file "${input}": ${err.message}`);
+			let fileStat = knownStat;
+			if (!fileStat) {
+				try {
+					fileStat = await statFn(filePath);
+				} catch (err) {
+					die(`cannot read file "${input}": ${err.message}`);
+				}
 			}
 			if (fileStat.size > fileSizeLimit) {
 				die(`schema file exceeds ${fileSizeLimit} byte size limit: "${input}"`);
@@ -1614,6 +1589,12 @@ Exit codes:
 // counts as direct execution; import.meta.filename is already the realpath
 // under ESM, so comparing against resolve(argv[1]) never matched via npx and
 // the CLI silently exited 0 (the 0.5.0 no-op bug).
+// Coverage-excluded for the same reason: this block only runs when cli.js IS the
+// process entry, so it is reachable only from the subprocess tests in
+// cli.test.js. Their coverage reaches this report only if the child's
+// NODE_V8_COVERAGE file lands before the runner reads the directory, which made
+// the 100% threshold flake. cli.test.js still asserts the behavior end to end.
+/* node:coverage disable */
 let entryPath;
 try {
 	entryPath = process.argv[1] && realpathSync(process.argv[1]);
@@ -1623,4 +1604,5 @@ try {
 if (entryPath === import.meta.filename) {
 	process.exitCode = await run(process.argv.slice(2));
 }
+/* node:coverage enable */
 // Stryker restore all

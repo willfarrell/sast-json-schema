@@ -62,6 +62,11 @@ describe("B3: safePattern bounded-quantifier ReDoS (2020-12)", () => {
 		["huge single repetition (5+ digit upper bound)", "^a{1,1000000}$"],
 		["huge exact repetition (5+ digits)", "^a{100000}$"],
 		["huge char-class repetition (5+ digits)", "^[a-z]{10000}$"],
+		["bounded group around a quantified escaped backslash", "^(\\\\+){1,5}$"],
+		[
+			"bounded group around a quantified escaped backslash after a literal",
+			"^(a\\\\+){1,5}$",
+		],
 	];
 	for (const [label, pattern] of rejectCases) {
 		it(`rejects ${label}: ${pattern}`, () => {
@@ -80,6 +85,9 @@ describe("B3: safePattern bounded-quantifier ReDoS (2020-12)", () => {
 		["exact small repetition", "^a{2,8}$"],
 		["date pattern", "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"],
 		["four-digit upper bound (below the 5-digit cap)", "^[a-z]{1,9999}$"],
+		// An ESCAPED + / * inside a bounded group is a literal, not a quantifier.
+		["bounded group with an escaped literal plus", "^a(\\+b{1,3}){0,1}$"],
+		["bounded group with an escaped literal star", "^a(\\*b{1,3}){1,4}$"],
 	];
 	for (const [label, pattern] of acceptCases) {
 		it(`accepts ${label}: ${pattern}`, () => {

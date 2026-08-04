@@ -499,6 +499,23 @@ describe("analyze DNS options", () => {
 		ok(ssrf[0].params.resolvedIP, "should include the resolved private IP");
 	});
 
+	test("$recursiveRef to a private-resolving hostname yields ssrf error online", async () => {
+		const schema = {
+			$schema: "https://json-schema.org/draft/2019-09/schema",
+			$id: "test",
+			$recursiveRef: "https://localhost/schema.json",
+		};
+		const errors = await analyze(schema, { dnsTimeoutMs: 5_000 });
+		const ssrf = errors.filter((e) => e.keyword === "ssrf");
+		strictEqual(
+			ssrf.length,
+			1,
+			"localhost $recursiveRef must be flagged as ssrf",
+		);
+		strictEqual(ssrf[0].instancePath, "/$recursiveRef");
+		ok(ssrf[0].params.resolvedIP, "should include the resolved private IP");
+	});
+
 	test("offline mode should not emit ssrf errors for remote $dynamicRef", async () => {
 		const schema = {
 			$schema: "https://json-schema.org/draft/2020-12/schema",
