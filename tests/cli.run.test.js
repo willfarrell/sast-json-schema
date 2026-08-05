@@ -21,7 +21,7 @@ const DIRTY = JSON.stringify({
 
 // files: map matched by path suffix -> file content; sizes: suffix -> byte size;
 // glob: optional async-generator stand-in for io.glob.
-const runCli = async (argv, { files = {}, sizes = {}, glob } = {}) => {
+const runCli = async (argv, { files = {}, sizes = {}, glob, stat } = {}) => {
 	const out = { log: [], error: [], write: [] };
 	const match = (map, p) => {
 		const key = Object.keys(map).find((k) => p.endsWith(k));
@@ -50,6 +50,7 @@ const runCli = async (argv, { files = {}, sizes = {}, glob } = {}) => {
 		},
 	};
 	if (glob) io.glob = glob;
+	if (stat) io.stat = stat;
 	const code = await run(argv, io);
 	return { code, ...out };
 };
@@ -302,6 +303,53 @@ describe("run() glob fallback", () => {
 		ok(logText.includes("g0.json has no issues"));
 		ok(logText.includes("g1.json has issues"));
 		ok(logText.indexOf("g0.json") < logText.indexOf("g1.json"));
+	});
+
+	// The existence check and the size gate are the same stat: re-statting would
+	// reopen a TOCTOU window between them (and double the syscalls per file).
+	test("a positional is stat'd exactly once", async () => {
+		let calls = 0;
+		const r = await runCli(["--offline", "clean.json"], {
+			files: { "clean.json": CLEAN },
+			stat: async () => {
+				calls++;
+				return { size: CLEAN.length };
+			},
+		});
+		strictEqual(r.code, 0);
+		strictEqual(calls, 1, "the size gate must reuse the existence stat");
+	});
+
+	// A glob match is never stat'd during the existence pass (only the raw
+	// positional is), so the size gate stats it itself. A match that cannot be
+	// stat'd (removed between the walk and the gate, or unreadable) is a tool
+	// error, not a silently skipped file.
+	test("a glob match that cannot be stat'd exits 2", async () => {
+		const r = await runCli(["--offline", "schemas/*.json"], {
+			files: { "gone.json": CLEAN },
+			glob: async function* () {
+				yield "gone.json";
+			},
+			stat: async (p) => {
+				throw new Error(`ENOENT: no such file, stat '${p}'`);
+			},
+		});
+		strictEqual(r.code, 2);
+		ok(r.error.join("\n").includes('cannot read file "gone.json"'));
+	});
+
+	// A pattern glob() itself refuses (bad syntax, unreadable directory) must not
+	// escape as an unhandled rejection: the original stat failure is the reported
+	// cause. Injected rather than relying on a real fs.glob throwing, which is
+	// timing-dependent and left this branch only intermittently covered.
+	test("a glob that throws falls back to the cannot-read error (exit 2)", async () => {
+		const r = await runCli(["--offline", "schemas/**/*.json"], {
+			glob: () => {
+				throw new Error("EINVAL: invalid pattern");
+			},
+		});
+		strictEqual(r.code, 2);
+		ok(r.error.join("\n").includes('cannot read file "schemas/**/*.json"'));
 	});
 
 	test("a pattern with no matches keeps the cannot-read error (exit 2)", async () => {

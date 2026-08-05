@@ -227,6 +227,33 @@
         "valid": false
       },
       {
+        "description": "Should fail when a `dependencies` KEY is a prototype-pollution vector (safePropertyName)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            },
+            "b": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          },
+          "required": [],
+          "maxProperties": 10,
+          "dependencies": {
+            "__proto__": ["b"]
+          }
+        },
+        "valid": false
+      },
+      {
         "description": "Should fail when `dependencies` subschema form violates schemaRules (unbounded string)",
         "data": {
           "$schema": "https://json-schema.org/draft-07/schema",

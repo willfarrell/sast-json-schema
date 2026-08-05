@@ -558,6 +558,25 @@ describe("crawlSchema", () => {
 		strictEqual(r.refs.length, 0);
 	});
 
+	// --- $recursiveRef collection (2019-09 predecessor of $dynamicRef) ---
+	// The 2019-09 meta-schema accepts a remote https $recursiveRef (see
+	// dependentSchemas.$recursiveRef -> safeRemoteRef), so it is just as much an
+	// SSRF fetch target as $ref/$dynamicRef and must reach the DNS pass.
+	test("should collect remote $recursiveRef URLs", () => {
+		const r = crawlSchema({
+			$recursiveRef: "https://internal.host/schema.json",
+		});
+		strictEqual(r.refs.length, 1);
+		strictEqual(r.refs[0].hostname, "internal.host");
+		strictEqual(r.refs[0].ref, "https://internal.host/schema.json");
+		strictEqual(r.refs[0].path, "/$recursiveRef");
+	});
+
+	test("should skip fragment-only $recursiveRef", () => {
+		const r = crawlSchema({ $recursiveRef: "#" });
+		strictEqual(r.refs.length, 0);
+	});
+
 	test("should not collect $id as a fetch target", () => {
 		const r = crawlSchema({ $id: "https://internal.host/schema.json" });
 		strictEqual(r.refs.length, 0);
@@ -865,6 +884,66 @@ describe("crawlSchema", () => {
 					e.instancePath.endsWith("/trigger/0"),
 			),
 		);
+	});
+
+	// `dependencies` is the pre-2019-09 spelling that carries BOTH shapes:
+	// {key: [names]} (dependentRequired-equivalent) and {key: subschema}
+	// (dependentSchemas-equivalent). Classic drafts (04/06/07) accept it, so its
+	// keys and its array entries are the same deserialization-vector surface.
+	test("should flag __proto__ in dependencies keys", () => {
+		const r = crawlSchema(JSON.parse('{"dependencies":{"__proto__":["x"]}}'));
+		ok(
+			r.errors.some(
+				(e) => e.keyword === "dependencies" && e.params.name === "__proto__",
+			),
+		);
+	});
+
+	test("should flag __proto__ in dependencies array values", () => {
+		const r = crawlSchema({
+			dependencies: { trigger: ["__proto__"] },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "dependencies" &&
+					e.params.name === "__proto__" &&
+					e.instancePath.endsWith("/trigger/0"),
+			),
+		);
+	});
+
+	// The subschema shape has no .entries(); the Array.isArray guard must skip it
+	// rather than throw, exactly as it does for a malformed dependentRequired.
+	test("a dependencies subschema value is skipped without throwing", () => {
+		const r = crawlSchema({
+			dependencies: { trigger: { type: "string" }, other: ["constructor"] },
+		});
+		ok(
+			r.errors.some(
+				(e) =>
+					e.keyword === "dependencies" &&
+					e.params.name === "constructor" &&
+					e.instancePath.endsWith("/other/0"),
+			),
+		);
+		ok(
+			!r.errors.some((e) => e.instancePath.includes("/trigger/")),
+			"the subschema entry must produce no dangerous-name findings",
+		);
+	});
+
+	// The denylist must be a denylist: an ordinary property name listed in either
+	// keyword is not a finding.
+	test("a safe dependentRequired/dependencies entry is not flagged", () => {
+		for (const key of ["dependentRequired", "dependencies"]) {
+			const r = crawlSchema(JSON.parse(`{"${key}":{"a":["b"]}}`));
+			strictEqual(
+				r.errors.filter((e) => e.schemaPath === "#/dangerous-name").length,
+				0,
+				`a safe ${key} entry must not be flagged`,
+			);
+		}
 	});
 
 	// Adversarial input: a non-array dependentRequired value has no .entries(),
@@ -2102,7 +2181,7 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 		const { execFile } = await import("node:child_process");
 		const { promisify } = await import("node:util");
 		const cliUrl = new URL("../cli.js", import.meta.url).href;
-		const script = `const { forceGc } = await import(${JSON.stringify(cliUrl)}); console.log(typeof globalThis.gc === "function" && forceGc());`;
+		const script = `const { forceGc } = await import(${JSON.stringify(cliUrl)}); console.log(String(typeof globalThis.gc === "function" && forceGc()));`;
 		const { stdout } = await promisify(execFile)("node", [
 			"--expose-gc",
 			"--input-type=module",
@@ -2110,6 +2189,40 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 			script,
 		]);
 		strictEqual(stdout.trim(), "true");
+	});
+
+	// FAIL-CLOSED: when the runtime-flag capture cannot produce a gc handle,
+	// forceGc must return false rather than throw. Stock Node always succeeds, so
+	// the subprocess neuters the two ways the capture can fail: setFlagsFromString
+	// as a no-op (runInNewContext then throws "gc is not defined") and
+	// runInNewContext returning a non-function.
+	test("forceGc returns false when the gc capture fails", async () => {
+		const { execFile } = await import("node:child_process");
+		const { promisify } = await import("node:util");
+		const cliUrl = new URL("../cli.js", import.meta.url).href;
+		const runWith = async (patch) => {
+			const script = `import { createRequire } from "node:module";
+const require = createRequire(${JSON.stringify(import.meta.url)});
+${patch}
+const { forceGc } = await import(${JSON.stringify(cliUrl)});
+console.log(String(forceGc()), String(forceGc()));`;
+			const { stdout } = await promisify(execFile)("node", [
+				"--input-type=module",
+				"-e",
+				script,
+			]);
+			return stdout.trim();
+		};
+		strictEqual(
+			await runWith(`require("node:v8").setFlagsFromString = () => {};`),
+			"false false",
+			"a flag capture that never exposes gc must fail closed",
+		);
+		strictEqual(
+			await runWith(`require("node:vm").runInNewContext = () => undefined;`),
+			"false false",
+			"a capture that yields a non-function must fail closed",
+		);
 	});
 
 	// PRIMARY (heap breaker, OOM repro): many distinct evil patternProperties keys
@@ -2342,10 +2455,10 @@ describe("crawlSchema collected-refs cap (A4)", () => {
 		strictEqual(t.schemaPath, "#/refs-truncated");
 		strictEqual(t.keyword, "$ref");
 		// instancePath is the path to the ref that first hit the cap; it must be a
-		// real JSON pointer ending at a $ref/$dynamicRef site, never the empty string.
+		// real JSON pointer ending at a ref site, never the empty string.
 		ok(t.instancePath.length > 0, "instancePath must not be empty");
 		ok(
-			/\/\$(ref|dynamicRef)$/.test(t.instancePath),
+			/\/\$(ref|dynamicRef|recursiveRef)$/.test(t.instancePath),
 			`instancePath must point at a ref site, got ${t.instancePath}`,
 		);
 		deepStrictEqual(t.params, {

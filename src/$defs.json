@@ -270,9 +270,9 @@
 				}
 			},
 			{
-				"$comment": "Reject a bounded quantifier {n,m} applied to a group (...) that itself contains an unbounded quantifier (+ or *), e.g. (a+){1,5}, (a*){1,5}, or (?:a+){1,5}. This nested-quantifier-around-a-repeating-group shape is a classic exponential-backtracking ReDoS. Groups whose only inner quantifiers are fixed/bounded {n}, e.g. (?:[0-9a-f]{4}-){3}, and bounded groups with no inner quantifier, e.g. (abc){1,5}, remain allowed. Known limitation: a group whose inner quantifier is itself bounded but with a large product, e.g. (a{1,1000}){1,1000}, is NOT rejected here; the CLI runtime (redos-detector) still catches it. See README Known Limitations.",
+				"$comment": "Reject a bounded quantifier {n,m} applied to a group (...) that itself contains an unbounded quantifier (+ or *), e.g. (a+){1,5}, (a*){1,5}, or (?:a+){1,5}. This nested-quantifier-around-a-repeating-group shape is a classic exponential-backtracking ReDoS. Groups whose only inner quantifiers are fixed/bounded {n}, e.g. (?:[0-9a-f]{4}-){3}, and bounded groups with no inner quantifier, e.g. (abc){1,5}, remain allowed. An ESCAPED + or * is a literal, not a quantifier, so (\\+b){0,1} is allowed; an escaped BACKSLASH is itself a literal atom, so (\\\\+){1,5} is still rejected. Known limitation: a group whose inner quantifier is itself bounded but with a large product, e.g. (a{1,1000}){1,1000}, is NOT rejected here; the CLI runtime (redos-detector) still catches it. See README Known Limitations.",
 				"not": {
-					"pattern": "\\([^()]*[+*][^()]*\\)\\{[0-9]"
+					"pattern": "\\([^()]*(?:[^()\\\\]|\\\\\\\\)[+*][^()]*\\)\\{[0-9]"
 				}
 			}
 		]
@@ -830,8 +830,11 @@
 		"$ref": "#/$defs/safePropertyNameArray"
 	},
 	"properties.dependencies": {
-		"$comment": "Pre-2019-09 keyword that accepts either an array of property names (dependentRequired-equivalent) or a subschema (dependentSchemas-equivalent). Each entry is dispatched to the matching validator.",
+		"$comment": "Pre-2019-09 keyword that accepts either an array of property names (dependentRequired-equivalent) or a subschema (dependentSchemas-equivalent). Each entry is dispatched to the matching validator. Keys name instance properties, so they carry the same safePropertyName denylist as properties/dependentRequired.",
 		"$ref": "#/$defs/safeObjectPropertiesLimits",
+		"propertyNames": {
+			"$ref": "#/$defs/safePropertyName"
+		},
 		"additionalProperties": {
 			"oneOf": [
 				{

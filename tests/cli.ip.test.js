@@ -200,6 +200,12 @@ describe("isPrivateIP IPv6 extended ranges", () => {
 		// Site-local fec0::/10 spans fec0-feff.
 		["fec0::", "site-local lower edge fec0"],
 		["feff::", "site-local upper edge feff"],
+		// RFC 8215 reserves 64:ff9b:1::/48 for LOCAL-USE NAT64. Its embedded IPv4
+		// sits at a deployment-chosen offset, so nothing here can be decoded to a
+		// public address: the whole prefix is local by definition and is blocked
+		// wholesale rather than decoded.
+		["64:ff9b:1::7f00:1", "local-use NAT64 lower edge"],
+		["64:ff9b:1:ffff::808:808", "local-use NAT64 with a public-looking tail"],
 		["ff00::", "multicast lower edge (existing)"],
 		// Documentation 2001:db8::/32.
 		["2001:db8::", "documentation 2001:db8::/32"],
