@@ -407,7 +407,13 @@ const checkNumericRange = (current, path) => {
 	};
 };
 
-const INSTANCE_DATA_KEYS = new Set(["const", "enum", "default", "examples"]);
+const INSTANCE_DATA_KEYS = new Set([
+	"const",
+	"enum",
+	"default",
+	"examples",
+	"errorMessage",
+]);
 
 // [type, minKeyword, maxKeyword] triples whose min > max makes a schema
 // unsatisfiable. Each is only checked when the schema declares the matching
@@ -511,8 +517,16 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		typeof options.memoryUsage === "function"
 			? options.memoryUsage
 			: () => process.memoryUsage().heapUsed;
-	const redosHeapBudgetBytes =
-		options.redosHeapBudgetBytes ?? REDOS_HEAP_BUDGET_BYTES;
+	// Number() because the CLI hands these through as strings; analyze() has already
+	// rejected anything that is not a non-negative integer.
+	const redosHeapBudgetBytes = Number(
+		options.redosHeapBudgetBytes ?? REDOS_HEAP_BUDGET_BYTES,
+	);
+	// Per-pattern TIME budget, injectable alongside the heap budget above. Raise it
+	// for trusted first-party schemas whose patterns are complex but provably safe:
+	// a large \p{...} class next to a wide bounded repeat takes seconds to analyze
+	// and so fails closed at the 1s default.
+	const redosTimeoutMs = Number(options.redosTimeoutMs ?? REDOS_TIMEOUT_MS);
 	// GC hook for the breaker's confirm step; injectable for deterministic tests
 	// (same pattern as options.memoryUsage above).
 	const runGc =
@@ -618,7 +632,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 					// safe/unsafe verdict is identical with or without it, so dropping it
 					// (-> {}) is an equivalent (timing-only) mutant.
 					const patternResult = isSafePattern(current.pattern, {
-						timeout: REDOS_TIMEOUT_MS,
+						timeout: redosTimeoutMs,
 					});
 					if (!patternResult.safe) {
 						// redos-detector always sets error (hitMaxScore) on unsafe verdicts.
@@ -628,7 +642,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 						// Stryker disable ConditionalExpression,StringLiteral
 						const message =
 							reason === "timedOut"
-								? `pattern analysis timed out after ${REDOS_TIMEOUT_MS}ms (fail-closed as ReDoS)`
+								? `pattern analysis timed out after ${redosTimeoutMs}ms (fail-closed as ReDoS)`
 								: reason === "hitMaxSteps"
 									? "pattern analysis exceeded step limit (fail-closed as ReDoS)"
 									: "pattern is vulnerable to ReDoS";
@@ -750,7 +764,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 					// analysis TIME only; for any key fast enough for a test the verdict
 					// is identical with or without it, so dropping it is timing-equivalent.
 					const patternResult = isSafePattern(patternKey, {
-						timeout: REDOS_TIMEOUT_MS,
+						timeout: redosTimeoutMs,
 					});
 					if (!patternResult.safe) {
 						patternSafe = false;
@@ -1092,6 +1106,8 @@ export const analyze = async (schema, options = {}) => {
 		"analysisTimeoutMs",
 		"maxHostnames",
 		"dnsTotalTimeoutMs",
+		"redosTimeoutMs",
+		"redosHeapBudgetBytes",
 	]) {
 		if (options[key] != null) {
 			const n = Number(options[key]);
@@ -1151,6 +1167,9 @@ export const analyze = async (schema, options = {}) => {
 		lang: options.lang,
 		deadline,
 		now: options.now,
+		// undefined (absent flag) falls back to the REDOS_* defaults inside crawlSchema.
+		redosTimeoutMs: options.redosTimeoutMs,
+		redosHeapBudgetBytes: options.redosHeapBudgetBytes,
 	});
 
 	// Depth and timeout signal INCOMPLETE analysis: the crawl bailed early and
@@ -1360,6 +1379,8 @@ export const run = async (argv, io = {}) => {
 					"override-max-properties": { type: "string" },
 					"max-schema-size": { type: "string" },
 					"analysis-timeout-ms": { type: "string" },
+					"redos-timeout-ms": { type: "string" },
+					"redos-heap-budget-bytes": { type: "string" },
 					"max-ssrf-hostnames": { type: "string" },
 					"dns-total-timeout-ms": { type: "string" },
 					ignore: { type: "string", multiple: true },
@@ -1384,6 +1405,12 @@ Options:
   --override-max-properties <n>    Override max properties limit (default: 1024)
   --max-schema-size <bytes>        Max serialized schema size in bytes (default: 67108864 = 64 MiB)
   --analysis-timeout-ms <ms>       Wall-clock budget for the schema crawl (default: 60000)
+  --redos-timeout-ms <ms>          Per-pattern time budget for ReDoS analysis; a pattern that
+                                   exceeds it is fail-closed as unsafe (default: 1000)
+  --redos-heap-budget-bytes <n>    Retained-heap budget for ReDoS analysis; once exceeded the
+                                   remaining patterns are not analyzed (default: 134217728 = 128 MiB).
+                                   Raise both only for trusted first-party schemas, and keep the
+                                   process heap (--max-old-space-size) well above the heap budget
   --max-ssrf-hostnames <n>         Max distinct remote $ref hostnames resolved for SSRF (default: 256)
   --dns-total-timeout-ms <ms>      Total budget for all SSRF DNS lookups (default: 30000)
   --ignore <instancePath>          Suppress errors by instancePath or instancePath:keyword (repeatable).
@@ -1468,6 +1495,8 @@ Exit codes:
 			overrideMaxProperties: values["override-max-properties"],
 			maxSchemaSize: values["max-schema-size"],
 			analysisTimeoutMs: values["analysis-timeout-ms"],
+			redosTimeoutMs: values["redos-timeout-ms"],
+			redosHeapBudgetBytes: values["redos-heap-budget-bytes"],
 			maxHostnames: values["max-ssrf-hostnames"],
 			dnsTotalTimeoutMs: values["dns-total-timeout-ms"],
 			ignore: values.ignore,

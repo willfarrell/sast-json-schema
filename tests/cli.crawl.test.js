@@ -1817,6 +1817,59 @@ describe("crawlSchema ReDoS-analysis bounds (A1)", () => {
 		);
 	});
 
+	// The per-pattern TIME budget is injectable, so a caller with trusted
+	// first-party schemas can buy room for complex-but-safe patterns instead of
+	// eating a false-positive fail-close. Driven with a 1ms budget against a
+	// real-world pattern that needs ~1000ms (a large \p{...} class beside a wide
+	// bounded repeat), so the 1000x margin keeps it off any timing cliff.
+	test("redosTimeoutMs overrides the per-pattern time budget", () => {
+		const EXPENSIVE =
+			"^(https?://)?[\\p{L}\\p{N}][\\p{L}\\p{N}\\._-]{0,249}\\.[\\p{L}\\p{N}-]{2,63}$";
+		const r = crawlSchema({ type: "string", pattern: EXPENSIVE }, 32, {
+			redosTimeoutMs: 1,
+		});
+		const redos = r.errors.filter((e) => e.schemaPath === "#/redos");
+		strictEqual(redos.length, 1, "1ms budget must fail-close the pattern");
+		strictEqual(redos[0].params.reason, "timedOut");
+		// The injected budget, not REDOS_TIMEOUT_MS, must reach the message.
+		ok(
+			redos[0].message.includes("after 1ms"),
+			`message must report the injected budget; got: ${redos[0].message}`,
+		);
+	});
+
+	// REGRESSION: `errorMessage` (ajv-errors) is a keyword->message map, not a
+	// subschema, so its "pattern" value is a message string and must never be
+	// ReDoS-analyzed. Descending into it burned budget on non-regexes and
+	// misattributed findings to /errorMessage/pattern.
+	test("does not analyze errorMessage values as patterns", () => {
+		const r = crawlSchema({
+			type: "string",
+			pattern: "^ok$",
+			errorMessage: {
+				pattern: EVIL,
+				properties: { nested: EVIL },
+			},
+		});
+		strictEqual(
+			r.errors.filter((e) => e.schemaPath === "#/redos").length,
+			0,
+			"errorMessage values must not be treated as regexes",
+		);
+		// Guard against over-skipping: a real sibling pattern is still analyzed.
+		const still = crawlSchema({
+			type: "string",
+			pattern: EVIL,
+			errorMessage: { pattern: "err-pattern-thing" },
+		});
+		deepStrictEqual(
+			still.errors
+				.filter((e) => e.schemaPath === "#/redos")
+				.map((e) => e.instancePath),
+			["/pattern"],
+		);
+	});
+
 	// HEAP CIRCUIT BREAKER (primary memory bound): an injected memoryUsage that
 	// crosses an injected budget must stop analysis early and emit exactly one
 	// incomplete #/redos-budget finding that survives --ignore. forceGc -> false
