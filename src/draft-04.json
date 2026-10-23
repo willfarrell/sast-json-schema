@@ -14,7 +14,10 @@
 								"$ref": "#/$defs/typeArray"
 							}
 						},
-						"required": ["type"]
+						"required": ["type"],
+						"not": {
+							"$ref": "#/$defs/valuePinned"
+						}
 					},
 					"then": {
 						"required": ["items"]
@@ -91,33 +94,26 @@
 					}
 				},
 				{
-					"description": "Ensure `object` has strictness. Draft-04 has no `propertyNames`.",
+					"description": "Ensure `object` has strictness. Draft-04 has no `propertyNames` or unevaluatedProperties, so additionalProperties is the only keyword that bounds the values of keys patternProperties does not match.",
 					"if": {
 						"properties": {
 							"type": {
 								"$ref": "#/$defs/typeObject"
 							}
 						},
-						"required": ["type"]
+						"required": ["type"],
+						"not": {
+							"$ref": "#/$defs/valuePinned"
+						}
 					},
 					"then": {
-						"anyOf": [
-							{
-								"required": ["additionalProperties"]
-							},
-							{
-								"required": ["properties"]
-							},
-							{
-								"required": ["patternProperties"]
-							}
-						],
-						"required": ["required"]
+						"required": ["additionalProperties", "required"]
 					}
 				}
 			]
 		},
 		"dependentSchemas.items": {
+			"$ref": "#/$defs/tupleItemsNeedAdditionalItems",
 			"required": ["maxItems", "uniqueItems"],
 			"properties": {
 				"uniqueItems": {
@@ -268,7 +264,7 @@
 					"$ref": "#/$defs/dependentSchemas.pattern"
 				},
 				"patternProperties": {
-					"$ref": "#/$defs/dependentSchemas.patternProperties"
+					"$ref": "#/$defs/dependentSchemas.patternProperties.draft-04"
 				},
 				"title": {
 					"$ref": "#/$defs/dependentSchemas.title"
@@ -309,7 +305,7 @@
 							"required": ["oneOf"]
 						},
 						{
-							"required": ["definitions"]
+							"$ref": "#/$defs/schemaLibraryRoot"
 						}
 					]
 				}

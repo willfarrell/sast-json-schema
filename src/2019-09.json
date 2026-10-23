@@ -238,10 +238,7 @@
 							"required": ["oneOf"]
 						},
 						{
-							"required": ["$defs"]
-						},
-						{
-							"required": ["definitions"]
+							"$ref": "#/$defs/schemaLibraryRoot"
 						}
 					]
 				}

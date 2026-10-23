@@ -1,4 +1,33 @@
 {
+	"schemaLibraryRoot": {
+		"$comment": "A root with no type/const/$ref/combinator is accepted only as a pure definitions library: metadata plus a non-empty definitions map. Any validation keyword beside the map must come with a type, otherwise the map would silently disable the type requirement.",
+		"propertyNames": {
+			"enum": [
+				"$schema",
+				"$id",
+				"id",
+				"$comment",
+				"title",
+				"description",
+				"$defs",
+				"definitions"
+			]
+		},
+		"anyOf": [
+			{
+				"required": ["$defs"],
+				"properties": { "$defs": { "minProperties": 1 } }
+			},
+			{
+				"required": ["definitions"],
+				"properties": { "definitions": { "minProperties": 1 } }
+			}
+		]
+	},
+	"valuePinned": {
+		"$comment": "A schema whose value is pinned by const or enum needs no further strictness keywords: the literal values are already bounded recursively (see dependentSchemas.const / dependentSchemas.enum).",
+		"anyOf": [{ "required": ["const"] }, { "required": ["enum"] }]
+	},
 	"safeAnchor": {
 		"$comment": "https://json-schema.org/draft/2020-12/json-schema-core#section-8.2.2",
 		"type": "string",
@@ -156,21 +185,21 @@
 				}
 			},
 			{
-				"$comment": "Reject control characters via hex escape: \\x00-\\x1f and \\x7f (DEL). Use \\r \\n \\t for those specific chars instead.",
+				"$comment": "Reject control characters via hex escape: \\x00-\\x1f, \\x7f (DEL) and \\x80-\\x9f (C1). Use \\r \\n \\t for those specific chars instead.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\x(0[0-9a-fA-F]|1[0-9a-fA-F]|7[fF])"
+					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\x(0[0-9a-fA-F]|1[0-9a-fA-F]|7[fF]|[89][0-9a-fA-F])"
 				}
 			},
 			{
-				"$comment": "Reject control characters via unicode escape: \\u0000-\\u001f and \\u007f",
+				"$comment": "Reject control characters via unicode escape: \\u0000-\\u001f, \\u007f and C1 \\u0080-\\u009f",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\u00(0[0-9a-fA-F]|1[0-9a-fA-F]|7[fF])"
+					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\u00(0[0-9a-fA-F]|1[0-9a-fA-F]|7[fF]|[89][0-9a-fA-F])"
 				}
 			},
 			{
-				"$comment": "Reject control characters via unicode brace escape: \\u{0}-\\u{1f} and \\u{7f}",
+				"$comment": "Reject control characters via unicode brace escape: \\u{0}-\\u{1f}, \\u{7f} and C1 \\u{80}-\\u{9f}",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\u\\{0*(0|[1-9a-fA-F]|1[0-9a-fA-F]|7[fF])\\}"
+					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\u\\{0*(0|[1-9a-fA-F]|1[0-9a-fA-F]|7[fF]|[89][0-9a-fA-F])\\}"
 				}
 			},
 			{
@@ -180,19 +209,31 @@
 				}
 			},
 			{
-				"$comment": "Reject unicode general category C (control, format, surrogate, private-use, unassigned) in short form: \\p{C}, \\p{Cc}, \\p{Cf}, \\p{Cs}, \\p{Co}, \\p{Cn}. These bypass \\0/\\x00/\\cA checks.",
+				"$comment": "Reject unicode general category C (control, format, surrogate, private-use, unassigned) in short form, also spelled gc=/General_Category=: \\p{C}, \\p{Cc}, \\p{Cf}, \\p{Cs}, \\p{Co}, \\p{Cn}. These bypass \\0/\\x00/\\cA checks.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\p\\{C[cfsno]?\\}"
+					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\p\\{((gc|General_Category)=)?C[cfsno]?\\}"
 				}
 			},
 			{
 				"$comment": "Reject unicode general category C long names: \\p{Other}, \\p{Control}, \\p{Format}, \\p{Surrogate}, \\p{Private_Use}, \\p{Unassigned}",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\p\\{(Other|Control|Format|Surrogate|Private_Use|Unassigned)\\}"
+					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\p\\{((gc|General_Category)=)?(Other|Control|Format|Surrogate|Private_Use|Unassigned)\\}"
 				}
 			},
 			{
-				"$comment": "Reject unbounded group repetition: )+ )*. Allows )? (optional), ){n} (exact), ){n,m} (bounded).",
+				"$comment": "Reject binary properties that include every control character: \\p{Any}, \\p{ASCII}, \\p{Assigned}",
+				"not": {
+					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\\\p\\{(Any|ASCII|Assigned)\\}"
+				}
+			},
+			{
+				"$comment": "Reject raw (unescaped) C0, DEL and C1 control characters written directly into the pattern string. Raw tab, CR and LF stay allowed, like their escapes.",
+				"not": {
+					"pattern": "[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f]"
+				}
+			},
+			{
+"$comment": "Reject unbounded group repetition: )+ )*. Allows )? (optional), ){n} (exact), ){n,m} (bounded).",
 				"not": {
 					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\)[+*]"
 				}
@@ -252,15 +293,15 @@
 				}
 			},
 			{
-				"$comment": "Reject top-level | after ^ anchor (breaks anchoring). Allows balanced depth-1 groups between ^ and |. Use (?:...) to wrap alternation.",
+				"$comment": "Reject top-level | after ^ anchor (breaks anchoring). Sees through balanced groups nested up to 3 deep between ^ and |; the CLI crawler checks any depth. Use (?:...) to wrap alternation.",
 				"not": {
-					"pattern": "^\\^([^()]|\\([^()]*\\))*\\|"
+					"pattern": "^\\^(?:[^()]|\\((?:[^()]|\\((?:[^()]|\\([^()]*\\))*\\))*\\))*\\|"
 				}
 			},
 			{
-				"$comment": "Reject top-level | before $ anchor (breaks anchoring). Allows balanced depth-1 groups between | and $.",
+				"$comment": "Reject top-level | before $ anchor (breaks anchoring). Sees through balanced groups nested up to 3 deep between | and $; the CLI crawler checks any depth.",
 				"not": {
-					"pattern": "\\|([^()]|\\([^()]*\\))*\\$$"
+					"pattern": "\\|(?:[^()]|\\((?:[^()]|\\((?:[^()]|\\([^()]*\\))*\\))*\\))*\\$"
 				}
 			},
 			{
@@ -353,8 +394,15 @@
 				"pattern": "^https://[-a-zA-Z0-9.]+\\.[a-zA-Z]+(/[-a-zA-Z0-9._/?&~+]*)?"
 			},
 			{
+				"$comment": "Reject localhost and IP-literal hostnames, including dotted-IP subdomains such as 127.0.0.1.nip.io that the positive pattern above would otherwise accept.",
 				"not": {
 					"pattern": "^https://(localhost|0[xX][0-9a-fA-F]|[0-9]+\\.[0-9]+\\.[0-9]|[0-9]{5,}|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|\\[::1\\])"
+				}
+			},
+			{
+				"$comment": "Reject special-use local TLDs that name private networks by definition, so no DNS lookup is needed to identify them: .localhost (RFC 6761 loopback), .local (RFC 6762 mDNS), .internal (ICANN private-use), .home.arpa (RFC 8375), .onion (RFC 7686). Hosts are case-insensitive and JSON Schema patterns have no i flag, hence the [xX] classes; the TLD ends at any URL delimiter (/ # ?) or the end.",
+				"not": {
+					"pattern": "^https://([-a-zA-Z0-9.]*\\.)?([lL][oO][cC][aA][lL]([hH][oO][sS][tT])?|[iI][nN][tT][eE][rR][nN][aA][lL]|[hH][oO][mM][eE]\\.[aA][rR][pP][aA]|[oO][nN][iI][oO][nN])([/#?]|$)"
 				}
 			},
 			{
@@ -684,7 +732,7 @@
 		}
 	},
 	"properties.additionalItems": {
-		"$comment": "Deprecated in 2020-12. Use prefixItems + items instead.",
+		"$comment": "Pre-2020-12 keyword (draft-04 through 2019-09). 2020-12 removed it in favour of prefixItems + items and rejects it outright via `additionalItems: false` in its schemaBase.",
 		"$ref": "#/$defs/schemaRules"
 	},
 	"properties.additionalProperties": {
@@ -1162,6 +1210,17 @@
 	"dependentSchemas.patternProperties": {
 		"$comment": "Require a sibling propertyNames so the schema author has explicitly bounded the keyspace shape (length + charset via the existing string-strictness rule). Without it, patternProperties silently admits whatever its regex matches, which can be infinite.",
 		"required": ["maxProperties", "propertyNames"],
+		"properties": {
+			"patternProperties": {
+				"propertyNames": {
+					"$ref": "#/$defs/safePattern"
+				}
+			}
+		}
+	},
+	"dependentSchemas.patternProperties.draft-04": {
+		"$comment": "draft-04 variant of dependentSchemas.patternProperties. draft-04 has no `propertyNames` keyword (it is banned via `propertyNames: false`), so the keyspace is bounded by `maxProperties` alone; requiring `propertyNames` would make every draft-04 patternProperties schema unsatisfiable.",
+		"required": ["maxProperties"],
 		"properties": {
 			"patternProperties": {
 				"propertyNames": {
@@ -1663,7 +1722,10 @@
 							"$ref": "#/$defs/typeArray"
 						}
 					},
-					"required": ["type"]
+					"required": ["type"],
+					"not": {
+						"$ref": "#/$defs/valuePinned"
+					}
 				},
 				"then": {
 					"anyOf": [
@@ -1773,7 +1835,10 @@
 							"$ref": "#/$defs/typeObject"
 						}
 					},
-					"required": ["type"]
+					"required": ["type"],
+					"not": {
+						"$ref": "#/$defs/valuePinned"
+					}
 				},
 				"then": {
 					"anyOf": [
@@ -1821,7 +1886,10 @@
 							"$ref": "#/$defs/typeArray"
 						}
 					},
-					"required": ["type"]
+					"required": ["type"],
+					"not": {
+						"$ref": "#/$defs/valuePinned"
+					}
 				},
 				"then": {
 					"anyOf": [
@@ -1921,36 +1989,26 @@
 				}
 			},
 			{
-				"description": "Ensure `object` has strictness.",
+				"description": "Ensure `object` has strictness. Before 2019-09 there is no unevaluatedProperties, so additionalProperties is the only keyword that bounds the values of keys that propertyNames or patternProperties admit.",
 				"if": {
 					"properties": {
 						"type": {
 							"$ref": "#/$defs/typeObject"
 						}
 					},
-					"required": ["type"]
+					"required": ["type"],
+					"not": {
+						"$ref": "#/$defs/valuePinned"
+					}
 				},
 				"then": {
-					"anyOf": [
-						{
-							"required": ["additionalProperties"]
-						},
-						{
-							"required": ["properties"]
-						},
-						{
-							"required": ["patternProperties"]
-						},
-						{
-							"required": ["propertyNames"]
-						}
-					],
-					"required": ["required"]
+					"required": ["additionalProperties", "required"]
 				}
 			}
 		]
 	},
 	"dependentSchemas.items.draft-06-07": {
+		"$ref": "#/$defs/tupleItemsNeedAdditionalItems",
 		"required": ["maxItems", "uniqueItems"],
 		"properties": {
 			"uniqueItems": {
@@ -1959,11 +2017,22 @@
 		}
 	},
 	"dependentSchemas.contains.draft-06-07": {
-		"required": ["maxItems", "uniqueItems"],
+		"$comment": "Without unevaluatedItems, contains alone leaves every non-matching item unconstrained, so items must be present too.",
+		"required": ["items", "maxItems", "uniqueItems"],
 		"properties": {
 			"uniqueItems": {
 				"const": true
 			}
+		}
+	},
+	"tupleItemsNeedAdditionalItems": {
+		"$comment": "Before 2019-09 there is no unevaluatedItems: a tuple (array-form items) only constrains its leading positions, so additionalItems must cover the rest.",
+		"if": {
+			"properties": { "items": { "type": "array" } },
+			"required": ["items"]
+		},
+		"then": {
+			"required": ["additionalItems"]
 		}
 	}
 }

@@ -1,4 +1,8 @@
 import { doesNotThrow, strictEqual, throws } from "node:assert";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, test } from "node:test";
 import { verifyRefs } from "../bin/build.js";
 
@@ -62,5 +66,27 @@ describe("verifyRefs", () => {
 			properties: { x: { $ref: "#/definitions/missing" } },
 		};
 		throws(() => verifyRefs(bad, "defs-bad.json"), /#\/definitions\/missing/);
+	});
+});
+
+describe("build", () => {
+	// The built meta-schemas are gitignored artifacts; building them must not
+	// depend on npm/npx being on PATH (e.g. a bare node container). The test
+	// builds into a temp dir: rewriting the repo's copies would race the other
+	// test files, which import them concurrently.
+	test("runs with only node available (empty PATH), into a given dir", () => {
+		const out = mkdtempSync(join(tmpdir(), "sast-build-"));
+		try {
+			const r = spawnSync(process.execPath, ["bin/build.js", out], {
+				cwd: new URL("..", import.meta.url),
+				env: { PATH: "" },
+				encoding: "utf8",
+			});
+			strictEqual(r.status, 0, r.stderr);
+			const built = JSON.parse(readFileSync(join(out, "2020-12.json"), "utf8"));
+			strictEqual(built.$id, "urn:willfarrell:sast-json-schema:2020-12");
+		} finally {
+			rmSync(out, { recursive: true, force: true });
+		}
 	});
 });

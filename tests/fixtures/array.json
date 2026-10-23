@@ -573,18 +573,18 @@
     ]
   },
   {
-    "description": "type=array with additionalItems recursive validation",
+    "description": "type=array with additionalItems recursive validation (2019-09; 2020-12 rejects the keyword)",
     "schema": {
-      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+      "$ref": "urn:willfarrell:sast-json-schema:2019-09"
     },
     "tests": [
       {
         "description": "Should pass when additionalItems inner schema is secure",
         "data": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
           "$id": "test",
           "type": "array",
-          "prefixItems": [
+          "items": [
             {
               "type": "integer",
               "minimum": 0,
@@ -607,10 +607,10 @@
       {
         "description": "Should fail when additionalItems inner schema is insecure (missing constraints)",
         "data": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
           "$id": "test",
           "type": "array",
-          "prefixItems": [
+          "items": [
             {
               "type": "integer",
               "minimum": 0,

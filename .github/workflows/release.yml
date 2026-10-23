@@ -8,65 +8,165 @@ on:
       - 'package.json'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # github.ref is the per-PR merge ref, so keying on it would let two releases
+  # run at once; one release at a time.
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: 24.x
+  NODE_VERSION: 26.x
 
 permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build
+  test:
+    name: Test
     if: ${{ github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          disable-sudo: true
           disable-telemetry: true
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            nodejs.org:443
+            objects.githubusercontent.com:443
+            registry.npmjs.org:443
+            release-assets.githubusercontent.com:443
+      # The merge commit that actually landed on main, not the PR's test-merge ref.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           persist-credentials: false
       - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
-          cache: npm
+          package-manager-cache: false # release artifacts must never touch the shared Actions cache
+      # Any package.json edit triggers this workflow; only a new version releases.
+      - name: Skip if this version is already published
+        id: version
+        run: |
+          name=$(npm pkg get name | xargs)
+          tag=$(npm pkg get version | xargs)
+          if [ -n "$(npm view "$name@$tag" version 2>/dev/null)" ]; then
+            echo "$name@$tag is already on npm; nothing to release"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install dependencies
+        if: ${{ steps.version.outputs.publish == 'true' }}
+        run: |
+          npm ci --ignore-scripts
+      - name: Build
+        if: ${{ steps.version.outputs.publish == 'true' }}
+        run: |
+          npm run build
+      - name: Lint and unit tests
+        if: ${{ steps.version.outputs.publish == 'true' }}
+        run: |
+          npm run test:lint
+          npm run test:unit
+    outputs:
+      publish: ${{ steps.version.outputs.publish }}
+
+  build:
+    name: Build
+    needs: test
+    if: ${{ needs.test.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: block
+          disable-sudo: true
+          disable-telemetry: true
+          allowed-endpoints: >
+            api.github.com:443
+            fulcio.sigstore.dev:443
+            github.com:443
+            nodejs.org:443
+            objects.githubusercontent.com:443
+            registry.npmjs.org:443
+            rekor.sigstore.dev:443
+            release-assets.githubusercontent.com:443
+            tuf-repo-cdn.sigstore.dev:443
+      # allowed-endpoints: >
+      #   github.com:443
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+      # allowed-endpoints: >
+      #   api.github.com:443
+      #   nodejs.org:443
+      #   objects.githubusercontent.com:443
+      #   registry.npmjs.org:443
+      #   release-assets.githubusercontent.com:443
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false # release artifacts must never touch the shared Actions cache
+      # allowed-endpoints: >
+      #   registry.npmjs.org:443
       - name: Set env
         run: |
           tag=$(npm pkg get version | xargs)
           printf 'tag=%s\n' "$tag" >> "$GITHUB_ENV"
           if [ "${tag##*-*}" ]; then prerelease=false; else prerelease=true; fi
           printf 'prerelease=%s\n' "$prerelease" >> "$GITHUB_ENV"
+      # allowed-endpoints: >
+      #   registry.npmjs.org:443
       - name: Install dependencies
         run: |
           npm ci --ignore-scripts
+      # allowed-endpoints: >
+      #   registry.npmjs.org:443
       - name: Verify dependency signatures
         run: |
           npm audit signatures
+      # allowed-endpoints: >
+      #   registry.npmjs.org:443
       - name: Build
         run: |
           npm run build --if-present
+      # allowed-endpoints: >
+      #   registry.npmjs.org:443
       - name: Pack
         id: pack
         run: |
           {
             echo "packages<<EOF"
-            npm pack --json
+            npm pack --ignore-scripts --json
             echo EOF
           } >> "$GITHUB_OUTPUT"
+      # allowed-endpoints: >
+      #   api.github.com:443
+      #   fulcio.sigstore.dev:443
+      #   rekor.sigstore.dev:443
+      #   tuf-repo-cdn.sigstore.dev:443
       - name: Build Attestations
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             *.tgz
@@ -76,7 +176,6 @@ jobs:
         with:
           name: ${{ env.tag }}
           path: |
-            package.json
             *.tgz
     outputs:
       tag: ${{ env.tag }}
@@ -86,29 +185,35 @@ jobs:
     name: Release
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          disable-sudo: true
           disable-telemetry: true
-      - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6.4.0 # zizmor: ignore[cache-poisoning] no cache configured (no `cache:` input); reconsider if caching is added
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          registry-url: https://registry.npmjs.org
+          allowed-endpoints: >
+            api.github.com:443
+            uploads.github.com:443
       - name: Download artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.build.outputs.tag }}
+      # allowed-endpoints: >
+      #   api.github.com:443
+      #   uploads.github.com:443
       - name: Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.0 # zizmor: ignore[superfluous-actions] prefer maintained action over inline `gh release` script
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2 # zizmor: ignore[superfluous-actions] prefer maintained action over inline `gh release` script
         with:
           draft: true
           prerelease: ${{ needs.build.outputs.prerelease }}
           tag_name: ${{ needs.build.outputs.tag }}
+          # If the tag does not exist yet, publishing the draft creates it here,
+          # on the merge commit that was built, not on whatever main is by then.
+          target_commitish: ${{ github.event.pull_request.merge_commit_sha }}
           generate_release_notes: true
           files: |
             **/*.tgz
@@ -120,35 +225,73 @@ jobs:
     name: Publish
     needs: release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm-publish
     permissions:
       contents: read
       id-token: write # npm publish
       attestations: read # gh attestation verify
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          disable-sudo: true
           disable-telemetry: true
+          allowed-endpoints: >
+            api.github.com:443
+            fulcio.sigstore.dev:443
+            nodejs.org:443
+            objects.githubusercontent.com:443
+            registry.npmjs.org:443
+            rekor.sigstore.dev:443
+            release-assets.githubusercontent.com:443
+            tmaproduction.blob.core.windows.net:443
+            tuf-repo-cdn.sigstore.dev:443
+            tuf-repo.github.com:443
+      # allowed-endpoints: >
+      #   api.github.com:443
+      #   nodejs.org:443
+      #   objects.githubusercontent.com:443
+      #   registry.npmjs.org:443
+      #   release-assets.githubusercontent.com:443
       - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false # release artifacts must never touch the shared Actions cache
       - name: Download artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.release.outputs.tag }}
+      # allowed-endpoints: >
+      #   api.github.com:443
+      #   tmaproduction.blob.core.windows.net:443
+      #   tuf-repo-cdn.sigstore.dev:443
+      #   tuf-repo.github.com:443
       - name: Verify build provenance attestation
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           find . -name '*.tgz' -print -exec gh attestation verify {} --repo ${{ github.repository }} \;
-      - name: npm publish (next)
+      # allowed-endpoints: >
+      #   api.github.com:443
+      #   fulcio.sigstore.dev:443
+      #   registry.npmjs.org:443
+      #   rekor.sigstore.dev:443
+      #   tuf-repo-cdn.sigstore.dev:443
+      - name: npm stage publish (next)
         if: ${{ needs.release.outputs.prerelease == 'true' }}
         run: |
-          find . -name '*.tgz' -exec npm publish --tag next --provenance --access public {} \;
-      - name: npm publish (latest)
+          find . -name '*.tgz' -exec npm stage publish --tag next --provenance --access public --ignore-scripts {} \;
+      # allowed-endpoints: >
+      #   api.github.com:443
+      #   fulcio.sigstore.dev:443
+      #   registry.npmjs.org:443
+      #   rekor.sigstore.dev:443
+      #   tuf-repo-cdn.sigstore.dev:443
+      - name: npm stage publish (latest)
         if: ${{ needs.release.outputs.prerelease == 'false' }}
         run: |
-          find . -name '*.tgz' -exec npm publish --tag latest --provenance --access public {} \;
+          find . -name '*.tgz' -exec npm stage publish --tag latest --provenance --access public --ignore-scripts {} \;

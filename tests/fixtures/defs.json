@@ -202,6 +202,60 @@
         "valid": false
       },
       {
+        "description": "Should fail when $ref targets a .localhost hostname (RFC 6761 loopback)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://api.localhost/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets a .local hostname (RFC 6762 mDNS)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://printer.local/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets a .internal hostname (ICANN private-use)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://api.internal/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets a .home.arpa hostname (RFC 8375)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://nas.home.arpa/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref targets a .onion hostname (RFC 7686)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://abcdefghijklmnop.onion/schema.json"
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when a hostname label merely equals a local TLD name",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "$ref": "https://local.example.com/schema.json"
+        },
+        "valid": true
+      },
+      {
         "description": "Should fail when $ref targets 127.0.0.1 (SSRF)",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",

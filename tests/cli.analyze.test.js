@@ -1,4 +1,4 @@
-import { deepStrictEqual, ok, strictEqual } from "node:assert";
+import { deepStrictEqual, ok, rejects, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import schema202012 from "../2020-12.json" with { type: "json" };
@@ -362,6 +362,16 @@ describe("analyze size guard", () => {
 			ok(err instanceof TypeError);
 			ok(err.message.includes("JSON-serializable"));
 		}
+	});
+
+	test("names deep nesting, not just circularity, when serialization overflows", async () => {
+		let schema = { type: "string" };
+		for (let i = 0; i < 20_000; i++) schema = { properties: { a: schema } };
+		await rejects(analyze(schema, { offline: true }), (err) => {
+			ok(err instanceof TypeError);
+			ok(err.message.includes("too deeply nested"), err.message);
+			return true;
+		});
 	});
 });
 
@@ -1084,31 +1094,53 @@ describe("formatSarif", () => {
 		strictEqual(driver.rules[0].fullDescription.text, "first");
 	});
 
-	test("ruleId is the first schemaPath segment, not the keyword, when both exist", () => {
+	test("ruleId is the full check path, so distinct checks are distinct rules", () => {
+		// AJV reports paths relative to the root schemaBase $ref, so most findings
+		// sit under #/allOf/<n>/...; the first segment alone would lump them all
+		// into one "allOf" rule.
 		const errors = [
-			{ schemaPath: "#/required/0", keyword: "required", message: "m" },
+			{ schemaPath: "#/allOf/3/then/required", keyword: "required" },
+			{ schemaPath: "#/allOf/1/then/required", keyword: "required" },
+			{ schemaPath: "#/properties/x", keyword: "kw" },
+			{ schemaPath: "#/required", keyword: "required" },
 		];
-		const sarif = formatSarif(errors, "/tmp/schema.json");
-		// `... || err.keyword` only fires when the segment is empty; here it is
-		// "required" from the path, which happens to differ from a keyword test.
-		strictEqual(sarif.runs[0].results[0].ruleId, "required");
-		const errors2 = [
-			{ schemaPath: "#/properties/x", keyword: "kw", message: "m" },
+		const { runs } = formatSarif(errors, "/tmp/schema.json");
+		const ids = [
+			"allOf/3/then/required",
+			"allOf/1/then/required",
+			"properties/x",
+			"required",
 		];
-		const sarif2 = formatSarif(errors2, "/tmp/schema.json");
-		strictEqual(sarif2.runs[0].results[0].ruleId, "properties");
-		// Same derivation in the rule table: must be the path segment, not keyword.
-		strictEqual(sarif2.runs[0].tool.driver.rules[0].id, "properties");
+		deepStrictEqual(runs[0].results.map((r) => r.ruleId), ids);
+		deepStrictEqual(runs[0].tool.driver.rules.map((r) => r.id), ids);
+	});
+
+	test("ruleId names the meta-schema definition for $defs/definitions paths", () => {
+		// Nearly every meta-schema finding lives under #/$defs/<rule>/..., so the
+		// first segment alone collapses them all into one opaque "$defs" rule.
+		const errors = [
+			{ schemaPath: "#/$defs/safePattern/allOf/14/not", keyword: "not" },
+			{ schemaPath: "#/$defs/safeUrl/allOf/0/pattern", keyword: "pattern" },
+			{ schemaPath: "#/definitions/safeInteger/maximum", keyword: "maximum" },
+		];
+		const { runs } = formatSarif(errors, "/tmp/schema.json");
+		deepStrictEqual(
+			runs[0].results.map((r) => r.ruleId),
+			["safePattern", "safeUrl", "safeInteger"],
+		);
+		deepStrictEqual(
+			runs[0].tool.driver.rules.map((r) => r.id),
+			["safePattern", "safeUrl", "safeInteger"],
+		);
 	});
 
 	test("ruleId strips only a leading '#/' from schemaPath", () => {
-		// A non-leading "#/" must be preserved: the strip is anchored to the start,
-		// so "foo#/bar" keeps its first segment "foo#" rather than collapsing to
-		// "foobar". Exercises both the rule-table and the per-result derivations.
+		// A non-leading "#/" must be preserved: the strip is anchored to the start.
+		// Exercises both the rule-table and the per-result derivations.
 		const errors = [{ schemaPath: "foo#/bar", keyword: "kw", message: "m" }];
 		const sarif = formatSarif(errors, "/tmp/schema.json");
-		strictEqual(sarif.runs[0].results[0].ruleId, "foo#");
-		strictEqual(sarif.runs[0].tool.driver.rules[0].id, "foo#");
+		strictEqual(sarif.runs[0].results[0].ruleId, "foo#/bar");
+		strictEqual(sarif.runs[0].tool.driver.rules[0].id, "foo#/bar");
 	});
 
 	test("top-level $schema is the SARIF 2.1.0 schema URL", () => {
@@ -1976,5 +2008,89 @@ describe("run() SSRF DNS notice (A3)", () => {
 			!r.error.some((m) => m.includes("resolving")),
 			"a clean schema with no remote refs stays quiet",
 		);
+	});
+});
+
+describe("resolveSSRFRefs per-lookup timeout", () => {
+	// dns.lookup ignores AbortSignal, so the timeout has to be enforced around
+	// the lookup. A resolver that never answers must fail closed within budget.
+	test("a hanging lookup is reported as unresolved after dnsTimeoutMs", async () => {
+		const refs = [
+			{
+				hostname: "hang.example",
+				ref: "https://hang.example/s",
+				path: "/$ref",
+			},
+		];
+		const start = Date.now();
+		const errors = await resolveSSRFRefs(refs, {
+			dnsTimeoutMs: 50,
+			lookup: () => new Promise(() => {}),
+		});
+		ok(Date.now() - start < 2_000, "must not wait on the hung lookup");
+		strictEqual(errors.length, 1);
+		strictEqual(errors[0].keyword, "ssrf");
+		ok(errors[0].message.includes("does not resolve"));
+	});
+
+	test("an answer before the timeout is classified normally", async () => {
+		const refs = [
+			{
+				hostname: "fast.example",
+				ref: "https://fast.example/s",
+				path: "/$ref",
+			},
+		];
+		const errors = await resolveSSRFRefs(refs, {
+			dnsTimeoutMs: 5_000,
+			lookup: async () => [{ address: "10.0.0.1", family: 4 }],
+		});
+		strictEqual(errors[0].params.resolvedIP, "10.0.0.1");
+	});
+});
+
+describe("analyze redosTimeoutMs must be positive", () => {
+	// redos-detector rejects a 0 timeout, which would otherwise surface as a
+	// misleading "could not be parsed" finding on every pattern.
+	test("redosTimeoutMs=0 is rejected as a usage error", async () => {
+		await rejects(
+			analyze({ type: "string", pattern: "^a$" }, { redosTimeoutMs: 0 }),
+			/redosTimeoutMs must be a positive integer/,
+		);
+	});
+
+	test("redosTimeoutMs=1 is accepted", async () => {
+		const errors = await analyze(
+			{ type: "string", maxLength: 1, pattern: "^a$" },
+			{ offline: true, redosTimeoutMs: 1 },
+		);
+		ok(Array.isArray(errors));
+	});
+});
+
+describe("resolveSSRFRefs timer hygiene and option nulls", () => {
+	test("a lookup that answers in time leaves no timeout timer behind", async () => {
+		const timers = () =>
+			process.getActiveResourcesInfo().filter((r) => r === "Timeout").length;
+		const before = timers();
+		await resolveSSRFRefs(
+			[
+				{
+					hostname: "fast.example",
+					ref: "https://fast.example/s",
+					path: "/$ref",
+				},
+			],
+			{ dnsTimeoutMs: 60_000, lookup: async () => [] },
+		);
+		strictEqual(timers(), before);
+	});
+
+	test("redosTimeoutMs=null means the default, not zero", async () => {
+		const errors = await analyze(
+			{ type: "string", maxLength: 1, pattern: "^a$" },
+			{ offline: true, redosTimeoutMs: null },
+		);
+		ok(Array.isArray(errors));
 	});
 });

@@ -322,7 +322,7 @@
       {
         "description": "Should fail when `deprecated` is used (not in draft-04 spec)",
         "data": {
-          "$schema": "http://json-schema.org/draft-04/schema#",
+          "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "string",
           "maxLength": 8,
@@ -358,6 +358,108 @@
           "id": "test",
           "type": "string",
           "format": "uuid"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "draft-04 patternProperties (no propertyNames keyword)",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-04"
+    },
+    "tests": [
+      {
+        "description": "Should pass patternProperties closed by additionalProperties false",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "patternProperties": {
+            "^A[A-Z]{0,4}$": { "type": "string", "maxLength": 5, "pattern": "^[a-z]+$" }
+          },
+          "additionalProperties": false,
+          "maxProperties": 5,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail patternProperties without maxProperties",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "patternProperties": {
+            "^A[A-Z]{0,4}$": { "type": "string", "maxLength": 5, "pattern": "^[a-z]+$" }
+          },
+          "additionalProperties": false,
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail patternProperties without additionalProperties (unmatched keys unbounded)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "patternProperties": {
+            "^A[A-Z]{0,4}$": { "type": "string", "maxLength": 5, "pattern": "^[a-z]+$" }
+          },
+          "maxProperties": 5,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "objects and arrays pinned by const/enum need no further strictness",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-04"
+    },
+    "tests": [
+      {
+        "description": "Should pass an object pinned by enum",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "enum": [
+            {
+              "a": "b"
+            },
+            {
+              "a": "c"
+            }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass an array pinned by enum",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "array",
+          "enum": [
+            [
+              1
+            ],
+            [
+              2
+            ]
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should still fail an unpinned object with no strictness",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object"
         },
         "valid": false
       }

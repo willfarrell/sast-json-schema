@@ -47,6 +47,26 @@
         "valid": true
       },
       {
+        "description": "Should fail when additionalItems is used (removed in 2020-12; use prefixItems + items)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "string",
+              "maxLength": 8,
+              "pattern": "^[a-z]+$"
+            }
+          ],
+          "additionalItems": false,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "unevaluatedItems": false
+        },
+        "valid": false
+      },
+      {
         "description": "Should pass when using $dynamicRef to a local fragment",
         "data": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -137,6 +157,82 @@
           "maxLength": 8,
           "enum": ["a"],
           "deprecated": "yes"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "objects and arrays pinned by const/enum need no further strictness",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass an object pinned by enum",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "enum": [
+            {
+              "a": "b"
+            },
+            {
+              "a": "c"
+            }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass an array pinned by enum",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "enum": [
+            [
+              1
+            ],
+            [
+              2
+            ]
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass an object pinned by const",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "const": {
+            "a": "b"
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass an array pinned by const",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "array",
+          "const": [
+            1,
+            2
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should still fail an unpinned object with no strictness",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object"
         },
         "valid": false
       }

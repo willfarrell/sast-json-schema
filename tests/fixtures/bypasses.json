@@ -1,0 +1,1632 @@
+[
+	{
+		"description": "definitions-only root is a library, not a typeless validator (2020-12)",
+		"$comment": "A root may omit type/const/$ref/combinators only when it is a pure definitions library: metadata plus a non-empty definitions map. Otherwise the definitions key would silently disable the type requirement.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:2020-12"
+		},
+		"tests": [
+			{
+				"description": "accept: metadata + non-empty definitions",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"title": "lib",
+					"$defs": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					}
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: empty definitions map",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"$defs": {}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside validation keywords, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"$defs": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"not": {
+						"type": "null"
+					}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside properties, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"$defs": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"properties": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "definitions-only root is a library, not a typeless validator (2019-09)",
+		"$comment": "A root may omit type/const/$ref/combinators only when it is a pure definitions library: metadata plus a non-empty definitions map. Otherwise the definitions key would silently disable the type requirement.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:2019-09"
+		},
+		"tests": [
+			{
+				"description": "accept: metadata + non-empty definitions",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2019-09/schema",
+					"$id": "test",
+					"title": "lib",
+					"$defs": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					}
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: empty definitions map",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2019-09/schema",
+					"$id": "test",
+					"$defs": {}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside validation keywords, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2019-09/schema",
+					"$id": "test",
+					"$defs": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"not": {
+						"type": "null"
+					}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside properties, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2019-09/schema",
+					"$id": "test",
+					"$defs": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"properties": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "definitions-only root is a library, not a typeless validator (draft-07)",
+		"$comment": "A root may omit type/const/$ref/combinators only when it is a pure definitions library: metadata plus a non-empty definitions map. Otherwise the definitions key would silently disable the type requirement.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:draft-07"
+		},
+		"tests": [
+			{
+				"description": "accept: metadata + non-empty definitions",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"title": "lib",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					}
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: empty definitions map",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"definitions": {}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside validation keywords, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"not": {
+						"type": "null"
+					}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside properties, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"properties": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "definitions-only root is a library, not a typeless validator (draft-06)",
+		"$comment": "A root may omit type/const/$ref/combinators only when it is a pure definitions library: metadata plus a non-empty definitions map. Otherwise the definitions key would silently disable the type requirement.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:draft-06"
+		},
+		"tests": [
+			{
+				"description": "accept: metadata + non-empty definitions",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"title": "lib",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					}
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: empty definitions map",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"definitions": {}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside validation keywords, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"not": {
+						"type": "null"
+					}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside properties, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"properties": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "definitions-only root is a library, not a typeless validator (draft-04)",
+		"$comment": "A root may omit type/const/$ref/combinators only when it is a pure definitions library: metadata plus a non-empty definitions map. Otherwise the definitions key would silently disable the type requirement.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:draft-04"
+		},
+		"tests": [
+			{
+				"description": "accept: metadata + non-empty definitions",
+				"data": {
+					"$schema": "https://json-schema.org/draft-04/schema",
+					"id": "test",
+					"title": "lib",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					}
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: empty definitions map",
+				"data": {
+					"$schema": "https://json-schema.org/draft-04/schema",
+					"id": "test",
+					"definitions": {}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside validation keywords, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft-04/schema",
+					"id": "test",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"not": {
+						"type": "null"
+					}
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: definitions beside properties, no type",
+				"data": {
+					"$schema": "https://json-schema.org/draft-04/schema",
+					"id": "test",
+					"definitions": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"properties": {
+						"a": {
+							"type": "string",
+							"maxLength": 5,
+							"enum": [
+								"x"
+							]
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "control characters via property classes, raw chars, and C1 escapes (2020-12)",
+		"$comment": "safePattern bans control characters; \\p{Any}, \\p{ASCII}, gc=/General_Category= spellings, raw U+0000-U+001F/U+007F, and C1 (U+0080-U+009F) escapes are the same characters by another name.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:2020-12"
+		},
+		"tests": [
+			{
+				"description": "accept: letters and numbers",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^[\\p{L}\\p{N}]{1,100}$"
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: gc= spelling of a safe category",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\p{gc=L}{1,100}$"
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: script property",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\p{Script=Latin}{1,100}$"
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: whitespace escapes",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^[a-z\\t\\r\\n ]{1,100}$"
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: Latin-1 letters past C1",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^[\\u00c0-\\u00ff]{1,100}$"
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: \\p{Any}",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\p{Any}{1,100}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: \\p{ASCII}",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\p{ASCII}{1,100}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: \\p{Assigned}",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\p{Assigned}{1,100}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: \\p{gc=Cc}",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^[\\p{gc=Cc}]{1,100}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: \\p{General_Category=Control}",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\p{General_Category=Control}{1,100}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: \\p{General_Category=C}",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\p{General_Category=C}{1,100}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: raw NUL character",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^[\u0000-\u001f]{1,10}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: raw DEL character",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^[a]{1,10}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: C1 via \\x escape",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^[\\x80-\\x9f]{1,10}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: C1 via \\u escape",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\u0085{1,10}$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: C1 via \\u{} escape",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 100,
+					"pattern": "^\\u{9b}{1,10}$"
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "top-level | behind nested groups breaks anchoring (2020-12)",
+		"$comment": "^A|B$ matches anything starting with A or ending with B. The check must see through groups nested up to 3 deep (the CLI crawler covers any depth).",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:2020-12"
+		},
+		"tests": [
+			{
+				"description": "accept: alternation wrapped in one group",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 256,
+					"pattern": "^(?:a|b)$"
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: nested groups inside a wrapping group",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 256,
+					"pattern": "^(?:(?:a|b)|(?:c|d))$"
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: depth-3 nesting inside a wrapping group",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 256,
+					"pattern": "^(?:(?:(?:a|b)|c)|d)$"
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: depth-2 groups either side of top-level |",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 256,
+					"pattern": "^(?:(a)|b)|(?:(c)|d)$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: depth-3 groups either side of top-level |",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 256,
+					"pattern": "^(?:(?:(a)|b)|c)|(?:(?:(d)|e)|f)$"
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: mixed depth-2/depth-3 either side",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "string",
+					"maxLength": 256,
+					"pattern": "^(?:(a)|b)|(?:(?:(d)|e)|f)$"
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "array items must all be constrained (draft-04)",
+		"$comment": "Before 2019-09 there is no unevaluatedItems, so a tuple needs additionalItems and contains needs items, or the remaining items accept anything.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:draft-04"
+		},
+		"tests": [
+			{
+				"description": "accept: single items schema",
+				"data": {
+					"$schema": "https://json-schema.org/draft-04/schema",
+					"id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: tuple with additionalItems false",
+				"data": {
+					"$schema": "https://json-schema.org/draft-04/schema",
+					"id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"additionalItems": false,
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: tuple with additionalItems schema",
+				"data": {
+					"$schema": "https://json-schema.org/draft-04/schema",
+					"id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"additionalItems": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: tuple without additionalItems",
+				"data": {
+					"$schema": "https://json-schema.org/draft-04/schema",
+					"id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "array items must all be constrained (draft-06)",
+		"$comment": "Before 2019-09 there is no unevaluatedItems, so a tuple needs additionalItems and contains needs items, or the remaining items accept anything.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:draft-06"
+		},
+		"tests": [
+			{
+				"description": "accept: single items schema",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: tuple with additionalItems false",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"additionalItems": false,
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: tuple with additionalItems schema",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"additionalItems": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: tuple without additionalItems",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			},
+			{
+				"description": "accept: contains with items",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"contains": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"items": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: contains without items",
+				"data": {
+					"$schema": "https://json-schema.org/draft-06/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"contains": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "array items must all be constrained (draft-07)",
+		"$comment": "Before 2019-09 there is no unevaluatedItems, so a tuple needs additionalItems and contains needs items, or the remaining items accept anything.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:draft-07"
+		},
+		"tests": [
+			{
+				"description": "accept: single items schema",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: tuple with additionalItems false",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"additionalItems": false,
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: tuple with additionalItems schema",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"additionalItems": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: tuple without additionalItems",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"items": [
+								{
+									"type": "string",
+									"maxLength": 5,
+									"enum": [
+										"a"
+									]
+								}
+							],
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			},
+			{
+				"description": "accept: contains with items",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"contains": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"items": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: contains without items",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"type": "array",
+							"contains": {
+								"type": "string",
+								"maxLength": 5,
+								"enum": [
+									"x"
+								]
+							},
+							"maxItems": 5,
+							"uniqueItems": true
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "remote $ref to a special-use local TLD (2020-12)",
+		"$comment": "The local-TLD rule must end at any URL delimiter (/, #, ?) or the end, and must ignore case, because URL hosts are case-insensitive.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:2020-12"
+		},
+		"tests": [
+			{
+				"description": "accept: public host with fragment",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://example.com/a.json#/$defs/a"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: public host whose label merely contains 'local'",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://localize.example.com/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: .internal then #fragment",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://metadata.google.internal#/$defs/a"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: .local then #fragment",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://svc.local#/$defs/a"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: .onion then ?query",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://x.onion?a=1"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: uppercase .LOCAL",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://svc.LOCAL/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: mixed-case .Internal",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://svc.Internal/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: uppercase .HOME.ARPA",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://printer.home.ARPA/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: uppercase LOCALHOST subdomain",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://api.LOCALHOST/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1,
+					"unevaluatedProperties": false
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "remote $ref to a special-use local TLD (draft-07)",
+		"$comment": "The local-TLD rule must end at any URL delimiter (/, #, ?) or the end, and must ignore case, because URL hosts are case-insensitive.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:draft-07"
+		},
+		"tests": [
+			{
+				"description": "accept: public host with fragment",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://example.com/a.json#/$defs/a"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "accept: public host whose label merely contains 'local'",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://localize.example.com/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": true
+			},
+			{
+				"description": "reject: .internal then #fragment",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://metadata.google.internal#/$defs/a"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: .local then #fragment",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://svc.local#/$defs/a"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: .onion then ?query",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://x.onion?a=1"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: uppercase .LOCAL",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://svc.LOCAL/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: mixed-case .Internal",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://svc.Internal/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: uppercase .HOME.ARPA",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://printer.home.ARPA/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: uppercase LOCALHOST subdomain",
+				"data": {
+					"$schema": "https://json-schema.org/draft-07/schema",
+					"$id": "test",
+					"type": "object",
+					"properties": {
+						"a": {
+							"$ref": "https://api.LOCALHOST/a.json"
+						}
+					},
+					"required": [
+						"a"
+					],
+					"additionalProperties": false,
+					"maxProperties": 1
+				},
+				"valid": false
+			}
+		]
+	},
+	{
+		"description": "root $id on a special-use local TLD (2020-12)",
+		"$comment": "Same rule applies to $id via safeIdUrl.",
+		"schema": {
+			"$ref": "urn:willfarrell:sast-json-schema:2020-12"
+		},
+		"tests": [
+			{
+				"description": "reject: uppercase .LOCAL $id",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "https://svc.LOCAL/s",
+					"type": "string",
+					"maxLength": 5,
+					"enum": [
+						"x"
+					]
+				},
+				"valid": false
+			},
+			{
+				"description": "reject: .internal#frag $id",
+				"data": {
+					"$schema": "https://json-schema.org/draft/2020-12/schema",
+					"$id": "https://x.internal#a",
+					"type": "string",
+					"maxLength": 5,
+					"enum": [
+						"x"
+					]
+				},
+				"valid": false
+			}
+		]
+	}
+]

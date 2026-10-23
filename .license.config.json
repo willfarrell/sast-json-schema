@@ -17,12 +17,14 @@
 		".license.template",
 		"**/.gitignore",
 		"**/.npmignore",
+		"**/.npmrc",
 		"**/*.fuzz.js",
-		"**/*.perf.js",
+		"**/*.bench.js",
 		"**/*.test.js",
 		"**/*.json",
 		"**/*.md",
 		"**/*.yml",
+		"**/*.yaml",
 		".DS_Store"
 	]
 }

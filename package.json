@@ -4,7 +4,7 @@
 	"description": "Meta-schema for the Static Application Security Testing (SAST) of JSON Schemas",
 	"type": "module",
 	"engines": {
-		"node": ">=24"
+		"node": ">=26"
 	},
 	"bin": {
 		"sast-json-schema": "./cli.js"
@@ -27,29 +27,28 @@
 		"2020-12.json",
 		"src/$defs.json",
 		"cli.js",
-		"package.json",
 		"SECURITY.md"
 	],
 	"publishConfig": {
 		"access": "public"
 	},
 	"scripts": {
-		"prepare": "husky || true",
-		"git:pre-commit": "npm run git:lint-staged && npm run git:test-staged",
+		"prepare": "node bin/build.js && (husky || true)",
+		"git:pre-commit": "npm run test:lint:staged",
 		"git:commit-msg": "commitlint --config commitlint.config.cjs --edit",
-		"git:lint-staged": "npm run test:lint:staged",
-		"git:unit-staged": "npm run test:unit",
-		"git:test-staged": "npm run git:unit-staged",
 		"build": "node bin/build.js",
-		"prepublishOnly": "npm run build && npm test",
+		"prepublishOnly": "npm run build && npm run test:lint && npm run test:unit",
+		"release:tag": "git tag -s -m $npm_package_version $npm_package_version",
+		"release:staged": "npm whoami >/dev/null && npm stage list $(npm pkg get name | tr -d '\"') --json | jq -r '.[] | \"\\(.packageName)@\\(.version) \\(.actor) \\(.shasum)\"'",
+		"release:approve": "npm stage list $(npm pkg get name | tr -d '\"') --json | jq -r --arg v \"$npm_package_version\" '.[] | select(.version == $v) | .id' | xargs -r -n1 -o npm stage approve",
 		"lint": "biome check --write --no-errors-on-unmatched",
 		"pretest": "npm run build",
-		"test": "npm run test:lint && npm run test:unit && npm run test:mutation && npm run test:sast && npm run test:perf && npm run test:dast",
+		"test": "npm run test:lint && npm run test:unit && npm run test:mutation && npm run test:sast && npm run test:bench && npm run test:dast",
 		"test:lint": "biome ci --no-errors-on-unmatched",
 		"test:lint:staged": "biome check --staged --no-errors-on-unmatched",
 		"test:unit": "node --test --experimental-test-coverage --test-coverage-include=cli.js --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 ./tests/*.test.js",
 		"test:mutation": "stryker run",
-		"test:perf": "node --test --test-concurrency=1 ./tests/*.perf.js",
+		"test:bench": "node --experimental-bench --bench './tests/*.bench.js'",
 		"test:dast": "npm run test:dast:fuzz",
 		"test:dast:fuzz": "node --test ./tests/*.fuzz.js",
 		"rm": "npm run rm:macos && npm run rm:node_modules && npm run rm:lock",
@@ -61,10 +60,10 @@
 		"test:sast:gitleaks": "npm run test:sast:gitleaks:dir && npm run test:sast:gitleaks:git",
 		"test:sast:gitleaks:dir": "gitleaks dir . --redact --no-banner",
 		"test:sast:gitleaks:git": "gitleaks git . --redact --no-banner",
-		"test:sast:license": "license-check-and-add check -f .license.config.json",
+		"test:sast:license": "node .github/license.mjs check",
 		"test:sast:lockfile": "lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https",
 		"test:sast:semgrep": "semgrep scan --config auto --error",
-		"test:sast:trivy": "trivy fs --scanners vuln,license --include-dev-deps --ignored-licenses 0BSD,Apache-2.0,BSD-1-Clause,BSD-2-Clause,BSD-3-Clause,CC0-1.0,CC-BY-4.0,ISC,MIT,Python-2.0,LGPL-3.0-or-later,MPL-2.0,BlueOak-1.0.0,Unlicense --exit-code 1 --skip-files '**/bun.lock' --disable-telemetry .",
+		"test:sast:trivy": "trivy fs --scanners vuln,license --include-dev-deps --config .github/trivy.yaml --exit-code 1 --skip-files '**/bun.lock' --disable-telemetry .",
 		"test:sast:trufflehog": "trufflehog filesystem --only-verified --log-level=-1 ./",
 		"test:sast:zizmor": "zizmor .github"
 	},
@@ -100,20 +99,15 @@
 		"redos-detector": "6.1.4"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.0.0",
-		"@commitlint/cli": "^21.0.0",
-		"@commitlint/config-conventional": "^21.0.0",
-		"@stryker-mutator/core": "^9.0.0",
+		"@biomejs/biome": "^2.5.11",
+		"@commitlint/cli": "^21.2.2",
+		"@commitlint/config-conventional": "^21.2.2",
+		"@stryker-mutator/core": "^10.0.0",
 		"fast-check": "^4.0.0",
 		"husky": "^9.0.0",
-		"json-schema-test-esm": "^3.0.0",
-		"license-check-and-add": "^4.0.0",
-		"tinybench": "^6.0.0"
+		"json-schema-test-esm": "^3.0.0"
 	},
 	"overrides": {
-		"brace-expansion": ">=5.0.9",
-		"fast-uri": "^3.1.5",
-		"js-yaml": ">=4.2.0",
 		"qs": ">=6.15.2"
 	},
 	"packageManager": "npm@12.0.1+sha512.L5T9i/YAQWQQWqTS/xZxJkei/9zcu99hCeE4qi41IyBVV7mRQad3qc2JfuOktwmH+qwGI/V2rbCL+/UYxb1+RQA=="

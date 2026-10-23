@@ -32,9 +32,9 @@ export const MAX_SSRF_HOSTNAMES = 256;
 export const DNS_TOTAL_TIMEOUT_MS = 30_000;
 
 // SAST meta-schemas keyed by draft version. Validators are compiled lazily in
-// sast() below and memoized: any single run uses exactly one draft, and eager
-// compilation of all five cost ~0.4s of every CLI invocation (including
-// --help/--version, which use none).
+// sast() below and memoized: a run compiles only the drafts its files declare,
+// and eager compilation of all five cost ~0.4s of every CLI invocation
+// (including --help/--version, which use none).
 const metaSchemas = new Map([
 	["2020-12", schema202012],
 	["2019-09", schema201909],
@@ -58,6 +58,8 @@ const knownSchemaUrls = new Map([
 // Maps a user schema's $schema URL to the matching draft version.
 const schemaVersion = (url) => {
 	if (!url) return DEFAULT_VERSION;
+	// A truthy non-string (e.g. `"$schema": 42`) is unsupported, not a crash.
+	if (typeof url !== "string") return undefined;
 	// Stryker disable next-line Regex: dropping the ^/$ anchors only changes the
 	// result for URLs with an interior "//" or "#", none of which are in the known
 	// set, so they resolve to the same (unsupported) lookup either way.
@@ -108,10 +110,9 @@ export const REDOS_HEAP_BUDGET_BYTES = 128 * 1024 * 1024;
 // letting callers fail closed.
 let cachedGc;
 // Stryker disable ConditionalExpression,BlockStatement: the branches below only
-// diverge on runtimes where gc is pre-exposed (--expose-gc, covered by a
-// subprocess test that per-test coverage cannot attribute) or where the flag
-// capture fails (not drivable on stock Node); on a plain run every surviving
-// branch yields the same working handle. The plain-run test pins the capture
+// diverge on runtimes where gc is pre-exposed (--expose-gc, reachable only in a
+// subprocess) or where the flag capture fails (not drivable on stock Node); on a
+// plain run every surviving branch yields the same working handle. The plain-run test pins the capture
 // path; the --expose-gc subprocess test pins the pre-exposed path.
 export const forceGc = () => {
 	// Stryker disable next-line EqualityOperator: inverting the cache check only
@@ -291,7 +292,10 @@ export const DEFAULT_LANG = "default";
 const resolveDangerousNames = (lang) => {
 	if (lang == null) return DANGEROUS_NAMES_BY_LANG[DEFAULT_LANG];
 	if (Array.isArray(lang)) return lang;
-	const list = DANGEROUS_NAMES_BY_LANG[lang];
+	// hasOwn: "__proto__" or "toString" must not resolve to Object.prototype.
+	const list =
+		Object.hasOwn(DANGEROUS_NAMES_BY_LANG, lang) &&
+		DANGEROUS_NAMES_BY_LANG[lang];
 	if (!list) {
 		throw new TypeError(
 			`unknown lang "${lang}", expected one of: ${Object.keys(DANGEROUS_NAMES_BY_LANG).join(", ")}`,
@@ -345,6 +349,11 @@ const checkNumericRange = (current, path) => {
 	const hasExMax =
 		Object.hasOwn(current, "exclusiveMaximum") &&
 		Number.isFinite(current.exclusiveMaximum);
+	// draft-04 spells an exclusive bound as `exclusiveMinimum: true` beside
+	// `minimum` (and likewise for maximum), so the boolean form makes the plain
+	// bound exclusive instead of carrying its own value.
+	const boolExMin = current.exclusiveMinimum === true;
+	const boolExMax = current.exclusiveMaximum === true;
 
 	if (!(hasMin || hasExMin) || !(hasMax || hasExMax)) return null;
 
@@ -362,6 +371,7 @@ const checkNumericRange = (current, path) => {
 		minIsExclusive = true;
 	} else {
 		effectiveMin = current.minimum;
+		minIsExclusive = boolExMin;
 	}
 
 	let effectiveMax;
@@ -378,6 +388,7 @@ const checkNumericRange = (current, path) => {
 		maxIsExclusive = true;
 	} else {
 		effectiveMax = current.maximum;
+		maxIsExclusive = boolExMax;
 	}
 
 	const impossible =
@@ -399,9 +410,13 @@ const checkNumericRange = (current, path) => {
 		keyword,
 		params: {
 			...(hasMin && { minimum: current.minimum }),
-			...(hasExMin && { exclusiveMinimum: current.exclusiveMinimum }),
+			...((hasExMin || boolExMin) && {
+				exclusiveMinimum: current.exclusiveMinimum,
+			}),
 			...(hasMax && { maximum: current.maximum }),
-			...(hasExMax && { exclusiveMaximum: current.exclusiveMaximum }),
+			...((hasExMax || boolExMax) && {
+				exclusiveMaximum: current.exclusiveMaximum,
+			}),
 		},
 		message: "numeric range is unsatisfiable",
 	};
@@ -415,6 +430,19 @@ const INSTANCE_DATA_KEYS = new Set([
 	"errorMessage",
 ]);
 
+// Keywords whose value maps NAMES to subschemas. Inside one of these, a key
+// such as "default" or "enum" is a property/definition name, not instance
+// data, so INSTANCE_DATA_KEYS must not skip it (otherwise naming a property
+// "default" hides its whole subtree from every crawl check).
+const SCHEMA_MAP_KEYS = new Set([
+	"properties",
+	"patternProperties",
+	"$defs",
+	"definitions",
+	"dependentSchemas",
+	"dependencies",
+]);
+
 // [type, minKeyword, maxKeyword] triples whose min > max makes a schema
 // unsatisfiable. Each is only checked when the schema declares the matching
 // type, so `{minItems: 5, maxItems: 1}` on a string is not a finding.
@@ -424,6 +452,55 @@ const MIN_MAX_PAIRS = [
 	["array", "minContains", "maxContains"],
 	["object", "minProperties", "maxProperties"],
 ];
+
+// An escape or a whole character class: the parts of a regex whose inner
+// ( ) | are literals, not syntax.
+const REGEX_ESCAPE_OR_CLASS = /\\.|\[(?:\\.|[^\\\]])*\]/gsu;
+
+// True when `pattern` has a `|` outside every group and character class, so
+// ^A|B$ parses as (^A)|(B$) and the anchors no longer bind the whole string.
+// The meta-schema can only see a few group levels deep; this scan has no limit.
+const hasTopLevelAlternation = (pattern) => {
+	let depth = 0;
+	// Stryker disable next-line StringLiteral: any replacement without ( ) | is
+	// equivalent; only removing the escapes and classes matters.
+	for (const c of pattern.replace(REGEX_ESCAPE_OR_CLASS, "")) {
+		if (c === "(") depth++;
+		else if (c === ")") depth--;
+		else if (c === "|" && depth === 0) return true;
+	}
+	return false;
+};
+
+// C0 controls except the whitespace \s covers (\t-\r), DEL, and C1: every
+// code point below U+00A0 that is neither \t-\r nor printable ASCII.
+const CONTROL_CHARS = Array.from({ length: 0xa0 }, (_, c) =>
+	String.fromCodePoint(c),
+).filter((ch) => /[^\t-\r -~]/u.test(ch));
+
+// One single-character atom of a regex: a character class, an escape with its
+// full argument, or any other character. Group syntax, quantifiers and anchors
+// also come out as "atoms", but none of them compiles on its own under the u
+// flag, so matchesControlChar skips them.
+const REGEX_ATOM =
+	/\[(?:\\.|[^\\\]])*\]|\\(?:[pPu]\{[^}]*\}|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|c[A-Za-z]|.)|[^\\[]/gsu;
+
+// True when any atom of `pattern` can match a control character, whatever the
+// spelling: a range spanning one ([ -￿]), a property (\p{Any}), an escape
+// or a raw character. The regex engine decides, so no spelling is missed.
+const matchesControlChar = (pattern) => {
+	for (const [atom] of pattern.matchAll(REGEX_ATOM)) {
+		let re;
+		try {
+			// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+			re = new RegExp(`^(?:${atom})$`, "u");
+		} catch {
+			continue; // not a standalone atom (e.g. "(" or "{"); nothing to test
+		}
+		if (CONTROL_CHARS.some((ch) => re.test(ch))) return true;
+	}
+	return false;
+};
 
 // RFC 6901 JSON Pointer token escaping: ~ → ~0, / → ~1.
 // https://datatracker.ietf.org/doc/html/rfc6901#section-3
@@ -454,17 +531,36 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 
 	const denylist = resolveDangerousNames(options.lang);
 	const denySet = new Set(denylist);
+	const lang = options.lang ?? DEFAULT_LANG;
+	// Records one dangerous-name finding; every site shares this shape.
+	const flagDangerous = (instancePath, keyword, params, what, suffix = "") => {
+		result.errors.push({
+			instancePath,
+			schemaPath: "#/dangerous-name",
+			keyword,
+			params: { ...params, lang },
+			message: `${what} for lang="${lang}"${suffix}`,
+		});
+	};
 
 	const visited = new WeakSet();
 	visited.add(obj);
 	result.depth = 1;
-	const stack = [[obj, "", 1]];
+	// Entries: [node, path, depth, role, base]. role is "map" for a keyword
+	// value that maps names to subschemas, "names" for a propertyNames
+	// subschema, undefined otherwise.
+	const stack = [[obj, "", 1, undefined, undefined]];
 
 	// Defense in depth: total number of regex patterns ReDoS-analyzed so far.
 	// Shared across top-level `pattern` and patternProperties keys. Once it
 	// exceeds MAX_REDOS_PATTERNS, no further pattern is analyzed and a single
 	// fail-closed budget finding is emitted (see redosBudgetExceeded).
 	let redosPatternCount = 0;
+	// Number() because the CLI hands this through as a string; analyze() has
+	// already rejected anything that is not a non-negative integer.
+	const maxRedosPatterns = Number(
+		options.maxRedosPatterns ?? MAX_REDOS_PATTERNS,
+	);
 	let redosBudgetReported = false;
 	// One-time flag: have we already recorded the collected-refs truncation
 	// finding? (See MAX_COLLECTED_REFS in the $ref/$dynamicRef collection below.)
@@ -494,15 +590,15 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 	// total-pattern cap has been exceeded, so callers can skip further analysis.
 	// Marked incomplete:true so --ignore cannot suppress it (analysis stopped).
 	const redosBudgetExceeded = (path) => {
-		if (redosPatternCount <= MAX_REDOS_PATTERNS) return false;
+		if (redosPatternCount <= maxRedosPatterns) return false;
 		if (!redosBudgetReported) {
 			redosBudgetReported = true;
 			result.errors.push({
 				instancePath: path,
 				schemaPath: "#/redos-budget",
 				keyword: "pattern",
-				params: { limit: MAX_REDOS_PATTERNS, incomplete: true },
-				message: `refusing to ReDoS-analyze more than ${MAX_REDOS_PATTERNS} patterns; remaining patterns not analyzed`,
+				params: { limit: maxRedosPatterns, incomplete: true },
+				message: `refusing to ReDoS-analyze more than ${maxRedosPatterns} patterns; remaining patterns not analyzed`,
 			});
 		}
 		return true;
@@ -562,13 +658,116 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		return true;
 	};
 
+	// Flags a regex (already vetted by analyzePattern) that matches any
+	// denylisted name; `label` names the site in the message.
+	const flagPatternMatches = (pattern, instancePath, keyword, label) => {
+		try {
+			// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+			// "u" like AJV, so \p{...} and friends mean what the validator reads.
+			const re = new RegExp(pattern, "u");
+			const matches = denylist.filter((n) => re.test(n));
+			if (matches.length > 0) {
+				flagDangerous(
+					instancePath,
+					keyword,
+					{ pattern, matches },
+					`${label} "${pattern}" matches deserialization vector(s)`,
+					`: ${matches.join(", ")}`,
+				);
+			}
+		} catch {
+			// unparseable regex; meta-schema safePattern rejects it
+		}
+	};
+
+	// Records the structural regex findings the meta-schema cannot see fully:
+	// alternation escaping the ^...$ anchors, and reachable control characters.
+	const checkPatternShape = (pattern, instancePath, keyword) => {
+		if (hasTopLevelAlternation(pattern)) {
+			result.errors.push({
+				instancePath,
+				schemaPath: "#/anchor",
+				keyword,
+				params: { pattern },
+				message: `${keyword} has a top-level | that escapes its ^...$ anchors; wrap the alternation in (?:...)`,
+			});
+		}
+		if (matchesControlChar(pattern)) {
+			result.errors.push({
+				instancePath,
+				schemaPath: "#/control",
+				keyword,
+				params: { pattern },
+				message: `${keyword} can match control characters (U+0000-U+001F, U+007F-U+009F other than \\t \\n \\v \\f \\r)`,
+			});
+		}
+	};
+
+	// ReDoS-analyzes one regex (a `pattern` value or a patternProperties key) and
+	// records any unsafe verdict. `label` prefixes the message so both sites read
+	// the same way. Returns false when the pattern is unsafe or unparseable.
+	const analyzePattern = (pattern, instancePath, keyword, label) => {
+		let reason;
+		try {
+			// The timeout bounds analysis TIME; the heap breaker above bounds
+			// MEMORY. No maxSteps: it would fail-close legitimate safe patterns.
+			// Stryker disable next-line ObjectLiteral: the timeout option bounds
+			// analysis TIME only; for any pattern fast enough for a test the
+			// safe/unsafe verdict is identical with or without it, so dropping it
+			// (-> {}) is an equivalent (timing-only) mutant.
+			// unicode: AJV compiles patterns with the u flag; without it \p{L} is
+			// read as a literal "p{L}" and overlapping classes look safe.
+			const patternResult = isSafePattern(pattern, {
+				timeout: redosTimeoutMs,
+				unicode: true,
+			});
+			if (patternResult.safe) return true;
+			// redos-detector always sets error (hitMaxScore) on unsafe verdicts.
+			reason = patternResult.error;
+		} catch {
+			reason = "parseError";
+		}
+		// hitMaxSteps only arises on a real library step limit, which cannot be
+		// triggered deterministically in a fast test.
+		// Stryker disable ConditionalExpression,StringLiteral
+		const tail =
+			reason === "parseError"
+				? "could not be parsed for ReDoS analysis"
+				: reason === "timedOut"
+					? `analysis timed out after ${redosTimeoutMs}ms (fail-closed as ReDoS)`
+					: reason === "hitMaxSteps"
+						? "analysis exceeded step limit (fail-closed as ReDoS)"
+						: "is vulnerable to ReDoS";
+		// Stryker restore ConditionalExpression,StringLiteral
+		result.errors.push({
+			instancePath,
+			schemaPath: "#/redos",
+			keyword,
+			params: { pattern, reason },
+			message: `${label} ${tail}`,
+		});
+		return false;
+	};
+
 	while (stack.length > 0) {
 		if (deadlinePassed()) {
 			timeoutBail();
 			return result;
 		}
 
-		const [current, path, currentDepth] = stack.pop();
+		const [current, path, currentDepth, role, parentBase] = stack.pop();
+		const isMap = role === "map";
+		// Base URI for resolving relative refs: an absolute $id (resolved against
+		// the enclosing base) replaces it. Inside a name map, "$id" is a property
+		// name, not a keyword.
+		let base = parentBase;
+		if (!isMap && typeof current.$id === "string") {
+			try {
+				base = new URL(current.$id, base).href;
+			} catch {
+				// relative $id with no absolute base, or not a URL: keep the parent's
+			}
+		}
 
 		const currentType = current.type;
 		const isType = (t) =>
@@ -617,6 +816,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				timeoutBail();
 				return result;
 			}
+			checkPatternShape(current.pattern, `${path}/pattern`, "pattern");
 			redosPatternCount++;
 			// Skip analysis (of this and every later pattern) once a backstop trips:
 			// the total-pattern cap or the heap circuit breaker (primary memory bound).
@@ -624,45 +824,21 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				!redosBudgetExceeded(`${path}/pattern`) &&
 				!redosHeapExceeded(`${path}/pattern`)
 			) {
-				try {
-					// The timeout bounds analysis TIME; the heap breaker above bounds
-					// MEMORY. No maxSteps: it would fail-close legitimate safe patterns.
-					// Stryker disable next-line ObjectLiteral: the timeout option bounds
-					// analysis TIME only; for any pattern fast enough for a test the
-					// safe/unsafe verdict is identical with or without it, so dropping it
-					// (-> {}) is an equivalent (timing-only) mutant.
-					const patternResult = isSafePattern(current.pattern, {
-						timeout: redosTimeoutMs,
-					});
-					if (!patternResult.safe) {
-						// redos-detector always sets error (hitMaxScore) on unsafe verdicts.
-						const reason = patternResult.error;
-						// timedOut/hitMaxSteps reasons only arise on a real library timeout,
-						// which cannot be triggered deterministically in a fast test.
-						// Stryker disable ConditionalExpression,StringLiteral
-						const message =
-							reason === "timedOut"
-								? `pattern analysis timed out after ${redosTimeoutMs}ms (fail-closed as ReDoS)`
-								: reason === "hitMaxSteps"
-									? "pattern analysis exceeded step limit (fail-closed as ReDoS)"
-									: "pattern is vulnerable to ReDoS";
-						// Stryker restore ConditionalExpression,StringLiteral
-						result.errors.push({
-							instancePath: `${path}/pattern`,
-							schemaPath: "#/redos",
-							keyword: "pattern",
-							params: { pattern: current.pattern, reason },
-							message,
-						});
-					}
-				} catch {
-					result.errors.push({
-						instancePath: `${path}/pattern`,
-						schemaPath: "#/redos",
-						keyword: "pattern",
-						params: { pattern: current.pattern, reason: "parseError" },
-						message: "pattern could not be parsed for ReDoS analysis",
-					});
+				const safe = analyzePattern(
+					current.pattern,
+					`${path}/pattern`,
+					"pattern",
+					"pattern",
+				);
+				// A propertyNames pattern admits every key it matches. Only a pattern
+				// that just passed ReDoS analysis is executed against the denylist.
+				if (safe && role === "names") {
+					flagPatternMatches(
+						current.pattern,
+						`${path}/pattern`,
+						"propertyNames",
+						"propertyNames pattern",
+					);
 				}
 			}
 		}
@@ -678,15 +854,53 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 			if (typeof site === "object" && site !== null && !Array.isArray(site)) {
 				for (const name of Object.keys(site)) {
 					if (denySet.has(name)) {
-						result.errors.push({
-							instancePath: `${path}/${siteKey}/${escapeJsonPointer(name)}`,
-							schemaPath: "#/dangerous-name",
-							keyword: siteKey,
-							params: { name, lang: options.lang ?? DEFAULT_LANG },
-							message: `${siteKey} key "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
-						});
+						flagDangerous(
+							`${path}/${siteKey}/${escapeJsonPointer(name)}`,
+							siteKey,
+							{ name },
+							`${siteKey} key "${name}" is a deserialization vector`,
+						);
 					}
 				}
+			}
+		}
+
+		// propertyNames is an allowlist of instance keys: an enum entry or const
+		// naming a deserialization vector admits it like declaring the property.
+		// Anything else (format, $ref, a combinator, a bare maxLength) cannot be
+		// checked against the denylist, so it fails closed.
+		if (role === "names") {
+			if (
+				!Array.isArray(current.enum) &&
+				!Object.hasOwn(current, "const") &&
+				typeof current.pattern !== "string"
+			) {
+				flagDangerous(
+					path,
+					"propertyNames",
+					{},
+					"propertyNames has no enum, const or pattern to rule out deserialization vectors",
+				);
+			}
+			if (Array.isArray(current.enum)) {
+				for (const [i, name] of current.enum.entries()) {
+					if (denySet.has(name)) {
+						flagDangerous(
+							`${path}/enum/${i}`,
+							"propertyNames",
+							{ name },
+							`propertyNames entry "${name}" is a deserialization vector`,
+						);
+					}
+				}
+			}
+			if (denySet.has(current.const)) {
+				flagDangerous(
+					`${path}/const`,
+					"propertyNames",
+					{ name: current.const },
+					`propertyNames const "${current.const}" is a deserialization vector`,
+				);
 			}
 		}
 
@@ -694,13 +908,12 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 			for (const [i, name] of current.required.entries()) {
 				// denySet only holds strings, so has(non-string) is already false.
 				if (denySet.has(name)) {
-					result.errors.push({
-						instancePath: `${path}/required/${i}`,
-						schemaPath: "#/dangerous-name",
-						keyword: "required",
-						params: { name, lang: options.lang ?? DEFAULT_LANG },
-						message: `required entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
-					});
+					flagDangerous(
+						`${path}/required/${i}`,
+						"required",
+						{ name },
+						`required entry "${name}" is a deserialization vector`,
+					);
 				}
 			}
 		}
@@ -719,13 +932,12 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 						for (const [i, name] of deps.entries()) {
 							// denySet only holds strings, so has(non-string) is already false.
 							if (denySet.has(name)) {
-								result.errors.push({
-									instancePath: `${path}/${depKey}/${escapeJsonPointer(trigger)}/${i}`,
-									schemaPath: "#/dangerous-name",
-									keyword: depKey,
-									params: { name, lang: options.lang ?? DEFAULT_LANG },
-									message: `${depKey} entry "${name}" is a deserialization vector for lang="${options.lang ?? DEFAULT_LANG}"`,
-								});
+								flagDangerous(
+									`${path}/${depKey}/${escapeJsonPointer(trigger)}/${i}`,
+									depKey,
+									{ name },
+									`${depKey} entry "${name}" is a deserialization vector`,
+								);
 							}
 						}
 					}
@@ -752,64 +964,35 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 					timeoutBail();
 					return result;
 				}
+				checkPatternShape(patternKey, keyPath, "patternProperties");
 				redosPatternCount++;
 				// Stop analyzing further patterns once a backstop trips: the
 				// total-pattern cap or the heap circuit breaker (primary memory bound).
 				if (redosBudgetExceeded(keyPath) || redosHeapExceeded(keyPath)) break;
-				let patternSafe = true;
-				try {
-					// The timeout bounds analysis TIME; the heap breaker above bounds
-					// MEMORY. No maxSteps: it would fail-close legitimate safe patterns.
-					// Stryker disable next-line ObjectLiteral: the timeout option bounds
-					// analysis TIME only; for any key fast enough for a test the verdict
-					// is identical with or without it, so dropping it is timing-equivalent.
-					const patternResult = isSafePattern(patternKey, {
-						timeout: redosTimeoutMs,
-					});
-					if (!patternResult.safe) {
-						patternSafe = false;
-						result.errors.push({
-							instancePath: keyPath,
-							schemaPath: "#/redos",
-							keyword: "patternProperties",
-							params: {
-								pattern: patternKey,
-								// redos-detector always sets error (hitMaxScore) on unsafe verdicts.
-								reason: patternResult.error,
-							},
-							message: `patternProperties key "${patternKey}" is vulnerable to ReDoS`,
-						});
-					}
-				} catch {}
-				if (!patternSafe) continue;
-				try {
-					// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
-					const re = new RegExp(patternKey);
-					const matches = denylist.filter((n) => re.test(n));
-					if (matches.length > 0) {
-						result.errors.push({
-							instancePath: keyPath,
-							schemaPath: "#/dangerous-name",
-							keyword: "patternProperties",
-							params: {
-								pattern: patternKey,
-								matches,
-								lang: options.lang ?? DEFAULT_LANG,
-							},
-							message: `patternProperties key "${patternKey}" matches deserialization vector(s) for lang="${options.lang ?? DEFAULT_LANG}": ${matches.join(", ")}`,
-						});
-					}
-				} catch {
-					// unparseable regex; meta-schema safePattern rejects it
+				if (
+					!analyzePattern(
+						patternKey,
+						keyPath,
+						"patternProperties",
+						`patternProperties key "${patternKey}"`,
+					)
+				) {
+					continue;
 				}
+				flagPatternMatches(
+					patternKey,
+					keyPath,
+					"patternProperties",
+					"patternProperties key",
+				);
 			}
 		}
 
 		// Collect remote $ref, $dynamicRef (2020-12), and $recursiveRef (2019-09)
-		// URLs as SSRF fetch targets. $id is deliberately NOT collected: it declares
-		// a base URI identifier, not a fetch target, and the -r/--ref-schema-files
-		// flag uses $id hostnames as the SAFE list, so flagging $id would self-flag
-		// the user's own schema.
+		// URLs as SSRF fetch targets. A relative ref is resolved against the $id
+		// base, because that is where a loader fetches it from. A bare $id is NOT
+		// collected: it declares an identifier, not a fetch target, and the
+		// -r/--ref-schema-files flag uses $id hostnames as the SAFE list.
 		for (const refKey of ["$ref", "$dynamicRef", "$recursiveRef"]) {
 			const refValue = current[refKey];
 			if (
@@ -818,7 +1001,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				!refValue.startsWith("#")
 			) {
 				try {
-					const url = new URL(refValue);
+					const url = new URL(refValue, base);
 					if (url.hostname) {
 						// Backstop: stop buffering once the collected-refs cap is reached,
 						// recording one truncation finding. Without this, a schema with a
@@ -838,7 +1021,8 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 						} else {
 							result.refs.push({
 								hostname: url.hostname,
-								ref: refValue,
+								// Report a relative ref by its resolved URL.
+								ref: URL.canParse(refValue) ? refValue : url.href,
 								path: `${path}/${refKey}`,
 							});
 						}
@@ -850,7 +1034,10 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		}
 
 		for (const key in current) {
-			if (Object.hasOwn(current, key) && !INSTANCE_DATA_KEYS.has(key)) {
+			if (
+				Object.hasOwn(current, key) &&
+				(isMap || !INSTANCE_DATA_KEYS.has(key))
+			) {
 				const value = current[key];
 				if (
 					typeof value === "object" &&
@@ -864,7 +1051,17 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 						result.depthExceeded = true;
 						return result;
 					}
-					stack.push([value, `${path}/${escapeJsonPointer(key)}`, newDepth]);
+					stack.push([
+						value,
+						`${path}/${escapeJsonPointer(key)}`,
+						newDepth,
+						SCHEMA_MAP_KEYS.has(key)
+							? "map"
+							: !isMap && key === "propertyNames"
+								? "names"
+								: undefined,
+						base,
+					]);
 				}
 			}
 		}
@@ -878,9 +1075,10 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 // IPv6: unspecified/loopback ::/127, unique-local fc00::/7, link-local
 // fe80::/10 + site-local fec0::/10 (combined fe80::/9), multicast ff00::/8,
 // and documentation 2001:db8::/32. Embedded-IPv4 carriers (IPv4-mapped
-// ::ffff:0:0/96, NAT64 64:ff9b::/96, 6to4 2002::/16) classify by their
-// embedded IPv4 instead; BlockList checks ::ffff forms against the IPv4
-// rules natively, and isPrivateIP below decodes NAT64/6to4.
+// ::ffff:0:0/96, NAT64 64:ff9b::/96, 6to4 2002::/16, IPv4-compatible ::/96,
+// SIIT ::ffff:0:0:0/96) classify by their embedded IPv4 instead; BlockList
+// checks ::ffff forms against the IPv4 rules natively, and isPrivateIP below
+// decodes the rest.
 const privateRanges = new BlockList();
 for (const [subnet, prefix] of [
 	["0.0.0.0", 8], // "this" network
@@ -958,18 +1156,31 @@ export const isPrivateIP = (ip) => {
 	// 64:ff9b:0:0:0:0:X:Y with the IPv4 embedded in the last two groups. The
 	// sibling 64:ff9b:1::/48 (RFC 8215) is LOCAL-USE with a deployment-chosen
 	// embedding offset, so it is blocked wholesale by privateRanges instead.
+	// Likewise the deprecated IPv4-compatible ::/96 (RFC 4291 2.5.5.1, which
+	// also covers :: and ::1 via 0.0.0.0/8) and SIIT ::ffff:0:0/96 (RFC 2765).
 	const normalized = g.map((n) => n.toString(16)).join(":");
-	if (normalized.startsWith("64:ff9b:0:0:0:0:"))
+	if (
+		["64:ff9b:0:0:0:0:", "0:0:0:0:0:0:", "0:0:0:0:ffff:0:"].some((p) =>
+			normalized.startsWith(p),
+		)
+	)
 		return embeddedIPv4Private(g[6], g[7]);
 	return privateRanges.check(addr, "ipv6");
 };
 
-const lookupHostname = async (hostname, entries, timeoutMs) => {
+const lookupHostname = async (hostname, entries, timeoutMs, lookup) => {
+	let timer;
 	try {
-		const results = await dnsLookup(hostname, {
-			all: true,
-			signal: AbortSignal.timeout(timeoutMs),
-		});
+		// dns.lookup ignores AbortSignal, so the timeout is enforced by racing a
+		// timer; a lookup that loses the race falls into the fail-closed catch.
+		// ponytail: the losing getaddrinfo still holds a libuv threadpool slot
+		// until the OS resolver gives up; raise UV_THREADPOOL_SIZE if that bites.
+		const results = await Promise.race([
+			lookup(hostname, { all: true }),
+			new Promise((_, reject) => {
+				timer = setTimeout(reject, timeoutMs);
+			}),
+		]).finally(() => clearTimeout(timer));
 		const privateAddr = results.find((r) => isPrivateIP(r.address));
 		if (!privateAddr) return [];
 		return entries.map(({ ref, path }) => ({
@@ -995,6 +1206,8 @@ export const resolveSSRFRefs = async (refs, options = {}) => {
 	// timeout magnitude, never the resolve/abort outcome; equivalent mutant.
 	const timeoutMs = options.dnsTimeoutMs ?? DNS_TIMEOUT_MS;
 	const concurrency = options.dnsConcurrency ?? DNS_CONCURRENCY;
+	// Injectable resolver (the system boundary) for deterministic tests.
+	const lookup = options.lookup ?? dnsLookup;
 	const safeHostnames = options.safeHostnames ?? new Set();
 	const hostnameMap = new Map();
 	for (const entry of refs) {
@@ -1065,7 +1278,7 @@ export const resolveSSRFRefs = async (refs, options = {}) => {
 		const batch = batches.slice(i, i + concurrency);
 		const batchResults = await Promise.all(
 			batch.map(([hostname, entries]) =>
-				lookupHostname(hostname, entries, timeoutMs),
+				lookupHostname(hostname, entries, timeoutMs, lookup),
 			),
 		);
 		results.push(...batchResults);
@@ -1108,6 +1321,7 @@ export const analyze = async (schema, options = {}) => {
 		"dnsTotalTimeoutMs",
 		"redosTimeoutMs",
 		"redosHeapBudgetBytes",
+		"maxRedosPatterns",
 	]) {
 		if (options[key] != null) {
 			const n = Number(options[key]);
@@ -1115,6 +1329,11 @@ export const analyze = async (schema, options = {}) => {
 				throw new TypeError(`${key} must be a non-negative integer`);
 			}
 		}
+	}
+	// redos-detector throws on a 0 timeout, which would misreport every pattern
+	// as unparseable.
+	if (options.redosTimeoutMs != null && Number(options.redosTimeoutMs) === 0) {
+		throw new TypeError("redosTimeoutMs must be a positive integer");
 	}
 
 	// new Set(undefined) is empty, so an absent --ignore list makes this filter
@@ -1138,7 +1357,7 @@ export const analyze = async (schema, options = {}) => {
 		serialized = JSON.stringify(schema);
 	} catch (err) {
 		throw new TypeError(
-			`schema must be JSON-serializable (circular reference?): ${err.message}`,
+			`schema must be JSON-serializable (circular reference or too deeply nested): ${err.message}`,
 		);
 	}
 	if (
@@ -1170,6 +1389,7 @@ export const analyze = async (schema, options = {}) => {
 		// undefined (absent flag) falls back to the REDOS_* defaults inside crawlSchema.
 		redosTimeoutMs: options.redosTimeoutMs,
 		redosHeapBudgetBytes: options.redosHeapBudgetBytes,
+		maxRedosPatterns: options.maxRedosPatterns,
 	});
 
 	// Depth and timeout signal INCOMPLETE analysis: the crawl bailed early and
@@ -1256,10 +1476,16 @@ export const formatSarif = (errors, inputPath, cwd = process.cwd()) => {
 	const artifactLocation = insideCwd
 		? { uri: relPath, uriBaseId: "SRCROOT" }
 		: { uri: pathToFileURL(resolve(inputPath)).href };
-	const ruleIdOf = (err) =>
-		err.schemaPath
-			? err.schemaPath.replace(/^#\//, "").split("/")[0] || err.keyword
-			: (err.keyword ?? "unknown");
+	// A finding under #/$defs/<name>/... is rule <name>. Anything else is
+	// relative to the root schemaBase $ref (e.g. #/allOf/3/then/required), where
+	// only the full path identifies the check, so the path is the rule.
+	const ruleIdOf = (err) => {
+		if (!err.schemaPath) return err.keyword ?? "unknown";
+		const path = err.schemaPath.replace(/^#\//, "");
+		const [first, second] = path.split("/");
+		if ((first === "$defs" || first === "definitions") && second) return second;
+		return path || err.keyword;
+	};
 	const ruleMap = new Map();
 	for (const err of errors) {
 		const ruleId = ruleIdOf(err);
@@ -1325,6 +1551,15 @@ export const formatSarif = (errors, inputPath, cwd = process.cwd()) => {
 
 // --- CLI entrypoint ---
 
+// Report lines carry schema-controlled text (property names, patterns, file
+// names). Escaping every control character (\p{Cc}: C0, DEL, C1) keeps a hostile
+// schema from injecting terminal escape sequences or forging report lines.
+const printable = (line) =>
+	line.replace(
+		/\p{Cc}/gu,
+		(c) => `\\u${c.codePointAt(0).toString(16).padStart(4, "0")}`,
+	);
+
 // Thrown by `die` to unwind to run()'s handler with an exit code, instead of
 // calling process.exit (which would make the entrypoint untestable in-process).
 class CliExit extends Error {
@@ -1347,20 +1582,22 @@ export const run = async (argv, io = {}) => {
 	const globFn = io.glob ?? glob;
 
 	const die = (msg) => {
-		errorLog(`Error: ${msg}`);
+		errorLog(printable(`Error: ${msg}`));
 		throw new CliExit(2);
 	};
 
 	const readJsonFile = async (filePath, label) => {
 		let content;
 		try {
-			// No encoding argument: JSON.parse coerces the returned Buffer itself.
 			content = await readFileFn(filePath);
 		} catch (err) {
 			die(`cannot read ${label}: ${err.message}`);
 		}
 		try {
-			return JSON.parse(content);
+			// String() decodes the Buffer as UTF-8; a leading byte-order mark (which
+			// Windows editors emit and JSON.parse rejects) is dropped. Only offset 0:
+			// an interior U+FEFF is data.
+			return JSON.parse(String(content).replace(/^\uFEFF/, ""));
 		} catch {
 			die(`invalid JSON in ${label}`);
 		}
@@ -1381,6 +1618,7 @@ export const run = async (argv, io = {}) => {
 					"analysis-timeout-ms": { type: "string" },
 					"redos-timeout-ms": { type: "string" },
 					"redos-heap-budget-bytes": { type: "string" },
+					"max-redos-patterns": { type: "string" },
 					"max-ssrf-hostnames": { type: "string" },
 					"dns-total-timeout-ms": { type: "string" },
 					ignore: { type: "string", multiple: true },
@@ -1400,21 +1638,24 @@ export const run = async (argv, io = {}) => {
 			log(`Usage: sast-json-schema [options] <file...>
 
 Options:
-  --override-max-items <n>         Override max items limit (default: 1024)
+  --override-max-items <n>         Raise the maxItems limit; cannot lower it (default: 1024)
   --override-max-depth <n>         Override max depth limit (default: 32)
-  --override-max-properties <n>    Override max properties limit (default: 1024)
+  --override-max-properties <n>    Raise the maxProperties limit; cannot lower it (default: 1024)
   --max-schema-size <bytes>        Max serialized schema size in bytes (default: 67108864 = 64 MiB)
   --analysis-timeout-ms <ms>       Wall-clock budget for the schema crawl (default: 60000)
   --redos-timeout-ms <ms>          Per-pattern time budget for ReDoS analysis; a pattern that
-                                   exceeds it is fail-closed as unsafe (default: 1000)
+                                   exceeds it is fail-closed as unsafe (default: 1000, minimum: 1)
   --redos-heap-budget-bytes <n>    Retained-heap budget for ReDoS analysis; once exceeded the
                                    remaining patterns are not analyzed (default: 134217728 = 128 MiB).
                                    Raise both only for trusted first-party schemas, and keep the
                                    process heap (--max-old-space-size) well above the heap budget
+  --max-redos-patterns <n>         Max regex patterns ReDoS-analyzed per schema; beyond it the rest are
+                                   not analyzed and a finding --ignore cannot suppress is reported (default: 256)
   --max-ssrf-hostnames <n>         Max distinct remote $ref hostnames resolved for SSRF (default: 256)
   --dns-total-timeout-ms <ms>      Total budget for all SSRF DNS lookups (default: 30000)
   --ignore <instancePath>          Suppress errors by instancePath or instancePath:keyword (repeatable).
-                                   Depth and timeout findings cannot be suppressed (they mean analysis was incomplete)
+                                   Findings that mean analysis was incomplete (depth, timeout, budgets
+                                   and caps) cannot be suppressed
   --offline                        Skip SSRF DNS resolution for remote $ref URLs
   -r, --ref-schema-files <file>    Load a reference schema; its $id hostname is treated as safe
                                    and skipped during SSRF DNS checks (repeatable)
@@ -1430,7 +1671,8 @@ Options:
 Exit codes:
   0    no issues found
   1    any schema has issues, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget findings
-  2    usage / tool error: bad args, unreadable file, invalid JSON, unsupported $schema, oversized schema, or non-JSON-serializable (circular) schema`);
+  2    usage / tool error: bad args, unreadable file, invalid JSON, unsupported $schema, oversized schema, or non-JSON-serializable (circular or too deeply nested) schema.
+       With several files the others are still analyzed and reported; 2 wins over 1`);
 			return 0;
 		}
 
@@ -1497,6 +1739,7 @@ Exit codes:
 			analysisTimeoutMs: values["analysis-timeout-ms"],
 			redosTimeoutMs: values["redos-timeout-ms"],
 			redosHeapBudgetBytes: values["redos-heap-budget-bytes"],
+			maxRedosPatterns: values["max-redos-patterns"],
 			maxHostnames: values["max-ssrf-hostnames"],
 			dnsTotalTimeoutMs: values["dns-total-timeout-ms"],
 			ignore: values.ignore,
@@ -1528,57 +1771,83 @@ Exit codes:
 		// the size gate below, so each is stat'd exactly once (no TOCTOU window
 		// between the two checks). Glob matches are never stat'd here, so they
 		// carry null and the size gate stats them itself.
-		const inputs = [];
-		for (const input of positionals) {
+		// Per-file failures (unreadable, invalid JSON, oversized, analyze() throw)
+		// are reported through die() but must not discard the other files: this
+		// catches die's unwind for one file, records the tool error, and moves on.
+		let toolError = false;
+		const perFile = async (fn) => {
 			try {
-				inputs.push([input, await statFn(resolve(input))]);
+				await fn();
 			} catch (err) {
-				const matches = [];
-				try {
-					for await (const match of globFn(input)) matches.push(match);
-				} catch {
-					// unglobbable pattern; report the stat failure below
-				}
-				if (matches.length === 0) {
-					die(`cannot read file "${input}": ${err.message}`);
-				}
-				inputs.push(...matches.sort().map((match) => [match, null]));
+				if (!(err instanceof CliExit)) throw err;
+				toolError = true;
 			}
+		};
+
+		const inputs = [];
+		let unresolved = 0;
+		for (const input of positionals) {
+			await perFile(async () => {
+				try {
+					inputs.push([input, await statFn(resolve(input))]);
+				} catch (err) {
+					const matches = [];
+					try {
+						for await (const match of globFn(input)) matches.push(match);
+					} catch {
+						// unglobbable pattern; report the stat failure below
+					}
+					if (matches.length === 0) {
+						unresolved++;
+						die(`cannot read file "${input}": ${err.message}`);
+					}
+					inputs.push(...matches.sort().map((match) => [match, null]));
+				}
+			});
 		}
 
 		// Analyze every <file> in one invocation, so the fixed startup cost (Node
 		// boot + one lazy validator compile per draft) is paid once, not per file.
-		// Any per-file failure (unreadable, invalid JSON, oversized, analyze()
-		// throw) is a tool error and exits 2 immediately, as it did for one file.
 		const results = [];
 		for (const [input, knownStat] of inputs) {
-			const filePath = resolve(input);
-			let fileStat = knownStat;
-			if (!fileStat) {
-				try {
-					fileStat = await statFn(filePath);
-				} catch (err) {
-					die(`cannot read file "${input}": ${err.message}`);
+			await perFile(async () => {
+				const filePath = resolve(input);
+				let fileStat = knownStat;
+				if (!fileStat) {
+					try {
+						fileStat = await statFn(filePath);
+					} catch (err) {
+						die(`cannot read file "${input}": ${err.message}`);
+					}
 				}
-			}
-			if (fileStat.size > fileSizeLimit) {
-				die(`schema file exceeds ${fileSizeLimit} byte size limit: "${input}"`);
-			}
-			const schema = await readJsonFile(filePath, `file "${input}"`);
-			try {
-				results.push([input, await analyze(schema, options)]);
-			} catch (err) {
-				die(`analyzing schema "${input}": ${err.message}`);
-			}
+				if (fileStat.size > fileSizeLimit) {
+					die(
+						`schema file exceeds ${fileSizeLimit} byte size limit: "${input}"`,
+					);
+				}
+				const schema = await readJsonFile(filePath, `file "${input}"`);
+				try {
+					results.push([input, await analyze(schema, options)]);
+				} catch (err) {
+					die(`analyzing schema "${input}": ${err.message}`);
+				}
+			});
 		}
+		// A tool error (exit 2) outranks findings (exit 1).
 		const anyIssues = results.some(([, errors]) => errors.length > 0);
+		const exitCode = toolError ? 2 : anyIssues ? 1 : 0;
+		// Nothing analyzed (e.g. the only file was unreadable): no report at all.
+		if (results.length === 0) return exitCode;
 
 		if (values.format === "json" || values.format === "sarif") {
 			if (values.format === "json") {
 				// One file keeps the historical bare-array payload; several files
-				// nest each file's array under its input path.
+				// (counting ones that failed) nest each analyzed file's array under
+				// its input path.
 				const payload =
-					results.length === 1 ? results[0][1] : Object.fromEntries(results);
+					inputs.length + unresolved === 1
+						? results[0][1]
+						: Object.fromEntries(results);
 				write(`${JSON.stringify(payload)}\n`);
 			} else {
 				// SARIF 2.1.0 allows multiple runs per log: one run per input file.
@@ -1591,19 +1860,26 @@ Exit codes:
 				write(`${JSON.stringify(sarif)}\n`);
 			}
 			for (const [input, errors] of results) {
-				if (errors.length) errorLog(`${input} has ${errors.length} issue(s)`);
+				if (errors.length)
+						errorLog(printable(`${input} has ${errors.length} issue(s)`));
 			}
-			return anyIssues ? 1 : 0;
+			return exitCode;
 		}
 		for (const [input, errors] of results) {
 			if (errors.length) {
-				log(`${input} has issues`);
-				log(JSON.stringify(errors, null, 2));
+				log(printable(`${input} has ${errors.length} issue(s)`));
+				for (const err of errors) {
+					log(
+							printable(
+								`  ${err.instancePath || "(root)"}  ${err.message} [${err.keyword}]`,
+							),
+						);
+				}
 			} else {
-				log(`${input} has no issues`);
+				log(printable(`${input} has no issues`));
 			}
 		}
-		return anyIssues ? 1 : 0;
+		return exitCode;
 	} catch (err) {
 		if (err instanceof CliExit) return err.code;
 		throw err;
@@ -1612,8 +1888,8 @@ Exit codes:
 
 // Stryker disable ConditionalExpression,LogicalOperator,BlockStatement,MethodExpression: the
 // main-module guard and its body only run when cli.js IS the process entry, which the
-// in-process tests (which import run() directly) never are; the spawned subprocess in
-// cli.test.js exercises it but perTest cannot attribute that coverage back here.
+// in-process tests (which import run() directly) never are; only the spawned
+// subprocess in cli.test.js exercises it.
 // realpathSync follows symlinks so the npm .bin shim (a symlink to cli.js)
 // counts as direct execution; import.meta.filename is already the realpath
 // under ESM, so comparing against resolve(argv[1]) never matched via npx and
@@ -1632,6 +1908,10 @@ try {
 }
 if (entryPath === import.meta.filename) {
 	process.exitCode = await run(process.argv.slice(2));
+	// A DNS lookup that lost its timeout race still holds a libuv request until
+	// the OS resolver gives up. Unref'd, this timer only fires if such a handle
+	// is keeping the process alive: stdout gets a second to flush, then we exit.
+	setTimeout(() => process.exit(), 1_000).unref();
 }
 /* node:coverage enable */
 // Stryker restore all

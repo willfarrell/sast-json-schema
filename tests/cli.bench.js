@@ -1,15 +1,12 @@
-import test from "node:test";
-import { Bench } from "tinybench";
+import { bench, suite } from "node:bench";
 import { analyze, crawlSchema, MAX_DEPTH } from "../cli.js";
 
 // Benchmarks the ANALYSIS ENGINE (analyze / crawlSchema), the code that ingests
-// untrusted input. Like index.perf.js these are tracked numbers, not gated
+// untrusted input. Like index.bench.js these are tracked numbers, not gated
 // thresholds: the suite only fails if a benchmark throws. All runs use
 // offline:true so no network/DNS occurs.
 
-test("perf: analyze engine benchmarks", async () => {
-	const suite = new Bench({ name: "sast-json-schema-engine" });
-
+suite("sast-json-schema-engine", () => {
 	const smallCleanSchema = {
 		$schema: "https://json-schema.org/draft/2020-12/schema",
 		type: "object",
@@ -54,20 +51,38 @@ test("perf: analyze engine benchmarks", async () => {
 	};
 	const deepSchema = buildDeepSchema(Math.floor((MAX_DEPTH - 2) / 2));
 
-	suite
-		.add("analyze small clean schema", async () => {
-			await analyze(smallCleanSchema, { offline: true });
-		})
-		.add(
-			"analyze 200 simple patternProperties (heap-breaker watch)",
-			async () => {
+	bench(
+		"analyze small clean schema",
+		{ warmup: 10, samples: 30 },
+		async (b) => {
+			const ops = 100;
+			b.start();
+			for (let i = 0; i < ops; i++) {
+				await analyze(smallCleanSchema, { offline: true });
+			}
+			b.end(ops);
+		},
+	);
+	bench(
+		"analyze 200 simple patternProperties (heap-breaker watch)",
+		{ warmup: 5, samples: 30 },
+		async (b) => {
+			const ops = 10;
+			b.start();
+			for (let i = 0; i < ops; i++) {
 				await analyze(manyPatternsSchema, { offline: true });
-			},
-		)
-		.add("crawlSchema deeply-nested schema near MAX_DEPTH", () => {
-			crawlSchema(deepSchema);
-		});
-
-	await suite.run();
-	console.table(suite.table());
+			}
+			b.end(ops);
+		},
+	);
+	bench(
+		"crawlSchema deeply-nested schema near MAX_DEPTH",
+		{ warmup: 10, samples: 30 },
+		(b) => {
+			const ops = 1_000;
+			b.start();
+			for (let i = 0; i < ops; i++) crawlSchema(deepSchema);
+			b.end(ops);
+		},
+	);
 });
