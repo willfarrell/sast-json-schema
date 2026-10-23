@@ -233,7 +233,7 @@
 				}
 			},
 			{
-"$comment": "Reject unbounded group repetition: )+ )*. Allows )? (optional), ){n} (exact), ){n,m} (bounded).",
+				"$comment": "Reject unbounded group repetition: )+ )*. Allows )? (optional), ){n} (exact), ){n,m} (bounded).",
 				"not": {
 					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\)[+*]"
 				}

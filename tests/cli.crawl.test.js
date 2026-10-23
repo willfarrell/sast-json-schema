@@ -2897,7 +2897,10 @@ describe("crawlSchema name-map and base-URI edges", () => {
 			$id: "https://outer.example/a.json",
 			properties: { $id: "https://evil.example/", x: { $ref: "y.json" } },
 		});
-		deepStrictEqual(r.refs.map((e) => e.hostname), ["outer.example"]);
+		deepStrictEqual(
+			r.refs.map((e) => e.hostname),
+			["outer.example"],
+		);
 	});
 
 	test("a non-string $id is ignored, even one that stringifies to a URL", () => {
@@ -3116,11 +3119,7 @@ describe("crawlSchema denylist matching uses AJV's unicode regex semantics", () 
 				(e) => e.schemaPath === "#/redos",
 			);
 		strictEqual(redos("^\\p{L}+\\p{Lu}+$").length, 1);
-		strictEqual(
-			redos("^\\p{L}+$").length,
-			0,
-			"a single class is still safe",
-		);
+		strictEqual(redos("^\\p{L}+$").length, 0, "a single class is still safe");
 	});
 });
 
@@ -3130,6 +3129,31 @@ describe("crawlSchema control-char scan on malformed patterns", () => {
 			const r = crawlSchema({ type: "string", pattern });
 			ok(!r.errors.some((e) => e.schemaPath === "#/control"), pattern);
 		}
+	});
+
+	// Regression for CodeQL js/polynomial-redos: a global regex rescanned the tail
+	// from every [ or \P{, which took seconds on a 100k-character pattern.
+	test("many unterminated [ or \\P{ are scanned in linear time", () => {
+		for (const pattern of [
+			`^${"[".repeat(100_000)}`,
+			`^${"\\P{".repeat(50_000)}`,
+		]) {
+			const r = crawlSchema({ type: "string", pattern });
+			ok(
+				!r.errors.some(
+					(e) => e.schemaPath === "#/control" || e.schemaPath === "#/anchor",
+				),
+			);
+		}
+	});
+
+	test("after an unterminated [ the rest is still scanned as plain atoms", () => {
+		const paths = (pattern) =>
+			crawlSchema({ type: "string", pattern }).errors.map((e) => e.schemaPath);
+		ok(paths("^[a[b|c$").includes("#/anchor"));
+		ok(paths("^[a[b\\x85$").includes("#/control"));
+		ok(paths("^\\p{L\\p{L}\\x85$").includes("#/control"));
+		ok(paths("^\\p{L\\x85$").includes("#/control"));
 	});
 });
 
@@ -3156,6 +3180,12 @@ describe("crawlSchema control-char and anchoring edges", () => {
 		"^[\\]\\x85]$",
 		"^[a\\\\]\\x85$",
 		"^\\{\\x85$",
+		// A later } must not turn a plain escape into a \p{...}-style atom.
+		"^\\.\\x85}$",
+		"^\\u0085}$",
+		"^\\x{\\x85}$",
+		// A closed \p{...} does not stop the next one being read whole.
+		"^\\p{L}\\p{Cc}$",
 	]) {
 		test(`control: flags ${JSON.stringify(pattern)}`, () => {
 			const [e, ...rest] = findings(pattern, "#/control");
@@ -3172,6 +3202,7 @@ describe("crawlSchema control-char and anchoring edges", () => {
 		"^\\x7e$",
 		"^\\u{a0}$",
 		"^[\\t-\\r]$",
+		"^a\\",
 	]) {
 		test(`control: does not flag ${JSON.stringify(pattern)}`, () => {
 			strictEqual(findings(pattern, "#/control").length, 0);
@@ -3187,7 +3218,13 @@ describe("crawlSchema control-char and anchoring edges", () => {
 			);
 		});
 	}
-	for (const pattern of ["^(?:[)]|b)$", "^(?:\\)|b)$", "^(?:[\\]|]|b)$"]) {
+	for (const pattern of [
+		"^(?:[)]|b)$",
+		"^(?:\\)|b)$",
+		"^(?:[\\]|]|b)$",
+		"^[\\]|]$",
+		"^\\][|]$",
+	]) {
 		test(`anchor: does not flag ${JSON.stringify(pattern)}`, () => {
 			strictEqual(findings(pattern, "#/anchor").length, 0);
 		});
@@ -3221,6 +3258,8 @@ describe("crawlSchema propertyNames finding shapes", () => {
 	test("a non-array enum restricts nothing, so only the fail-closed finding fires", () => {
 		const errs = dn({ enum: "__proto__" });
 		strictEqual(errs.length, 1);
-		ok(errs[0].message.startsWith("propertyNames has no enum, const or pattern"));
+		ok(
+			errs[0].message.startsWith("propertyNames has no enum, const or pattern"),
+		);
 	});
 });

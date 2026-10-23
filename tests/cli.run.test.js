@@ -212,7 +212,10 @@ describe("run() output formats", () => {
 		ok(lines.length > 0);
 		ok(!r.log.join("\n").includes("instancePath"));
 		for (const line of lines) ok(/^ {2}\S.* \[\S+\]$/.test(line), line);
-		ok(lines.some((l) => l.startsWith("  (root)  ")), lines.join("\n"));
+		ok(
+			lines.some((l) => l.startsWith("  (root)  ")),
+			lines.join("\n"),
+		);
 	});
 
 	test("json format with no issues writes [] and exits 0", async () => {

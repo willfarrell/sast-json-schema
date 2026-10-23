@@ -453,19 +453,37 @@ const MIN_MAX_PAIRS = [
 	["object", "minProperties", "maxProperties"],
 ];
 
-// An escape or a whole character class: the parts of a regex whose inner
-// ( ) | are literals, not syntax.
-const REGEX_ESCAPE_OR_CLASS = /\\.|\[(?:\\.|[^\\\]])*\]/gsu;
+// Index of the ] closing the character class opened at `open`, or -1 when it
+// never closes. Escapes inside the class are skipped as pairs, so \] does not
+// close it. Patterns are untrusted, so the regex scanners below are hand-written
+// and linear: a global regex over "[[[[..." or "\p{\p{..." would be quadratic.
+// A class that never closes means no later [ can close either (the scan
+// from it sees the same tail), so the scanners stop looking after one failure.
+const classEnd = (pattern, open) => {
+	// Stryker disable next-line EqualityOperator: pattern[length] is undefined and matches neither branch.
+	for (let i = open + 1; i < pattern.length; i++) {
+		if (pattern[i] === "\\") i++;
+		else if (pattern[i] === "]") return i;
+	}
+	return -1;
+};
 
 // True when `pattern` has a `|` outside every group and character class, so
 // ^A|B$ parses as (^A)|(B$) and the anchors no longer bind the whole string.
+// Escapes and whole classes are skipped: their inner ( ) | are literals.
 // The meta-schema can only see a few group levels deep; this scan has no limit.
 const hasTopLevelAlternation = (pattern) => {
 	let depth = 0;
-	// Stryker disable next-line StringLiteral: any replacement without ( ) | is
-	// equivalent; only removing the escapes and classes matters.
-	for (const c of pattern.replace(REGEX_ESCAPE_OR_CLASS, "")) {
-		if (c === "(") depth++;
+	let classesClose = true;
+	// Stryker disable next-line EqualityOperator: pattern[length] is undefined and matches no branch.
+	for (let i = 0; i < pattern.length; i++) {
+		const c = pattern[i];
+		if (c === "\\") i++;
+		else if (c === "[" && classesClose) {
+			const end = classEnd(pattern, i);
+			if (end === -1) classesClose = false;
+			else i = end;
+		} else if (c === "(") depth++;
 		else if (c === ")") depth--;
 		else if (c === "|" && depth === 0) return true;
 	}
@@ -478,18 +496,57 @@ const CONTROL_CHARS = Array.from({ length: 0xa0 }, (_, c) =>
 	String.fromCodePoint(c),
 ).filter((ch) => /[^\t-\r -~]/u.test(ch));
 
-// One single-character atom of a regex: a character class, an escape with its
+// A fixed-length escape at the sticky index: \xHH, \uHHHH, \cX, or \ plus one
+// code point. Bounded, so it cannot backtrack.
+const FIXED_ESCAPE = /\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|c[A-Za-z]|.)/suy;
+
+// Each single-character atom of a regex: a character class, an escape with its
 // full argument, or any other character. Group syntax, quantifiers and anchors
 // also come out as "atoms", but none of them compiles on its own under the u
-// flag, so matchesControlChar skips them.
-const REGEX_ATOM =
-	/\[(?:\\.|[^\\\]])*\]|\\(?:[pPu]\{[^}]*\}|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|c[A-Za-z]|.)|[^\\[]/gsu;
+// flag, so matchesControlChar skips them. An unterminated [ and a trailing \
+// are not atoms. Linear, like hasTopLevelAlternation: once a class or a \p{
+// fails to close, later ones cannot close either, so neither is searched again.
+function* regexAtoms(pattern) {
+	let classesClose = true;
+	let bracesClose = true;
+	let i = 0;
+	while (i < pattern.length) {
+		// Index of the atom's last code unit.
+		let end = -1;
+		if (pattern[i] === "[") {
+			if (classesClose) end = classEnd(pattern, i);
+			if (end === -1) {
+				classesClose = false;
+				i++;
+				continue;
+			}
+		} else if (pattern[i] === "\\") {
+			// \p{...}, \P{...} and \u{...} run to the next }.
+			if (pattern[i + 2] === "{" && "pPu".includes(pattern[i + 1])) {
+				// Stryker disable next-line ConditionalExpression: skips only a search that would fail.
+				if (bracesClose) end = pattern.indexOf("}", i + 3);
+				// Stryker disable next-line ConditionalExpression,UnaryOperator,BooleanLiteral: speed only.
+				if (end === -1) bracesClose = false;
+			}
+			if (end === -1) {
+				FIXED_ESCAPE.lastIndex = i;
+				const fixed = FIXED_ESCAPE.exec(pattern);
+				if (fixed === null) return;
+				end = i + fixed[0].length - 1;
+			}
+		} else {
+			end = i + String.fromCodePoint(pattern.codePointAt(i)).length - 1;
+		}
+		yield pattern.slice(i, end + 1);
+		i = end + 1;
+	}
+}
 
 // True when any atom of `pattern` can match a control character, whatever the
 // spelling: a range spanning one ([ -￿]), a property (\p{Any}), an escape
 // or a raw character. The regex engine decides, so no spelling is missed.
 const matchesControlChar = (pattern) => {
-	for (const [atom] of pattern.matchAll(REGEX_ATOM)) {
+	for (const atom of regexAtoms(pattern)) {
 		let re;
 		try {
 			// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
@@ -662,8 +719,8 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 	// denylisted name; `label` names the site in the message.
 	const flagPatternMatches = (pattern, instancePath, keyword, label) => {
 		try {
-			// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
 			// "u" like AJV, so \p{...} and friends mean what the validator reads.
+			// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
 			const re = new RegExp(pattern, "u");
 			const matches = denylist.filter((n) => re.test(n));
 			if (matches.length > 0) {
@@ -1861,7 +1918,7 @@ Exit codes:
 			}
 			for (const [input, errors] of results) {
 				if (errors.length)
-						errorLog(printable(`${input} has ${errors.length} issue(s)`));
+					errorLog(printable(`${input} has ${errors.length} issue(s)`));
 			}
 			return exitCode;
 		}
@@ -1870,10 +1927,10 @@ Exit codes:
 				log(printable(`${input} has ${errors.length} issue(s)`));
 				for (const err of errors) {
 					log(
-							printable(
-								`  ${err.instancePath || "(root)"}  ${err.message} [${err.keyword}]`,
-							),
-						);
+						printable(
+							`  ${err.instancePath || "(root)"}  ${err.message} [${err.keyword}]`,
+						),
+					);
 				}
 			} else {
 				log(printable(`${input} has no issues`));

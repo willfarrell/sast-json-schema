@@ -50,7 +50,8 @@ for (let i = 0; i < args.length; i++) {
 }
 
 const config = JSON.parse(readFileSync(configPath, "utf8"));
-if (!config.license) throw new Error("Missing required field in config: license");
+if (!config.license)
+	throw new Error("Missing required field in config: license");
 const license = readFileSync(config.license, "utf8").replace(
 	/^(\r\n|\n)+|(\r\n|\n)+$/g,
 	"",
@@ -145,7 +146,9 @@ const ignores = [
 	...(config.ignore ?? []),
 	...(config.ignoreDefaultIgnores ? [] : DEFAULT_IGNORES),
 ].map(undot);
-const include = ignores.filter((glob) => glob.startsWith("!")).map((glob) => glob.slice(1));
+const include = ignores
+	.filter((glob) => glob.startsWith("!"))
+	.map((glob) => glob.slice(1));
 const exclude = ignores.filter((glob) => !glob.startsWith("!"));
 const isIgnored = (file) => {
 	const parts = undot(file).split("/");
@@ -213,9 +216,13 @@ for (const file of files) {
 if (config.output) writeFileSync(config.output, changed.join(EOL));
 
 if (mode === "add") {
-	console.log(`\x1b[33m!\x1b[0m Inserted license into ${changed.length} file(s)`);
+	console.log(
+		`\x1b[33m!\x1b[0m Inserted license into ${changed.length} file(s)`,
+	);
 } else if (mode === "remove") {
-	console.log(`\x1b[32m✔\x1b[0m Removed license from ${changed.length} file(s).`);
+	console.log(
+		`\x1b[32m✔\x1b[0m Removed license from ${changed.length} file(s).`,
+	);
 } else if (changed.length) {
 	console.error(
 		`License check failed. ${changed.length} file(s) did not have the license.`,

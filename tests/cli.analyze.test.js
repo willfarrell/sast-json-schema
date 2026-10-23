@@ -365,8 +365,9 @@ describe("analyze size guard", () => {
 	});
 
 	test("names deep nesting, not just circularity, when serialization overflows", async () => {
-		let schema = { type: "string" };
-		for (let i = 0; i < 20_000; i++) schema = { properties: { a: schema } };
+		// Node 26 stringifies plain data iteratively, so a toJSON leaf forces the recursive path.
+		let schema = { type: "string", toJSON: () => ({ type: "string" }) };
+		for (let i = 0; i < 100_000; i++) schema = { properties: { a: schema } };
 		await rejects(analyze(schema, { offline: true }), (err) => {
 			ok(err instanceof TypeError);
 			ok(err.message.includes("too deeply nested"), err.message);
@@ -1111,8 +1112,14 @@ describe("formatSarif", () => {
 			"properties/x",
 			"required",
 		];
-		deepStrictEqual(runs[0].results.map((r) => r.ruleId), ids);
-		deepStrictEqual(runs[0].tool.driver.rules.map((r) => r.id), ids);
+		deepStrictEqual(
+			runs[0].results.map((r) => r.ruleId),
+			ids,
+		);
+		deepStrictEqual(
+			runs[0].tool.driver.rules.map((r) => r.id),
+			ids,
+		);
 	});
 
 	test("ruleId names the meta-schema definition for $defs/definitions paths", () => {

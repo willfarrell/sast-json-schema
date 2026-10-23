@@ -99,7 +99,7 @@ jobs:
           scan-type: fs
           scan-ref: .
           hide-progress: true
-          trivy-config: .github/trivy.yaml
+          trivy-config: .github/trivy.yml
           exit-code: 1
           format: table
 
