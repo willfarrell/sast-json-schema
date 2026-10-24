@@ -1,13 +1,10 @@
-import test from "node:test";
+import { bench, suite } from "node:bench";
 import Ajv from "ajv/dist/2020.js";
-import { Bench } from "tinybench";
 import schema from "../2020-12.json" with { type: "json" };
 
-test("perf: schema validation benchmarks", async () => {
+suite("sast-json-schema", () => {
 	const ajv = new Ajv({ strictTypes: false });
 	const validate = ajv.compile(schema);
-
-	const suite = new Bench({ name: "sast-json-schema" });
 
 	const secureSchema = {
 		type: "object",
@@ -219,31 +216,28 @@ test("perf: schema validation benchmarks", async () => {
 		],
 	};
 
-	suite
-		.add("validate secure schema", () => {
-			validate(secureSchema);
-		})
-		.add("validate insecure schema", () => {
-			validate(insecureSchema);
-		})
-		.add("validate complex schema", () => {
-			validate(complexSchema);
-		})
-		.add("compile + validate", () => {
+	const validateBench = (name, data) =>
+		bench(name, { warmup: 100, samples: 30 }, (b) => {
+			const ops = 10_000;
+			b.start();
+			for (let i = 0; i < ops; i++) validate(data);
+			b.end(ops);
+		});
+
+	validateBench("validate secure schema", secureSchema);
+	validateBench("validate insecure schema", insecureSchema);
+	validateBench("validate complex schema", complexSchema);
+	bench("compile + validate", { warmup: 2, samples: 30 }, (b) => {
+		const ops = 10;
+		b.start();
+		for (let i = 0; i < ops; i++) {
 			const v = ajv.compile(schema);
 			v(secureSchema);
 			ajv.removeSchema();
-		})
-		.add("validate deeply nested schema", () => {
-			validate(deeplyNestedSchema);
-		})
-		.add("validate many patterns schema", () => {
-			validate(manyPatternsSchema);
-		})
-		.add("validate large enum schema", () => {
-			validate(largeEnumSchema);
-		});
-
-	await suite.run();
-	console.table(suite.table());
+		}
+		b.end(ops);
+	});
+	validateBench("validate deeply nested schema", deeplyNestedSchema);
+	validateBench("validate many patterns schema", manyPatternsSchema);
+	validateBench("validate large enum schema", largeEnumSchema);
 });

@@ -1,4 +1,4 @@
-import { ok, rejects, strictEqual } from "node:assert";
+import { deepStrictEqual, ok, rejects, strictEqual } from "node:assert";
 import { describe, test } from "node:test";
 import { run } from "../cli.js";
 import pkg from "../package.json" with { type: "json" };
@@ -128,6 +128,28 @@ describe("run() file handling", () => {
 		ok(r.error.join("\n").includes('invalid JSON in file "bad.json"'));
 	});
 
+	test("a UTF-8 byte-order mark before the JSON is ignored", async () => {
+		const r = await runCli(["bom.json"], {
+			files: { "bom.json": `\uFEFF${CLEAN}` },
+		});
+		strictEqual(r.code, 0);
+		ok(r.log.join("\n").includes("bom.json has no issues"));
+	});
+
+	test("a byte-order mark inside a JSON string is data, not stripped", async () => {
+		// Only a LEADING BOM is stripped. An interior U+FEFF is part of the value:
+		// here it makes $id fail safeIdUrl, so the finding proves it survived.
+		const schema = JSON.stringify({
+			...JSON.parse(CLEAN),
+			$id: "https://example.test/\uFEFFclean.json",
+		});
+		const r = await runCli(["inner.json", "--format", "json"], {
+			files: { "inner.json": schema },
+		});
+		strictEqual(r.code, 1);
+		ok(r.write.join("").includes('"instancePath":"/$id"'));
+	});
+
 	test("a file larger than the size limit exits 2 at the gate", async () => {
 		const r = await runCli(["big.json", "--max-schema-size", "10"], {
 			files: { "big.json": CLEAN },
@@ -183,9 +205,17 @@ describe("run() output formats", () => {
 			files: { "dirty.json": DIRTY },
 		});
 		strictEqual(r.code, 1);
-		ok(r.log.join("\n").includes("dirty.json has issues"));
-		// the human format dumps the error array as pretty JSON
-		ok(r.log.join("\n").includes("instancePath"));
+		// Header with the count, then one indented line per finding:
+		// "<instancePath or (root)>  <message> [<keyword>]". No JSON dump.
+		const [header, ...lines] = r.log.join("\n").split("\n");
+		strictEqual(header, `dirty.json has ${lines.length} issue(s)`);
+		ok(lines.length > 0);
+		ok(!r.log.join("\n").includes("instancePath"));
+		for (const line of lines) ok(/^ {2}\S.* \[\S+\]$/.test(line), line);
+		ok(
+			lines.some((l) => l.startsWith("  (root)  ")),
+			lines.join("\n"),
+		);
 	});
 
 	test("json format with no issues writes [] and exits 0", async () => {
@@ -239,7 +269,7 @@ describe("run() multiple files", () => {
 		});
 		strictEqual(r.code, 1);
 		ok(r.log.join("\n").includes("clean.json has no issues"));
-		ok(r.log.join("\n").includes("dirty.json has issues"));
+		ok(/dirty\.json has \d+ issue\(s\)/.test(r.log.join("\n")));
 	});
 
 	test("exits 0 when every file is clean", async () => {
@@ -283,6 +313,36 @@ describe("run() multiple files", () => {
 		});
 		strictEqual(r.code, 2);
 		ok(r.error.join("\n").includes('cannot read file "missing.json"'));
+		// The readable file is still analyzed and reported.
+		ok(r.log.join("\n").includes("clean.json has no issues"));
+	});
+
+	test("a bad file mid-list does not discard the files around it", async () => {
+		const r = await runCli(["--offline", "a.json", "bad.json", "dirty.json"], {
+			files: { "a.json": CLEAN, "bad.json": "{nope", "dirty.json": DIRTY },
+		});
+		strictEqual(r.code, 2, "a tool error still wins the exit code");
+		ok(r.error.join("\n").includes('invalid JSON in file "bad.json"'));
+		const logText = r.log.join("\n");
+		ok(logText.includes("a.json has no issues"));
+		ok(/dirty\.json has \d+ issue\(s\)/.test(logText));
+	});
+
+	test("json format keys only the analyzed files when one fails", async () => {
+		const r = await runCli(
+			["--offline", "--format", "json", "a.json", "bad.json"],
+			{ files: { "a.json": CLEAN, "bad.json": "{nope" } },
+		);
+		strictEqual(r.code, 2);
+		deepStrictEqual(JSON.parse(r.write.join("")), { "a.json": [] });
+	});
+
+	test("a single failing file writes no report", async () => {
+		const r = await runCli(["--format", "json", "bad.json"], {
+			files: { "bad.json": "{nope" },
+		});
+		strictEqual(r.code, 2);
+		strictEqual(r.write.join(""), "");
 	});
 });
 
@@ -301,7 +361,7 @@ describe("run() glob fallback", () => {
 		strictEqual(r.code, 1);
 		const logText = r.log.join("\n");
 		ok(logText.includes("g0.json has no issues"));
-		ok(logText.includes("g1.json has issues"));
+		ok(/g1\.json has \d+ issue\(s\)/.test(logText));
 		ok(logText.indexOf("g0.json") < logText.indexOf("g1.json"));
 	});
 
@@ -716,5 +776,89 @@ describe("run() ref-schema-files and dns budget specifics", () => {
 		});
 		strictEqual(r.code, 0);
 		ok(!r.error.join("\n").includes("byte size limit"));
+	});
+});
+
+describe("run() --max-redos-patterns", () => {
+	test("is passed through to the analysis", async () => {
+		const many = JSON.stringify({
+			...JSON.parse(CLEAN),
+			allOf: [{ pattern: "^a$" }, { pattern: "^b$" }],
+		});
+		const r = await runCli(
+			["--offline", "--format", "json", "--max-redos-patterns", "1", "m.json"],
+			{ files: { "m.json": many } },
+		);
+		ok(r.write.join("").includes('"schemaPath":"#/redos-budget"'));
+	});
+
+	test("rejects a non-integer value", async () => {
+		const r = await runCli(["--max-redos-patterns", "x", "c.json"], {
+			files: { "c.json": CLEAN },
+		});
+		strictEqual(r.code, 2);
+		ok(r.error.join("\n").includes("maxRedosPatterns"));
+	});
+});
+
+describe("run() per-file isolation does not swallow bugs", () => {
+	test("an unexpected (non-tool) error still propagates", async () => {
+		// A broken stat (returns nothing) is a programming error, not a per-file
+		// tool error, so it must surface rather than be counted as exit 2.
+		await rejects(
+			runCli(["a.json"], {
+				files: { "a.json": CLEAN },
+				stat: async () => undefined,
+			}),
+			TypeError,
+		);
+	});
+});
+
+describe("run() json payload shape counts failed files", () => {
+	test("two analyzed files plus one unreadable still nest by path", async () => {
+		const r = await runCli(
+			["--offline", "--format", "json", "a.json", "b.json", "missing.json"],
+			{ files: { "a.json": CLEAN, "b.json": CLEAN } },
+		);
+		strictEqual(r.code, 2);
+		deepStrictEqual(JSON.parse(r.write.join("")), {
+			"a.json": [],
+			"b.json": [],
+		});
+	});
+});
+
+describe("run() human output escapes control characters", () => {
+	test("a hostile property name cannot inject terminal escape sequences", async () => {
+		const esc = "\u001b]0;pwned\u0007\u001b[2J";
+		const r = await runCli(["--offline", "s.json"], {
+			files: {
+				"s.json": JSON.stringify({
+					$schema: "https://json-schema.org/draft/2020-12/schema",
+					type: "object",
+					properties: { [`a${esc}`]: { type: "string" } },
+				}),
+			},
+		});
+		strictEqual(r.code, 1);
+		ok(r.log.length > 1);
+		ok(
+			r.log.every((line) => !/\p{Cc}/u.test(line)),
+			"no raw control characters reach the terminal",
+		);
+		ok(
+			r.log.some((line) => line.includes("\\u001b]0;pwned\\u0007")),
+			"the escape is shown visibly instead",
+		);
+	});
+
+	test("a hostile file name in a tool error is escaped too", async () => {
+		const r = await runCli(["--offline", "x\u001b[2J.json"], {
+			glob: async function* () {},
+		});
+		strictEqual(r.code, 2);
+		ok(!/\p{Cc}/u.test(r.error.join("\n")));
+		ok(r.error[0].includes("x\\u001b[2J.json"));
 	});
 });

@@ -338,6 +338,173 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "draft-07 objects must be closed with additionalProperties",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-07"
+    },
+    "tests": [
+      {
+        "description": "Should fail propertyNames without additionalProperties (values unbounded)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "object",
+          "maxProperties": 5,
+          "required": [],
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail patternProperties without additionalProperties (unmatched keys unbounded)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "object",
+          "maxProperties": 5,
+          "required": [],
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          },
+          "patternProperties": {
+            "^A$": {
+              "type": "string",
+              "maxLength": 5,
+              "pattern": "^[A-Z]+$"
+            }
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass propertyNames with a typed additionalProperties",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "object",
+          "maxProperties": 5,
+          "required": [],
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass patternProperties closed by additionalProperties false",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "object",
+          "maxProperties": 5,
+          "required": [],
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          },
+          "patternProperties": {
+            "^A$": {
+              "type": "string",
+              "maxLength": 5,
+              "pattern": "^[A-Z]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "objects and arrays pinned by const/enum need no further strictness",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-07"
+    },
+    "tests": [
+      {
+        "description": "Should pass an object pinned by enum",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "object",
+          "enum": [
+            {
+              "a": "b"
+            },
+            {
+              "a": "c"
+            }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass an array pinned by enum",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "array",
+          "enum": [
+            [
+              1
+            ],
+            [
+              2
+            ]
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass an object pinned by const",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "object",
+          "const": {
+            "a": "b"
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass an array pinned by const",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "array",
+          "const": [
+            1,
+            2
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "Should still fail an unpinned object with no strictness",
+        "data": {
+          "$schema": "https://json-schema.org/draft-07/schema",
+          "$id": "test",
+          "type": "object"
+        },
+        "valid": false
+      }
+    ]
   }
 ]
-

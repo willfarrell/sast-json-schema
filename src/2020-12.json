@@ -6,9 +6,7 @@
 	"$defs": {
 		"schemaBase": {
 			"properties": {
-				"additionalItems": {
-					"$ref": "#/$defs/properties.additionalItems"
-				},
+				"additionalItems": false,
 				"additionalProperties": {
 					"$ref": "#/$defs/properties.additionalProperties"
 				},
@@ -241,10 +239,7 @@
 							"required": ["oneOf"]
 						},
 						{
-							"required": ["$defs"]
-						},
-						{
-							"required": ["definitions"]
+							"$ref": "#/$defs/schemaLibraryRoot"
 						}
 					]
 				}

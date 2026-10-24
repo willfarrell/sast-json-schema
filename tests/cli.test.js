@@ -390,7 +390,7 @@ describe("cli.", () => {
 		);
 		const r = await runCli(["--offline", path]);
 		strictEqual(r.code, 1);
-		ok(r.stdout.includes("has issues"));
+		ok(/has \d+ issue\(s\)/.test(r.stdout));
 	});
 
 	test("--override-max-depth with non-integer exits 2", async () => {
@@ -539,5 +539,22 @@ describe("cli.", () => {
 			stdout.includes("Usage: sast-json-schema"),
 			"CLI must run when argv[1] is a symlink to cli.js (the npm .bin shim)",
 		);
+	});
+});
+
+describe("cli exit with a lingering handle", () => {
+	// A DNS lookup that lost its timeout race keeps a libuv request open until
+	// the OS resolver gives up. A ref'd 60s timer stands in for it: the CLI must
+	// still exit promptly with the right code once the report is written.
+	test("exits within seconds, not when the stray handle finally closes", async () => {
+		const linger = "data:text/javascript,setTimeout(()=>{},60000)";
+		const start = Date.now();
+		const { stdout } = await execFileAsync(
+			process.execPath,
+			["--import", linger, cliPath, "--version"],
+			{ timeout: 20_000 },
+		);
+		ok(Date.now() - start < 10_000, `took ${Date.now() - start}ms`);
+		ok(stdout.trim().length > 0);
 	});
 });

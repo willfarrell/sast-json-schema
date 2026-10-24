@@ -482,30 +482,20 @@ describe("crawlSchema", () => {
 		ok(err.message.includes("vulnerable to ReDoS"));
 	});
 
-	test("step-exhaustion pattern reports reason: hitMaxSteps", (t) => {
+	test("step-exhaustion pattern fails closed with a message matching its reason", () => {
+		// Which budget runs out first (steps or the 1s timeout) depends on the
+		// hardware, so assert the message agrees with whichever reason came back.
 		const r = crawlSchema({
 			pattern: "^(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+$",
 		});
 		const err = r.errors.find((e) => e.keyword === "pattern");
 		ok(err, "expected a pattern error");
-		if (err.params.reason !== "hitMaxSteps") {
-			t.skip(`got reason: ${err.params.reason} (hardware-dependent)`);
-			return;
-		}
-		ok(err.message.includes("step limit"));
-	});
-
-	test("step-exhaustion pattern reports reason: timedOut", (t) => {
-		const r = crawlSchema({
-			pattern: "^(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+$",
-		});
-		const err = r.errors.find((e) => e.keyword === "pattern");
-		ok(err, "expected a pattern error");
-		if (err.params.reason !== "timedOut") {
-			t.skip(`got reason: ${err.params.reason} (hardware-dependent)`);
-			return;
-		}
-		ok(err.message.includes("timed out"));
+		const expected = { hitMaxSteps: "step limit", timedOut: "timed out" };
+		ok(
+			Object.hasOwn(expected, err.params.reason),
+			`unexpected reason: ${err.params.reason}`,
+		);
+		ok(err.message.includes(expected[err.params.reason]));
 	});
 
 	test("unparseable pattern reports reason: parseError", () => {
@@ -1546,6 +1536,84 @@ describe("crawlSchema equal-bound ranges are valid", () => {
 			{ type: "object", minProperties: 5, maxProperties: 5 },
 			"minProperties",
 		));
+});
+
+// draft-04 spells an exclusive bound as a boolean beside minimum/maximum, so
+// `{minimum: 5, maximum: 5, exclusiveMinimum: true}` admits no value at all.
+describe("crawlSchema draft-04 boolean exclusive bounds", () => {
+	const rangeError = (schema) =>
+		crawlSchema(schema).errors.find(
+			(e) => e.message === "numeric range is unsatisfiable",
+		);
+
+	test("exclusiveMinimum: true with minimum === maximum is unsatisfiable", () => {
+		const e = rangeError({
+			type: "integer",
+			minimum: 5,
+			maximum: 5,
+			exclusiveMinimum: true,
+		});
+		ok(e, "expected a range finding");
+		strictEqual(e.keyword, "exclusiveMinimum");
+		strictEqual(e.schemaPath, "#/exclusiveMinimum");
+		deepStrictEqual(e.params, {
+			minimum: 5,
+			exclusiveMinimum: true,
+			maximum: 5,
+		});
+	});
+
+	test("exclusiveMaximum: true with minimum === maximum is unsatisfiable", () => {
+		const e = rangeError({
+			type: "number",
+			minimum: 5,
+			maximum: 5,
+			exclusiveMaximum: true,
+		});
+		ok(e, "expected a range finding");
+		strictEqual(e.keyword, "exclusiveMaximum");
+		deepStrictEqual(e.params, {
+			minimum: 5,
+			maximum: 5,
+			exclusiveMaximum: true,
+		});
+	});
+
+	test("exclusiveMinimum: true with minimum < maximum is satisfiable", () => {
+		strictEqual(
+			rangeError({
+				type: "integer",
+				minimum: 4,
+				maximum: 5,
+				exclusiveMinimum: true,
+			}),
+			undefined,
+		);
+	});
+
+	test("exclusiveMinimum: false keeps minimum inclusive", () => {
+		strictEqual(
+			rangeError({
+				type: "integer",
+				minimum: 5,
+				maximum: 5,
+				exclusiveMinimum: false,
+			}),
+			undefined,
+		);
+	});
+
+	test("exclusiveMaximum: false keeps maximum inclusive", () => {
+		strictEqual(
+			rangeError({
+				type: "integer",
+				minimum: 5,
+				maximum: 5,
+				exclusiveMaximum: false,
+			}),
+			undefined,
+		);
+	});
 });
 
 // Type/own-property guards on the range checks: a non-array (or a schema missing
@@ -2672,6 +2740,526 @@ describe("crawlSchema injected clock (deadline branches)", () => {
 		ok(
 			r.errors.some((e) => e.schemaPath === "#/redos"),
 			"the pattern is analyzed and flagged when no bail occurs",
+		);
+	});
+});
+
+describe("crawlSchema property names that collide with data keywords", () => {
+	// A property/definition NAMED default/enum/const/examples/errorMessage is a
+	// subschema, not instance data, so every crawl check must still reach it.
+	for (const name of ["default", "enum", "const", "examples", "errorMessage"]) {
+		test(`crawls properties.${name} (ReDoS, dangerous name, refs, min/max)`, () => {
+			const r = crawlSchema(
+				{
+					type: "object",
+					properties: {
+						[name]: {
+							type: "string",
+							pattern: "^(a|a)*$",
+							minLength: 9,
+							maxLength: 1,
+							properties: { __class__: {} },
+							$ref: "https://schemas.example.com/x.json",
+						},
+					},
+				},
+				32,
+				{ lang: "py" },
+			);
+			const paths = r.errors.map((e) => e.schemaPath);
+			ok(paths.includes("#/redos"), "ReDoS pattern is analyzed");
+			ok(paths.includes("#/dangerous-name"), "dangerous name is flagged");
+			ok(paths.includes("#/minLength"), "min > max is flagged");
+			strictEqual(r.refs.length, 1, "remote $ref is collected");
+		});
+
+		test(`crawls $defs.${name}`, () => {
+			const r = crawlSchema({
+				$defs: { [name]: { type: "string", pattern: "^(a|a)*$" } },
+			});
+			ok(r.errors.some((e) => e.schemaPath === "#/redos"));
+		});
+	}
+
+	test("nesting under properties.default counts toward depth", () => {
+		let schema = { type: "string" };
+		for (let i = 0; i < 40; i++) {
+			schema = { type: "object", properties: { default: schema } };
+		}
+		strictEqual(crawlSchema(schema).depthExceeded, true);
+	});
+
+	test("still skips default/enum/const/examples VALUES on a schema", () => {
+		const r = crawlSchema({
+			type: "string",
+			default: { pattern: "^(a|a)*$" },
+			examples: [{ $ref: "https://schemas.example.com/x.json" }],
+		});
+		strictEqual(r.errors.length, 0);
+		strictEqual(r.refs.length, 0);
+	});
+});
+
+describe("crawlSchema patternProperties keys match pattern reporting", () => {
+	test("an unparseable key is a parse-error ReDoS finding, not silently skipped", () => {
+		const r = crawlSchema({ patternProperties: { "(": { type: "string" } } });
+		const e = r.errors.find((x) => x.schemaPath === "#/redos");
+		ok(e, "expected a ReDoS finding for the unparseable key");
+		strictEqual(e.keyword, "patternProperties");
+		strictEqual(e.instancePath, "/patternProperties/(");
+		strictEqual(e.params.reason, "parseError");
+		strictEqual(
+			e.message,
+			'patternProperties key "(" could not be parsed for ReDoS analysis',
+		);
+	});
+
+	test("a timed-out key says it timed out, with the injected budget", () => {
+		const EXPENSIVE =
+			"^(https?://)?[\\p{L}\\p{N}][\\p{L}\\p{N}\\._-]{0,249}\\.[\\p{L}\\p{N}-]{2,63}$";
+		const r = crawlSchema(
+			{ patternProperties: { [EXPENSIVE]: { type: "string" } } },
+			32,
+			{ redosTimeoutMs: 1 },
+		);
+		const e = r.errors.find((x) => x.schemaPath === "#/redos");
+		strictEqual(e.params.reason, "timedOut");
+		ok(e.message.includes("timed out after 1ms"), e.message);
+	});
+});
+
+describe("crawlSchema relative $ref resolved against $id", () => {
+	// A loader fetches a relative $ref from the base URI set by $id, so that
+	// resolved host is an SSRF target even though the $ref has no hostname.
+	test("relative $ref under a root $id is collected with the $id host", () => {
+		const r = crawlSchema({
+			$id: "https://metadata.example/root/schema.json",
+			$ref: "latest/meta-data.json",
+		});
+		strictEqual(r.refs.length, 1);
+		strictEqual(r.refs[0].hostname, "metadata.example");
+		strictEqual(
+			r.refs[0].ref,
+			"https://metadata.example/root/latest/meta-data.json",
+		);
+		strictEqual(r.refs[0].path, "/$ref");
+	});
+
+	test("a nested $id changes the base for refs beneath it", () => {
+		const r = crawlSchema({
+			$id: "https://outer.example/a.json",
+			properties: {
+				x: { $id: "https://inner.example/b.json", $ref: "c.json" },
+				y: { $ref: "d.json" },
+			},
+		});
+		const hosts = r.refs.map((e) => `${e.path}=${e.hostname}`).sort();
+		deepStrictEqual(hosts, [
+			"/properties/x/$ref=inner.example",
+			"/properties/y/$ref=outer.example",
+		]);
+	});
+
+	test("relative $ref without an absolute $id is still not collected", () => {
+		strictEqual(
+			crawlSchema({ $id: "test", $ref: "other.json" }).refs.length,
+			0,
+		);
+		strictEqual(crawlSchema({ $ref: "other.json" }).refs.length, 0);
+	});
+
+	test("a property NAMED $id does not change the base", () => {
+		const r = crawlSchema({
+			properties: { $id: { type: "string" } },
+			$ref: "other.json",
+		});
+		strictEqual(r.refs.length, 0);
+	});
+});
+
+describe("crawlSchema name-map and base-URI edges", () => {
+	for (const mapKey of [
+		"patternProperties",
+		"definitions",
+		"dependentSchemas",
+		"dependencies",
+	]) {
+		test(`crawls a subschema named "default" under ${mapKey}`, () => {
+			const r = crawlSchema({
+				[mapKey]: { default: { type: "string", pattern: "^(a|a)*$" } },
+			});
+			ok(r.errors.some((e) => e.schemaPath === "#/redos"));
+		});
+	}
+
+	test("a string under a name map keyed $id does not become the base", () => {
+		const r = crawlSchema({
+			$id: "https://outer.example/a.json",
+			properties: { $id: "https://evil.example/", x: { $ref: "y.json" } },
+		});
+		deepStrictEqual(
+			r.refs.map((e) => e.hostname),
+			["outer.example"],
+		);
+	});
+
+	test("a non-string $id is ignored, even one that stringifies to a URL", () => {
+		const r = crawlSchema({ $id: ["https://evil.example/"], $ref: "y.json" });
+		strictEqual(r.refs.length, 0);
+	});
+
+	test("a cycle that does not pass through the root terminates cleanly", () => {
+		const a = { type: "object" };
+		a.properties = { self: a };
+		const r = crawlSchema({ properties: { a } });
+		ok(!r.depthExceeded, "the revisit is skipped, not walked to the limit");
+	});
+});
+
+describe("crawlSchema top-level alternation (anchoring) at any depth", () => {
+	// ^A|B$ means (^A)|(B$): anything starting with A or ending with B matches.
+	// The meta-schema only sees 3 group levels deep; the crawler must not stop.
+	const deep = (n, x) => (n === 0 ? x : `(?:(${deep(n - 1, x)})|z)`);
+	const anchorFindings = (schema) =>
+		crawlSchema(schema).errors.filter((e) => e.schemaPath === "#/anchor");
+
+	test("flags top-level | between deeply nested groups in pattern", () => {
+		const pattern = `^${deep(5, "a")}|${deep(5, "b")}$`;
+		const [e, ...rest] = anchorFindings({ type: "string", pattern });
+		strictEqual(rest.length, 0);
+		strictEqual(e.instancePath, "/pattern");
+		strictEqual(e.keyword, "pattern");
+		deepStrictEqual(e.params, { pattern });
+	});
+
+	test("flags a patternProperties key the same way", () => {
+		const key = `^${deep(4, "a")}|${deep(4, "b")}$`;
+		const [e] = anchorFindings({ patternProperties: { [key]: {} } });
+		strictEqual(e.keyword, "patternProperties");
+		strictEqual(e.instancePath, `/patternProperties/${key}`);
+	});
+
+	test("does not flag alternation inside a wrapping group, class, or escape", () => {
+		for (const pattern of [
+			`^(?:${deep(5, "a")}|b)$`,
+			"^[|]$",
+			"^a\\|b$",
+			"^(?:a|[)|]|\\)|b)$",
+		]) {
+			strictEqual(
+				anchorFindings({ type: "string", pattern }).length,
+				0,
+				pattern,
+			);
+		}
+	});
+});
+
+describe("crawlSchema control characters reachable by any spelling", () => {
+	// Asks the regex engine itself whether each atom (class or escape) can match
+	// a C0/DEL/C1 control character, so ranges spanning them are caught too.
+	// Tab, LF, VT, FF and CR are whitespace that \s legitimately covers.
+	const controlFindings = (schema) =>
+		crawlSchema(schema).errors.filter((e) => e.schemaPath === "#/control");
+
+	for (const pattern of [
+		"^[ -\\uffff]{1,10}$",
+		"^[!-\\u{10ffff}]{1,10}$",
+		"^[\\u0020-\\u00ff]{1,10}$",
+		"^a\\p{Any}$",
+		"^[\\p{gc=Cc}]$",
+		"^a\u0001$",
+	]) {
+		test(`flags ${JSON.stringify(pattern)}`, () => {
+			const [e, ...rest] = controlFindings({ type: "string", pattern });
+			strictEqual(rest.length, 0);
+			strictEqual(e.instancePath, "/pattern");
+			strictEqual(e.keyword, "pattern");
+			strictEqual(e.params.pattern, pattern);
+		});
+	}
+
+	test("flags a patternProperties key", () => {
+		const [e] = controlFindings({
+			patternProperties: { "^[!-\\uffff]{1,5}$": {} },
+		});
+		strictEqual(e.keyword, "patternProperties");
+	});
+
+	for (const pattern of [
+		"^[\\p{L}\\p{N}\\s]{1,10}$",
+		"^[\\t-\\r ]{1,10}$",
+		"^[ -~]{1,10}$",
+		"^[\\u00a0-\\u00ff]{1,10}$",
+		"^(?:a|b)\\d{1,3}$",
+		"^[",
+	]) {
+		test(`does not flag ${JSON.stringify(pattern)}`, () => {
+			strictEqual(controlFindings({ type: "string", pattern }).length, 0);
+		});
+	}
+});
+
+describe("crawlSchema propertyNames that admit dangerous names", () => {
+	// propertyNames is an allowlist of instance keys; listing or matching a
+	// deserialization vector there admits it just like declaring the property.
+	const dn = (schema, lang) =>
+		crawlSchema(schema, 32, { lang }).errors.filter(
+			(e) => e.schemaPath === "#/dangerous-name",
+		);
+
+	test("flags an enum entry", () => {
+		const [e, ...rest] = dn({ propertyNames: { enum: ["a", "__proto__"] } });
+		strictEqual(rest.length, 0);
+		strictEqual(e.instancePath, "/propertyNames/enum/1");
+		strictEqual(e.keyword, "propertyNames");
+		deepStrictEqual(e.params, { name: "__proto__", lang: "default" });
+		strictEqual(
+			e.message,
+			'propertyNames entry "__proto__" is a deserialization vector for lang="default"',
+		);
+	});
+
+	test("flags a const", () => {
+		const [e] = dn({ propertyNames: { const: "__class__" } }, "py");
+		strictEqual(e.instancePath, "/propertyNames/const");
+		strictEqual(e.params.name, "__class__");
+	});
+
+	test("flags a pattern that matches a dangerous name", () => {
+		const [e] = dn({
+			propertyNames: { pattern: "^_{2}[a-z]{1,10}_{2}$", maxLength: 20 },
+		});
+		strictEqual(e.instancePath, "/propertyNames/pattern");
+		ok(e.params.matches.includes("__proto__"));
+	});
+
+	test("ignores safe names, non-strings, and names outside the chosen lang", () => {
+		strictEqual(dn({ propertyNames: { enum: ["a", 1, null] } }).length, 0);
+		strictEqual(dn({ propertyNames: { const: "__class__" } }, "js").length, 0);
+		strictEqual(dn({ propertyNames: { pattern: "^[0-9]{1,5}$" } }).length, 0);
+		strictEqual(dn({ propertyNames: true }).length, 0);
+	});
+
+	test("flags a propertyNames with no enum, const or pattern (fail closed)", () => {
+		// format "hostname" admits "constructor", "uri-reference" admits
+		// "__proto__"; a $ref or combinator is not followed. None can be checked.
+		for (const names of [
+			{ type: "string", format: "hostname", maxLength: 20 },
+			{ $ref: "#/$defs/key" },
+			{ allOf: [{ pattern: "^[a-z]{1,5}$" }] },
+		]) {
+			const [e, ...rest] = dn({ propertyNames: names });
+			strictEqual(rest.length, 0);
+			strictEqual(e.instancePath, "/propertyNames");
+			strictEqual(e.keyword, "propertyNames");
+			strictEqual(
+				e.message,
+				'propertyNames has no enum, const or pattern to rule out deserialization vectors for lang="default"',
+			);
+		}
+	});
+});
+
+describe("crawlSchema property NAMED propertyNames", () => {
+	test("is an ordinary subschema: its enum is instance data, not a key allowlist", () => {
+		const r = crawlSchema({
+			properties: { propertyNames: { type: "string", enum: ["__proto__"] } },
+		});
+		strictEqual(
+			r.errors.filter((e) => e.keyword === "propertyNames").length,
+			0,
+		);
+	});
+});
+
+describe("crawlSchema maxRedosPatterns option", () => {
+	test("a lower cap trips the fail-closed budget finding sooner", () => {
+		const r = crawlSchema(
+			{
+				allOf: [
+					{ type: "string", pattern: "^a$" },
+					{ type: "string", pattern: "^b$" },
+					{ type: "string", pattern: "^c$" },
+				],
+			},
+			32,
+			{ maxRedosPatterns: 2 },
+		);
+		const budget = r.errors.filter((e) => e.schemaPath === "#/redos-budget");
+		strictEqual(budget.length, 1);
+		deepStrictEqual(budget[0].params, { limit: 2, incomplete: true });
+	});
+});
+
+describe("crawlSchema denylist matching uses AJV's unicode regex semantics", () => {
+	const dn = (schema) =>
+		crawlSchema(schema).errors.filter(
+			(e) => e.schemaPath === "#/dangerous-name",
+		);
+
+	test("\\p{...} is a property class, as AJV reads it, not a literal 'p'", () => {
+		const [e] = dn({ patternProperties: { "^_{2}\\p{Ll}{1,9}_{2}$": {} } });
+		ok(e, "expected the key to match __proto__ under the u flag");
+		ok(e.params.matches.includes("__proto__"));
+	});
+
+	test("a key that is invalid under the u flag is skipped without throwing", () => {
+		strictEqual(dn({ patternProperties: { "^a\\-b$": {} } }).length, 0);
+		// redos-detector accepts an unknown \p{...} property that V8 rejects, so
+		// this key passes ReDoS analysis and reaches the denylist regex compile.
+		strictEqual(dn({ patternProperties: { "^\\p{Foo}$": {} } }).length, 0);
+	});
+
+	test("ReDoS analysis reads \\p{...} as a class, so overlapping classes are unsafe", () => {
+		// Without the u flag \p{L} is a literal "p{L}" and this looks safe; under
+		// AJV's u flag \p{L} ⊃ \p{Lu}, which backtracks polynomially.
+		const redos = (pattern) =>
+			crawlSchema({ type: "string", pattern }).errors.filter(
+				(e) => e.schemaPath === "#/redos",
+			);
+		strictEqual(redos("^\\p{L}+\\p{Lu}+$").length, 1);
+		strictEqual(redos("^\\p{L}+$").length, 0, "a single class is still safe");
+	});
+});
+
+describe("crawlSchema control-char scan on malformed patterns", () => {
+	test("an unterminated \\p{ or {n, quantifier ends the scan instead of looping", () => {
+		for (const pattern of ["^a{1,$", "^\\p{L", "^\\u{41"]) {
+			const r = crawlSchema({ type: "string", pattern });
+			ok(!r.errors.some((e) => e.schemaPath === "#/control"), pattern);
+		}
+	});
+
+	// Regression for CodeQL js/polynomial-redos: a global regex rescanned the tail
+	// from every [ or \P{, which took seconds on a 100k-character pattern.
+	test("many unterminated [ or \\P{ are scanned in linear time", () => {
+		for (const pattern of [
+			`^${"[".repeat(100_000)}`,
+			`^${"\\P{".repeat(50_000)}`,
+		]) {
+			const r = crawlSchema({ type: "string", pattern });
+			ok(
+				!r.errors.some(
+					(e) => e.schemaPath === "#/control" || e.schemaPath === "#/anchor",
+				),
+			);
+		}
+	});
+
+	test("after an unterminated [ the rest is still scanned as plain atoms", () => {
+		const paths = (pattern) =>
+			crawlSchema({ type: "string", pattern }).errors.map((e) => e.schemaPath);
+		ok(paths("^[a[b|c$").includes("#/anchor"));
+		ok(paths("^[a[b\\x85$").includes("#/control"));
+		ok(paths("^\\p{L\\p{L}\\x85$").includes("#/control"));
+		ok(paths("^\\p{L\\x85$").includes("#/control"));
+	});
+});
+
+describe("crawlSchema control-char and anchoring edges", () => {
+	const findings = (pattern, schemaPath) =>
+		crawlSchema({ type: "string", pattern }).errors.filter(
+			(e) => e.schemaPath === schemaPath,
+		);
+
+	// Every spelling of a control character, each code-point boundary, and
+	// escapes/classes that hide their neighbours from a naive scan.
+	for (const pattern of [
+		"^\\x85$",
+		"^\\u0085$",
+		"^\\u{85}$",
+		"^\\cA$",
+		"^\\p{Cc}$",
+		"^\\P{L}$",
+		"^\\x7f$",
+		"^\\x9f$",
+		"^\\x08$",
+		"^\\x0e$",
+		"^\\x1f$",
+		"^[\\]\\x85]$",
+		"^[a\\\\]\\x85$",
+		"^\\{\\x85$",
+		// A later } must not turn a plain escape into a \p{...}-style atom.
+		"^\\.\\x85}$",
+		"^\\u0085}$",
+		"^\\x{\\x85}$",
+		// A closed \p{...} does not stop the next one being read whole.
+		"^\\p{L}\\p{Cc}$",
+	]) {
+		test(`control: flags ${JSON.stringify(pattern)}`, () => {
+			const [e, ...rest] = findings(pattern, "#/control");
+			strictEqual(rest.length, 0);
+			strictEqual(
+				e.message,
+				"pattern can match control characters (U+0000-U+001F, U+007F-U+009F other than \\t \\n \\v \\f \\r)",
+			);
+		});
+	}
+	for (const pattern of [
+		"^\\xa0$",
+		"^\\x20$",
+		"^\\x7e$",
+		"^\\u{a0}$",
+		"^[\\t-\\r]$",
+		"^a\\",
+	]) {
+		test(`control: does not flag ${JSON.stringify(pattern)}`, () => {
+			strictEqual(findings(pattern, "#/control").length, 0);
+		});
+	}
+
+	for (const pattern of ["^[a]|b$", "^[a(]|b$", "^\\(|b$", "^[\\]]|b$"]) {
+		test(`anchor: flags ${JSON.stringify(pattern)}`, () => {
+			const [e] = findings(pattern, "#/anchor");
+			strictEqual(
+				e.message,
+				"pattern has a top-level | that escapes its ^...$ anchors; wrap the alternation in (?:...)",
+			);
+		});
+	}
+	for (const pattern of [
+		"^(?:[)]|b)$",
+		"^(?:\\)|b)$",
+		"^(?:[\\]|]|b)$",
+		"^[\\]|]$",
+		"^\\][|]$",
+	]) {
+		test(`anchor: does not flag ${JSON.stringify(pattern)}`, () => {
+			strictEqual(findings(pattern, "#/anchor").length, 0);
+		});
+	}
+});
+
+describe("crawlSchema propertyNames finding shapes", () => {
+	const dn = (propertyNames) =>
+		crawlSchema({ propertyNames }).errors.filter(
+			(e) => e.schemaPath === "#/dangerous-name",
+		);
+
+	test("const finding keyword and message", () => {
+		const [e] = dn({ const: "constructor" });
+		strictEqual(e.keyword, "propertyNames");
+		strictEqual(
+			e.message,
+			'propertyNames const "constructor" is a deserialization vector for lang="default"',
+		);
+	});
+
+	test("pattern finding keyword and message", () => {
+		const [e] = dn({ pattern: "^_{2}proto_{2}$" });
+		strictEqual(e.keyword, "propertyNames");
+		strictEqual(
+			e.message,
+			'propertyNames pattern "^_{2}proto_{2}$" matches deserialization vector(s) for lang="default": __proto__',
+		);
+	});
+
+	test("a non-array enum restricts nothing, so only the fail-closed finding fires", () => {
+		const errs = dn({ enum: "__proto__" });
+		strictEqual(errs.length, 1);
+		ok(
+			errs[0].message.startsWith("propertyNames has no enum, const or pattern"),
 		);
 	});
 });

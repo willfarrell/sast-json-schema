@@ -236,7 +236,7 @@
       {
         "description": "Should fail when `deprecated` is used (not in draft-06 spec)",
         "data": {
-          "$schema": "http://json-schema.org/draft-06/schema#",
+          "$schema": "https://json-schema.org/draft-06/schema",
           "$id": "test",
           "type": "string",
           "maxLength": 8,
@@ -284,6 +284,98 @@
           "format": "uuid"
         },
         "valid": false
+      }
+    ]
+  },
+  {
+    "description": "draft-06 objects must be closed with additionalProperties",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-06"
+    },
+    "tests": [
+      {
+        "description": "Should fail propertyNames without additionalProperties (values unbounded)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "maxProperties": 5,
+          "required": [],
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail patternProperties without additionalProperties (unmatched keys unbounded)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "maxProperties": 5,
+          "required": [],
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          },
+          "patternProperties": {
+            "^A$": {
+              "type": "string",
+              "maxLength": 5,
+              "pattern": "^[A-Z]+$"
+            }
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass propertyNames with a typed additionalProperties",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "maxProperties": 5,
+          "required": [],
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass patternProperties closed by additionalProperties false",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "maxProperties": 5,
+          "required": [],
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 5,
+            "pattern": "^[A-Z]+$"
+          },
+          "patternProperties": {
+            "^A$": {
+              "type": "string",
+              "maxLength": 5,
+              "pattern": "^[A-Z]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "valid": true
       }
     ]
   }

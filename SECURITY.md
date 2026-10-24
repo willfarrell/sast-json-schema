@@ -8,7 +8,7 @@ This document outlines security procedures and general policies for the sast-jso
 * [Disclosure Policy](#disclosure-policy)
 
 ## Security Goals
-Our goal is to ensure OSS follows secure design principles and meets security best practices as outlined by the following [OWASP ASVS 5.0.0 Level 3](https://github.com/OWASP/ASVS/tree/master/5.0/en).
+Our goal is to ensure OSS follows secure design principles and meets security best practices as outlined by the following [OWASP ASVS 5.0.0 Level 3](https://github.com/OWASP/ASVS/tree/v5.0.0/5.0/en).
 
 Standards are evaluated using automated scans (Linting, Unit tests, SAST, SCA, DAST, Perf) and manual self-audits. 3rd party audits are welcome.
 
@@ -30,11 +30,13 @@ seriously. Thank you for improving the security of our open source
 software. We appreciate your efforts and responsible disclosure and will
 make every effort to acknowledge your contributions.
 
-Report security vulnerabilities by emailing the lead maintainer at:
+Report security vulnerabilities privately through
+[GitHub Security Advisories](https://github.com/willfarrell/sast-json-schema/security/advisories/new)
+(the channel the issue tracker points to), or by emailing the lead maintainer at:
 ```
 willfarrell@proton.me
 ```
-The lead maintainer will acknowledge your email within 24 hours, and will
+The lead maintainer will acknowledge your report within 24 hours, and will
 send a more detailed response within 48 hours indicating the next steps in
 handling your report. After the initial reply to your report, the security
 team will endeavour to keep you informed of the progress towards a fix and

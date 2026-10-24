@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Copyright 2026 will Farrell, and sast-json-schema contributors.
 // SPDX-License-Identifier: MIT
-import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,7 +63,8 @@ export const verifyRefs = (schema, file = "schema") => {
 	walk(schema);
 };
 
-const build = () => {
+// outDir defaults to the repo root, where package.json exports the drafts.
+const build = (outDir = root) => {
 	let defsLib;
 	try {
 		defsLib = JSON.parse(readFileSync(`${root}/src/$defs.json`, "utf8"));
@@ -72,7 +72,6 @@ const build = () => {
 		console.error(`Error loading src/$defs.json: ${err.message}`);
 		process.exit(1);
 	}
-	const outputs = [];
 	for (const draft of drafts) {
 		let src;
 		let manifest;
@@ -112,23 +111,12 @@ const build = () => {
 			finalDefs[name] = authored[name] ?? defsLib[name];
 		}
 		manifest.$defs = finalDefs;
-		const outPath = `${root}/${draft}.json`;
+		const outPath = resolve(outDir, `${draft}.json`);
 		verifyRefs(manifest, `${draft}.json`);
 		writeFileSync(outPath, `${JSON.stringify(manifest, null, "\t")}\n`);
-		outputs.push(outPath);
 		console.log(
 			`built ${draft}.json (${Object.keys(finalDefs).length} defs, ${Object.keys(authored).length} local)`,
 		);
-	}
-
-	try {
-		execFileSync("npx", ["biome", "format", "--write", ...outputs], {
-			cwd: root,
-			stdio: "inherit",
-		});
-	} catch (err) {
-		console.error(`biome format step failed: ${err.message}`);
-		throw err;
 	}
 };
 
@@ -136,5 +124,5 @@ const isEntryPoint =
 	process.argv[1] &&
 	resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isEntryPoint) {
-	build();
+	build(process.argv[2]);
 }

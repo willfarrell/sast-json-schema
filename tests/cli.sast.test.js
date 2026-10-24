@@ -278,6 +278,10 @@ describe("sast() $schema URL normalization", () => {
 			/Unsupported \$schema: http:\/\/bogus\.example\/v1/,
 		);
 	});
+
+	test("a non-string $schema is unsupported, not a crash", () => {
+		throws(() => sast({ $schema: 42 }), /Unsupported \$schema: 42/);
+	});
 });
 
 describe("resolveDangerousNames unknown language", () => {
@@ -286,5 +290,14 @@ describe("resolveDangerousNames unknown language", () => {
 			() => crawlSchema({ type: "object" }, 32, { lang: "klingon" }),
 			/unknown lang "klingon", expected one of: js, py, /,
 		);
+	});
+
+	test("an inherited Object.prototype key is an unknown lang, not a crash", () => {
+		for (const lang of ["__proto__", "constructor", "toString"]) {
+			throws(
+				() => crawlSchema({ type: "object" }, 32, { lang }),
+				new RegExp(`unknown lang "${lang}"`),
+			);
+		}
 	});
 });

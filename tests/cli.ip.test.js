@@ -33,6 +33,9 @@ describe("isPrivateIP", () => {
 		["::ffff:10.0.0.1", "IPv4-mapped private dotted"],
 		["::ffff:192.168.1.1", "IPv4-mapped private dotted"],
 		["0:0:0:0:0:ffff:7f00:1", "IPv4-mapped loopback hex"],
+		["::7f00:1", "IPv4-compatible ::/96 loopback hex"],
+		["::a00:1", "IPv4-compatible ::/96 private hex"],
+		["::ffff:0:7f00:1", "SIIT ::ffff:0:0/96 loopback hex"],
 	];
 
 	for (const [ip, desc] of privateCases) {
@@ -45,6 +48,8 @@ describe("isPrivateIP", () => {
 		["8.8.8.8", "Google DNS"],
 		["1.1.1.1", "Cloudflare DNS"],
 		["2607:f8b0:4004:800::200e", "Google IPv6"],
+		["::808:808", "IPv4-compatible ::/96 public hex"],
+		["::ffff:0:808:808", "SIIT ::ffff:0:0/96 public hex"],
 		["not-an-ip", "non-IP string"],
 	];
 

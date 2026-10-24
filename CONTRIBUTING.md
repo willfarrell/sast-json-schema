@@ -11,7 +11,11 @@ npm install
 npm test
 ```
 
-The per-draft meta-schemas at the repo root (`2020-12.json`, `2019-09.json`, etc.) are generated from `src/$defs.json` + `src/<draft>.json` by `bin/build.js`. `npm test` runs `npm run build` first via the `pretest` hook, but if you invoke tests directly (e.g. `node --test ./cli.test.js`) after editing anything under `src/`, run `npm run build` manually so the built artifacts are up to date.
+The per-draft meta-schemas at the repo root (`2020-12.json`, `2019-09.json`, etc.) are generated from `src/$defs.json` + `src/<draft>.json` by `bin/build.js`. `npm test` runs `npm run build` first via the `pretest` hook, but if you invoke tests directly (e.g. `npm run test:unit` or `node --test tests/cli.test.js`), run `npm run build` first after editing anything under `src/` (`npm install` builds them once via the `prepare` hook). `npm run test:bench` uses the experimental `node:bench` module and needs Node.js 26.9 or later.
+
+`npm test` also runs the SAST suite, which needs these tools on your `PATH` (they are not npm dependencies): [actionlint](https://github.com/rhysd/actionlint), [gitleaks](https://github.com/gitleaks/gitleaks), [semgrep](https://semgrep.dev), [trivy](https://trivy.dev), [trufflehog](https://github.com/trufflesecurity/trufflehog) and [zizmor](https://github.com/zizmorcore/zizmor). Without them, run `npm run test:lint && npm run test:unit`, which is what the release workflow runs (the pre-commit hook only lints staged files).
+
+The maintainer release scripts (`release:staged`, `release:approve`) also need `jq` and an `xargs` that supports `-o` (BSD or GNU findutils 4.7+).
 
 ## Committing
 

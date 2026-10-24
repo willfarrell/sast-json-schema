@@ -190,7 +190,7 @@
 							"required": ["oneOf"]
 						},
 						{
-							"required": ["definitions"]
+							"$ref": "#/$defs/schemaLibraryRoot"
 						}
 					]
 				}
