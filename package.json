@@ -34,8 +34,9 @@
 	},
 	"scripts": {
 		"prepare": "node bin/build.js && (husky || true)",
-		"git:pre-commit": "npm run test:lint:staged",
+		"git:pre-commit": "npm run git:lint-staged",
 		"git:commit-msg": "commitlint --config commitlint.config.cjs --edit",
+		"git:lint-staged": "biome check --staged --no-errors-on-unmatched",
 		"build": "node bin/build.js",
 		"prepublishOnly": "npm run build && npm run test:lint && npm run test:unit",
 		"release:tag": "git tag -s -m $npm_package_version $npm_package_version",
@@ -45,7 +46,6 @@
 		"pretest": "npm run build",
 		"test": "npm run test:lint && npm run test:unit && npm run test:mutation && npm run test:sast && npm run test:bench && npm run test:dast",
 		"test:lint": "biome ci --no-errors-on-unmatched",
-		"test:lint:staged": "biome check --staged --no-errors-on-unmatched",
 		"test:unit": "node --test --experimental-test-coverage --test-coverage-include=cli.js --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 ./tests/*.test.js",
 		"test:mutation": "stryker run",
 		"test:bench": "node --experimental-bench --bench './tests/*.bench.js'",
