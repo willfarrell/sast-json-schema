@@ -2101,3 +2101,262 @@ describe("resolveSSRFRefs timer hygiene and option nulls", () => {
 		ok(Array.isArray(errors));
 	});
 });
+
+describe("analyze: a propertyNames not.enum of the vectors gives a clean result", () => {
+	const JS_VECTORS = ["__proto__", "constructor", "prototype"];
+	const PRINTABLE = "^[\\x21-\\x7E]+$";
+	const propertyNames = (rejected) => ({
+		type: "string",
+		maxLength: 1024,
+		pattern: PRINTABLE,
+		not: { type: "string", enum: rejected },
+	});
+	const value = { type: "string", maxLength: 10, pattern: "^[a-z]+$" };
+	const additionalPropertiesMap = (rejected) => ({
+		$schema: "https://json-schema.org/draft/2020-12/schema",
+		$id: "test",
+		type: "object",
+		unevaluatedProperties: false,
+		propertyNames: propertyNames(rejected),
+		additionalProperties: value,
+		maxProperties: 10,
+		required: [],
+	});
+	const patternPropertiesMap = (rejected) => ({
+		$schema: "https://json-schema.org/draft/2020-12/schema",
+		$id: "test",
+		type: "object",
+		unevaluatedProperties: false,
+		additionalProperties: false,
+		propertyNames: propertyNames(rejected),
+		patternProperties: { [PRINTABLE]: value },
+		maxProperties: 10,
+		required: [],
+	});
+
+	for (const [name, build, flaggedPaths] of [
+		[
+			"additionalProperties",
+			additionalPropertiesMap,
+			["/propertyNames/pattern"],
+		],
+		[
+			"patternProperties",
+			patternPropertiesMap,
+			[`/patternProperties/${PRINTABLE}`, "/propertyNames/pattern"],
+		],
+	]) {
+		test(`${name} map: rejecting every vector leaves no errors`, async () => {
+			deepStrictEqual(
+				await analyze(build(JS_VECTORS), { offline: true, lang: "js" }),
+				[],
+			);
+		});
+
+		test(`${name} map: the one vector not rejected is the only one reported`, async () => {
+			const errors = await analyze(build(["__proto__", "prototype"]), {
+				offline: true,
+				lang: "js",
+			});
+			deepStrictEqual(
+				errors.map((e) => [e.instancePath, e.params.matches]),
+				flaggedPaths.map((path) => [path, ["constructor"]]),
+			);
+		});
+	}
+});
+
+describe("analyze: a keyword beside $ref in a classic draft says why it fails", () => {
+	const refSiblingMessage = (keyword) =>
+		`"${keyword}" is ignored next to $ref in draft-04, draft-06 and draft-07; move the $ref into allOf to keep it`;
+	const REF_SIBLING_MESSAGE = refSiblingMessage("maxLength");
+	const refWithSibling = (draft) => ({
+		$schema: `https://json-schema.org/${draft}/schema`,
+		...(draft === "draft-04" ? { id: "test" } : { $id: "test" }),
+		type: "object",
+		additionalProperties: false,
+		maxProperties: 10,
+		required: [],
+		properties: { sib: { $ref: "#/definitions/name", maxLength: 3 } },
+		definitions: {
+			name: { type: "string", maxLength: 64, pattern: "^[a-z]+$" },
+		},
+	});
+
+	test("draft-07: the sibling finding explains itself and keeps AJV's location", async () => {
+		deepStrictEqual(
+			await analyze(refWithSibling("draft-07"), { offline: true, lang: "js" }),
+			[
+				{
+					instancePath: "/properties/sib/maxLength",
+					schemaPath: "#/$defs/refSiblingIgnored/false schema",
+					keyword: "false schema",
+					params: {},
+					message: REF_SIBLING_MESSAGE,
+				},
+			],
+		);
+	});
+
+	for (const draft of ["draft-04", "draft-06"]) {
+		test(`${draft}: the sibling finding explains itself`, async () => {
+			const errors = await analyze(refWithSibling(draft), {
+				offline: true,
+				lang: "js",
+			});
+			deepStrictEqual(
+				errors.map((e) => [e.instancePath, e.message]),
+				[["/properties/sib/maxLength", REF_SIBLING_MESSAGE]],
+			);
+		});
+	}
+
+	test("the finding names the keyword as written, not as its pointer segment", async () => {
+		const schema = refWithSibling("draft-07");
+		schema.properties.sib = {
+			$ref: "#/definitions/name",
+			"x-a/b~c/d~e": 1,
+			'say"hi': 2,
+		};
+		const errors = await analyze(schema, { offline: true, lang: "js" });
+		deepStrictEqual(
+			errors.map((e) => [e.instancePath, e.message]),
+			[
+				["/properties/sib/x-a~1b~0c~1d~0e", refSiblingMessage("x-a/b~c/d~e")],
+				['/properties/sib/say"hi', refSiblingMessage('say\\"hi')],
+			],
+		);
+	});
+
+	test("an unrelated false-schema finding keeps AJV's message", async () => {
+		const errors = await analyze(
+			{
+				$schema: "https://json-schema.org/draft-04/schema",
+				id: "test",
+				type: "object",
+				additionalProperties: false,
+				maxProperties: 10,
+				required: [],
+				propertyNames: { enum: ["a"] },
+			},
+			{ offline: true, lang: "js" },
+		);
+		const banned = errors.find((e) => e.instancePath === "/propertyNames");
+		strictEqual(banned.schemaPath, "#/properties/propertyNames/false schema");
+		strictEqual(banned.message, "boolean schema is false");
+	});
+
+	const runOn = async (format) => {
+		const source = JSON.stringify(refWithSibling("draft-07"));
+		const out = [];
+		await run(["s.json", "--offline", "--lang", "js", "--format", format], {
+			log: (m) => out.push(String(m)),
+			error: () => {},
+			write: (s) => out.push(String(s)),
+			readFile: async () => source,
+			stat: async () => ({ size: source.length }),
+		});
+		return out.join("\n");
+	};
+
+	test("human output carries the explanation", async () => {
+		ok(
+			(await runOn("human")).includes(
+				`  /properties/sib/maxLength  ${REF_SIBLING_MESSAGE} [false schema]`,
+			),
+		);
+	});
+
+	test("json output carries the explanation", async () => {
+		const [e] = JSON.parse(await runOn("json"));
+		strictEqual(e.message, REF_SIBLING_MESSAGE);
+	});
+
+	test("sarif output carries the explanation under the same rule id", async () => {
+		const [sarifRun] = JSON.parse(await runOn("sarif")).runs;
+		const [result] = sarifRun.results;
+		strictEqual(result.ruleId, "refSiblingIgnored");
+		strictEqual(result.message.text, REF_SIBLING_MESSAGE);
+		strictEqual(
+			sarifRun.tool.driver.rules[0].fullDescription.text,
+			REF_SIBLING_MESSAGE,
+		);
+	});
+});
+
+describe("analyze: maps that share one propertyNames key rule through $ref", () => {
+	const JS_VECTORS = ["__proto__", "constructor", "prototype"];
+	const KEY = "^[a-z_]+$";
+	const value = { type: "string", maxLength: 10, pattern: "^[a-z]+$" };
+	const sharedKeyRuleSchema = (draft, rejected) => {
+		const modern = draft === "2020-12";
+		const container = modern ? "$defs" : "definitions";
+		const map = (extra) => ({
+			type: "object",
+			...(modern && { unevaluatedProperties: false }),
+			propertyNames: { $ref: `#/${container}/key` },
+			maxProperties: 10,
+			required: [],
+			...extra,
+		});
+		return {
+			$schema: modern
+				? "https://json-schema.org/draft/2020-12/schema"
+				: "https://json-schema.org/draft-07/schema",
+			$id: "test",
+			type: "object",
+			...(modern && { unevaluatedProperties: false }),
+			additionalProperties: false,
+			maxProperties: 10,
+			required: [],
+			properties: {
+				typed: map({ additionalProperties: value }),
+				patterned: map({
+					additionalProperties: false,
+					patternProperties: { [KEY]: value },
+				}),
+			},
+			[container]: {
+				key: {
+					type: "string",
+					maxLength: 64,
+					pattern: KEY,
+					not: { type: "string", enum: rejected },
+				},
+			},
+		};
+	};
+
+	for (const [draft, container] of [
+		["2020-12", "$defs"],
+		["draft-07", "definitions"],
+	]) {
+		test(`${draft}: a shared #/${container} rule rejecting every vector leaves no errors`, async () => {
+			deepStrictEqual(
+				await analyze(sharedKeyRuleSchema(draft, JS_VECTORS), {
+					offline: true,
+					lang: "js",
+				}),
+				[],
+			);
+		});
+
+		test(`${draft}: the one vector the shared rule does not reject is the only one reported`, async () => {
+			const errors = await analyze(
+				sharedKeyRuleSchema(draft, ["__proto__", "prototype"]),
+				{ offline: true, lang: "js" },
+			);
+			deepStrictEqual(
+				errors.map((e) => [e.instancePath, e.keyword, e.params.matches]),
+				[
+					[
+						`/properties/patterned/patternProperties/${KEY}`,
+						"patternProperties",
+						["constructor"],
+					],
+					[`/${container}/key/pattern`, "propertyNames", ["constructor"]],
+				],
+			);
+		});
+	}
+});

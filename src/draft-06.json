@@ -143,7 +143,7 @@
 					"$ref": "#/$defs/dependentSchemas.patternProperties"
 				},
 				"propertyNames": {
-					"$ref": "#/$defs/dependentSchemas.propertyNames"
+					"$ref": "#/$defs/dependentSchemas.propertyNames.draft-06-07"
 				},
 				"title": {
 					"$ref": "#/$defs/dependentSchemas.title"

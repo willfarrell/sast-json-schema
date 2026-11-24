@@ -378,5 +378,199 @@
         "valid": true
       }
     ]
+  },
+  {
+    "description": "draft-06 $ref siblings are ignored by spec-strict validators",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-06"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $ref has a maxLength sibling",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/name",
+              "maxLength": 3
+            }
+          },
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when $ref has a description sibling (annotation only)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/name",
+              "description": "annotated"
+            }
+          },
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when $ref has an examples sibling (annotation only)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/name",
+              "examples": ["alice"]
+            }
+          },
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref has a readOnly sibling (readOnly is not a draft-06 keyword)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/name",
+              "readOnly": true
+            }
+          },
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref has a default sibling (AJV useDefaults applies it, spec-strict validators ignore it)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/name",
+              "default": "alice"
+            }
+          },
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "draft-06 propertyNames may share a key rule through a bare local $ref",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-06"
+    },
+    "tests": [
+      {
+        "description": "Should pass when propertyNames is a bare $ref to #/definitions/<name>",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "$ref": "#/definitions/key"
+          },
+          "definitions": {
+            "key": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z_]+$",
+              "not": {
+                "type": "string",
+                "enum": [
+                  "__proto__",
+                  "constructor",
+                  "prototype"
+                ]
+              }
+            }
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when propertyNames is only a remote $ref (the key rule cannot be checked)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-06/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "$ref": "https://schema.example.org/keys.json#/definitions/key"
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": false
+      }
+    ]
   }
 ]

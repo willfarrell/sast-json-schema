@@ -237,5 +237,41 @@
         "valid": false
       }
     ]
+  },
+  {
+    "description": "2020-12 evaluates $ref siblings, so they stay allowed",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when $ref has type, maxLength and pattern siblings",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "unevaluatedProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/name",
+              "type": "string",
+              "maxLength": 3,
+              "pattern": "^a$"
+            }
+          },
+          "$defs": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": true
+      }
+    ]
   }
 ]

@@ -217,5 +217,223 @@
         "valid": true
       }
     ]
+  },
+  {
+    "description": "propertyNames may exclude names with a typed not",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when propertyNames excludes names with not.enum for a typed additionalProperties map",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 1024,
+            "pattern": "^[\\x21-\\x7E]+$",
+            "not": {
+              "type": "string",
+              "enum": [
+                "__proto__",
+                "constructor",
+                "prototype"
+              ]
+            }
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when the propertyNames not.enum also covers a patternProperties key",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "patternProperties": {
+            "^[a-z_]+$": {
+              "type": "string",
+              "maxLength": 8,
+              "enum": ["a"]
+            }
+          },
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z_]+$",
+            "not": {
+              "$comment": "JS prototype-pollution names",
+              "type": ["string"],
+              "enum": [
+                "__proto__",
+                "constructor",
+                "prototype"
+              ]
+            }
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should pass when propertyNames excludes a name with not.const",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^_[a-z_]+$",
+            "not": {
+              "type": "string",
+              "const": "__proto__"
+            }
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "propertyNames may share a key rule through a local $ref",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:2020-12"
+    },
+    "tests": [
+      {
+        "description": "Should pass when propertyNames is a bare $ref to #/$defs/<name>",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/key"
+          },
+          "$defs": {
+            "key": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z_]+$",
+              "not": {
+                "type": "string",
+                "enum": [
+                  "__proto__",
+                  "constructor",
+                  "prototype"
+                ]
+              }
+            }
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when propertyNames is only a remote $ref (the key rule cannot be checked)",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "$ref": "https://schema.example.org/keys.json#/$defs/key"
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when propertyNames has neither type nor $ref",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "const": "name"
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass when propertyNames combines type, bounds and a local $ref",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "object",
+          "unevaluatedProperties": false,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/key",
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z_]+$"
+          },
+          "$defs": {
+            "key": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z_]+$",
+              "not": {
+                "type": "string",
+                "enum": [
+                  "__proto__",
+                  "constructor",
+                  "prototype"
+                ]
+              }
+            }
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": true
+      }
+    ]
   }
 ]
