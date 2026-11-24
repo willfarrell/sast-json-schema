@@ -3043,7 +3043,8 @@ describe("crawlSchema propertyNames that admit dangerous names", () => {
 
 	test("flags a propertyNames with no enum, const or pattern (fail closed)", () => {
 		// format "hostname" admits "constructor", "uri-reference" admits
-		// "__proto__"; a $ref or combinator is not followed. None can be checked.
+		// "__proto__"; a combinator, or a $ref with no definition to follow, is
+		// not followed. None can be checked.
 		for (const names of [
 			{ type: "string", format: "hostname", maxLength: 20 },
 			{ $ref: "#/$defs/key" },
@@ -3110,6 +3111,18 @@ describe("crawlSchema denylist matching uses AJV's unicode regex semantics", () 
 		// this key passes ReDoS analysis and reaches the denylist regex compile.
 		strictEqual(dn({ patternProperties: { "^\\p{Foo}$": {} } }).length, 0);
 	});
+
+	for (const schema of [
+		{ patternProperties: { "^\\p{Foo}$": {} } },
+		{ propertyNames: { pattern: "^\\p{Foo}$" } },
+	]) {
+		test(`a ReDoS-safe pattern V8 cannot compile is not reported as ReDoS: ${JSON.stringify(schema)}`, () => {
+			deepStrictEqual(
+				crawlSchema(schema).errors.filter((e) => e.schemaPath === "#/redos"),
+				[],
+			);
+		});
+	}
 
 	test("ReDoS analysis reads \\p{...} as a class, so overlapping classes are unsafe", () => {
 		// Without the u flag \p{L} is a literal "p{L}" and this looks safe; under
@@ -3255,6 +3268,264 @@ describe("crawlSchema propertyNames finding shapes", () => {
 		);
 	});
 
+	const notMatches = (not) =>
+		crawlSchema(
+			{
+				propertyNames: {
+					type: "string",
+					maxLength: 1024,
+					pattern: "^[\\x21-\\x7E]+$",
+					not,
+				},
+			},
+			undefined,
+			{ lang: "js" },
+		).errors.filter((e) => e.schemaPath === "#/dangerous-name");
+
+	test("pattern names excluded by a typed not.enum are not flagged", () => {
+		strictEqual(
+			notMatches({
+				type: "string",
+				enum: ["__proto__", "constructor", "prototype"],
+			}).length,
+			0,
+		);
+	});
+
+	test("pattern names not excluded by a typed not.enum are still flagged", () => {
+		const [e] = notMatches({ type: "string", enum: ["__proto__"] });
+		deepStrictEqual(e.params.matches, ["constructor", "prototype"]);
+	});
+
+	test("pattern name excluded by a typed not.const is not flagged", () => {
+		const [e] = notMatches({ type: "string", const: "constructor" });
+		deepStrictEqual(e.params.matches, ["__proto__", "prototype"]);
+	});
+
+	test("not with enum and const excludes only names in both", () => {
+		const [e] = notMatches({
+			type: "string",
+			enum: ["__proto__", "prototype"],
+			const: "prototype",
+		});
+		deepStrictEqual(e.params.matches, ["__proto__", "constructor"]);
+	});
+
+	const DENY_JS = ["__proto__", "constructor", "prototype"];
+	for (const not of [
+		{ $comment: "x", type: "string", enum: DENY_JS },
+		{ type: ["string"], enum: DENY_JS },
+		{ type: ["string", "null"], enum: DENY_JS },
+		{ title: "x", type: "string", enum: DENY_JS },
+		{ description: "x", type: "string", enum: DENY_JS },
+	]) {
+		test(`not ${JSON.stringify(not)} still excludes its names`, () => {
+			strictEqual(notMatches(not).length, 0);
+		});
+	}
+
+	for (const not of [
+		{ type: "string", enum: ["__proto__"], maxLength: 3 },
+		{ type: "number", enum: ["__proto__"] },
+		{ type: ["number"], enum: ["__proto__"] },
+		{ type: "not-a-string", enum: ["__proto__"] },
+		{ type: "string", enum: ["__proto__"], const: "prototype" },
+	]) {
+		test(`not ${JSON.stringify(not)} cannot match __proto__, so excludes nothing`, () => {
+			const [e] = notMatches(not);
+			deepStrictEqual(e.params.matches, [
+				"__proto__",
+				"constructor",
+				"prototype",
+			]);
+		});
+	}
+
+	for (const not of [
+		null,
+		{},
+		[],
+		{ $comment: "x" },
+		{ type: "string", enum: "__proto__" },
+	]) {
+		test(`not ${JSON.stringify(not)} excludes nothing`, () => {
+			const [e] = notMatches(not);
+			deepStrictEqual(e.params.matches, [
+				"__proto__",
+				"constructor",
+				"prototype",
+			]);
+		});
+	}
+
+	const NOT_IGNORED_NOTE =
+		"; propertyNames.not ignored: only a string type, an enum array, const, $comment, title and description are understood";
+
+	test("a pattern finding says when the sibling not was ignored", () => {
+		const [e] = notMatches({
+			type: "string",
+			enum: ["__proto__"],
+			maxLength: 3,
+		});
+		strictEqual(
+			e.message,
+			`propertyNames pattern "^[\\x21-\\x7E]+$" matches deserialization vector(s) for lang="js": __proto__, constructor, prototype${NOT_IGNORED_NOTE}`,
+		);
+		strictEqual(e.params.notIgnored, true);
+	});
+
+	for (const not of [
+		null,
+		{},
+		{ $comment: "x" },
+		{ type: "string", enum: ["__proto__"], format: "email" },
+		{ type: "number", enum: ["__proto__"] },
+		{ type: "string", enum: "__proto__" },
+	]) {
+		test(`a pattern finding notes that not ${JSON.stringify(not)} was ignored`, () => {
+			const [e] = notMatches(not);
+			ok(e.message.endsWith(NOT_IGNORED_NOTE));
+			strictEqual(e.params.notIgnored, true);
+		});
+	}
+
+	test("a pattern finding has no note when a well-formed not just does not list the names", () => {
+		const [e] = notMatches({ type: "string", enum: ["__proto__"] });
+		strictEqual(
+			e.message,
+			'propertyNames pattern "^[\\x21-\\x7E]+$" matches deserialization vector(s) for lang="js": constructor, prototype',
+		);
+		deepStrictEqual(Object.keys(e.params), ["pattern", "matches", "lang"]);
+	});
+
+	test("a pattern finding without a not has no note", () => {
+		const [e] = dn({ pattern: "^_{2}proto_{2}$" });
+		deepStrictEqual(Object.keys(e.params), ["pattern", "matches", "lang"]);
+	});
+
+	const PRINTABLE = "^[\\x21-\\x7E]+$";
+	const patternPropertiesMatches = (not, $schema) =>
+		crawlSchema(
+			{
+				...($schema && { $schema }),
+				propertyNames: {
+					type: "string",
+					maxLength: 1024,
+					pattern: PRINTABLE,
+					not,
+				},
+				patternProperties: { [PRINTABLE]: {} },
+			},
+			undefined,
+			{ lang: "js" },
+		).errors.filter(
+			(e) =>
+				e.schemaPath === "#/dangerous-name" &&
+				e.keyword === "patternProperties",
+		);
+
+	test("patternProperties names rejected by the sibling propertyNames.not are not flagged", () => {
+		strictEqual(
+			patternPropertiesMatches({
+				type: "string",
+				enum: ["__proto__", "constructor", "prototype"],
+			}).length,
+			0,
+		);
+	});
+
+	test("patternProperties names the sibling propertyNames.not does not reject are still flagged", () => {
+		const [e] = patternPropertiesMatches({
+			type: "string",
+			enum: ["__proto__"],
+		});
+		deepStrictEqual(e.params.matches, ["constructor", "prototype"]);
+	});
+
+	test("draft-04 has no propertyNames, so its not excludes nothing from patternProperties", () => {
+		const [e] = patternPropertiesMatches(
+			{ type: "string", enum: ["__proto__", "constructor", "prototype"] },
+			"http://json-schema.org/draft-04/schema#",
+		);
+		deepStrictEqual(e.params.matches, [
+			"__proto__",
+			"constructor",
+			"prototype",
+		]);
+	});
+
+	for (const $schema of [
+		"http://json-schema.org/draft-06/schema#",
+		"https://json-schema.org/draft/2020-12/schema",
+	]) {
+		test(`${$schema} has propertyNames, so its not excludes names from patternProperties`, () => {
+			strictEqual(
+				patternPropertiesMatches(
+					{ type: "string", enum: ["__proto__", "constructor", "prototype"] },
+					$schema,
+				).length,
+				0,
+			);
+		});
+	}
+
+	test("a patternProperties finding says when the sibling propertyNames.not was ignored", () => {
+		const [e] = patternPropertiesMatches({
+			type: "string",
+			enum: ["__proto__"],
+			maxLength: 3,
+		});
+		strictEqual(
+			e.message,
+			`patternProperties key "^[\\x21-\\x7E]+$" matches deserialization vector(s) for lang="js": __proto__, constructor, prototype${NOT_IGNORED_NOTE}`,
+		);
+		strictEqual(e.params.notIgnored, true);
+	});
+
+	test("a patternProperties finding has no note when a well-formed propertyNames.not just does not list the names", () => {
+		const [e] = patternPropertiesMatches({
+			type: "string",
+			enum: ["__proto__"],
+		});
+		ok(!e.message.includes(NOT_IGNORED_NOTE));
+		deepStrictEqual(Object.keys(e.params), ["pattern", "matches", "lang"]);
+	});
+
+	test("a draft-04 patternProperties finding has no note, as propertyNames itself is ignored", () => {
+		const [e] = patternPropertiesMatches(
+			{ type: "string", enum: ["__proto__"], maxLength: 3 },
+			"http://json-schema.org/draft-04/schema#",
+		);
+		ok(!e.message.includes(NOT_IGNORED_NOTE));
+		deepStrictEqual(Object.keys(e.params), ["pattern", "matches", "lang"]);
+	});
+
+	const defaultLangMatches = (not) =>
+		dn({
+			type: "string",
+			maxLength: 1024,
+			pattern: PRINTABLE,
+			...(not && { not }),
+		});
+
+	test("default lang: a not.enum of the JS names leaves every other name reported", () => {
+		const [all] = defaultLangMatches();
+		ok(all.params.matches.length > DENY_JS.length);
+		const [e] = defaultLangMatches({ type: "string", enum: DENY_JS });
+		deepStrictEqual(
+			e.params.matches,
+			all.params.matches.filter((n) => !DENY_JS.includes(n)),
+		);
+	});
+
+	test("default lang: a not.enum of every reported name leaves no finding", () => {
+		const [all] = defaultLangMatches();
+		strictEqual(
+			defaultLangMatches({ type: "string", enum: all.params.matches }).length,
+			0,
+		);
+	});
+
 	test("a non-array enum restricts nothing, so only the fail-closed finding fires", () => {
 		const errs = dn({ enum: "__proto__" });
 		strictEqual(errs.length, 1);
@@ -3262,4 +3533,787 @@ describe("crawlSchema propertyNames finding shapes", () => {
 			errs[0].message.startsWith("propertyNames has no enum, const or pattern"),
 		);
 	});
+});
+
+describe("crawlSchema entries of a name map are ordinary schemas, whatever their name", () => {
+	// Renaming a property or definition from a neutral name to a keyword's name
+	// must change nothing in the findings except that path segment.
+	const NEUTRAL = "foo";
+	const KEYWORD_NAMES = [
+		"properties",
+		"patternProperties",
+		"$defs",
+		"definitions",
+		"dependentSchemas",
+		"dependencies",
+		"dependentRequired",
+		"propertyNames",
+	];
+	const CONTAINERS = [
+		"properties",
+		"patternProperties",
+		"$defs",
+		"definitions",
+		"dependentSchemas",
+		"dependencies",
+	];
+	const findingsUnder = (container, name, subschema) => {
+		const r = crawlSchema({ [container]: { [name]: subschema } }, 32, {
+			lang: "js",
+		});
+		const renamed = (path) =>
+			path.replace(`/${container}/${name}`, `/${container}/${NEUTRAL}`);
+		return {
+			errors: r.errors.map((e) => ({
+				...e,
+				instancePath: renamed(e.instancePath),
+			})),
+			refs: r.refs.map((ref) => ({ ...ref, path: renamed(ref.path) })),
+		};
+	};
+	const TOO_SHORT = { type: "string", minLength: 2, maxLength: 1 };
+
+	for (const [label, subschema] of [
+		["a propertyNames pattern", { propertyNames: { pattern: "^__proto__$" } }],
+		["a propertyNames enum", { propertyNames: { enum: ["a", "__proto__"] } }],
+		["a propertyNames const", { propertyNames: { const: "constructor" } }],
+		["a propertyNames that fails closed", { propertyNames: { maxLength: 8 } }],
+		[
+			"an $id that sets the base of a relative $ref",
+			{
+				$id: "https://schemas.example/a/",
+				properties: { x: { $ref: "b.json" } },
+			},
+		],
+		[
+			"instance data that looks like schemas",
+			{
+				propertyNames: { const: "constructor" },
+				default: TOO_SHORT,
+				const: TOO_SHORT,
+				enum: [TOO_SHORT],
+				examples: [TOO_SHORT],
+			},
+		],
+	]) {
+		test(`${label} is found the same way under any entry name`, () => {
+			for (const container of CONTAINERS) {
+				const expected = findingsUnder(container, NEUTRAL, subschema);
+				ok(
+					expected.errors.length + expected.refs.length > 0,
+					`${container}.${NEUTRAL} has findings`,
+				);
+				for (const name of KEYWORD_NAMES) {
+					deepStrictEqual(
+						findingsUnder(container, name, subschema),
+						expected,
+						`${container}.${name}`,
+					);
+				}
+			}
+		});
+	}
+});
+
+describe("crawlSchema a name map is not a schema, so no keyword check reads it", () => {
+	const findings = (schema, lang = "js") =>
+		crawlSchema(schema, 32, { lang }).errors.map(
+			(e) => `${e.instancePath} ${e.message}`,
+		);
+	const vector = (path, what) =>
+		`${path} ${what} is a deserialization vector for lang="js"`;
+
+	// The names a schema declares are still checked by that schema, exactly once,
+	// at the root and in a schema that is itself an entry of a name map.
+	for (const at of ["", "/properties/x", "/$defs/x"]) {
+		const nest = (json) => {
+			const schema = JSON.parse(json);
+			if (at === "") return schema;
+			const [, container, name] = at.split("/");
+			return { [container]: { [name]: schema } };
+		};
+		for (const site of [
+			"properties",
+			"$defs",
+			"definitions",
+			"dependentSchemas",
+			"dependencies",
+		]) {
+			test(`a schema at "${at}" reports a ${site} name once`, () => {
+				deepStrictEqual(findings(nest(`{"${site}":{"__proto__":{}}}`)), [
+					vector(`${at}/${site}/__proto__`, `${site} key "__proto__"`),
+				]);
+			});
+		}
+		for (const site of ["dependentRequired", "dependencies"]) {
+			test(`a schema at "${at}" reports a ${site} key and entry once each`, () => {
+				deepStrictEqual(
+					findings(nest(`{"${site}":{"__proto__":["a","constructor"]}}`)),
+					[
+						vector(`${at}/${site}/__proto__`, `${site} key "__proto__"`),
+						vector(`${at}/${site}/__proto__/1`, `${site} entry "constructor"`),
+					],
+				);
+			});
+		}
+		test(`a schema at "${at}" reports a required name once`, () => {
+			deepStrictEqual(findings(nest('{"required":["a","prototype"]}')), [
+				vector(`${at}/required/1`, 'required entry "prototype"'),
+			]);
+		});
+		test(`a schema at "${at}" reports a patternProperties key once`, () => {
+			deepStrictEqual(findings(nest('{"patternProperties":{"^proto":{}}}')), [
+				`${at}/patternProperties/^proto patternProperties key "^proto" matches deserialization vector(s) for lang="js": prototype`,
+			]);
+		});
+	}
+
+	for (const name of ["properties", "$defs"]) {
+		test(`the keywords of a property named ${name} are not read as its names`, () => {
+			deepStrictEqual(
+				findings(
+					{ properties: { [name]: { type: "object", description: "x" } } },
+					"default",
+				),
+				[],
+			);
+		});
+	}
+
+	test("the keywords of a property named patternProperties are not read, analysed or counted as regexes", () => {
+		deepStrictEqual(
+			crawlSchema(
+				{ properties: { patternProperties: { type: "object" } } },
+				32,
+				{ lang: "js", maxRedosPatterns: 0 },
+			).errors,
+			[],
+		);
+	});
+
+	test("the enum of a property named dependencies is not read as dependency names", () => {
+		deepStrictEqual(
+			findings({
+				properties: {
+					dependencies: { type: "string", enum: ["constructor", "a"] },
+				},
+			}),
+			[],
+		);
+	});
+
+	test("a dependentRequired trigger named propertyNames is not the keyword", () => {
+		deepStrictEqual(
+			findings({ dependentRequired: { propertyNames: ["a"] } }),
+			[],
+		);
+	});
+
+	for (const site of ["dependentRequired", "dependencies"]) {
+		test(`a ${site} trigger named required is reported once, as a ${site} entry`, () => {
+			deepStrictEqual(findings({ [site]: { required: ["__proto__"] } }), [
+				vector(`/${site}/required/0`, `${site} entry "__proto__"`),
+			]);
+		});
+	}
+});
+
+describe("crawlSchema propertyNames $ref to a shared key rule", () => {
+	const KEY_PATTERN = "^[a-z_]+$";
+	const keyRule = (extra = {}) => ({
+		type: "string",
+		maxLength: 64,
+		pattern: KEY_PATTERN,
+		...extra,
+	});
+	const crawl = (schema, options = {}) =>
+		crawlSchema(schema, undefined, { lang: "js", ...options }).errors;
+
+	test("the referenced definition's pattern is checked at the definition", () => {
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: { key: keyRule() },
+			}),
+			[
+				{
+					instancePath: "/$defs/key/pattern",
+					schemaPath: "#/dangerous-name",
+					keyword: "propertyNames",
+					params: {
+						pattern: KEY_PATTERN,
+						matches: ["__proto__", "constructor", "prototype"],
+						lang: "js",
+					},
+					message: `propertyNames pattern "${KEY_PATTERN}" matches deserialization vector(s) for lang="js": __proto__, constructor, prototype`,
+				},
+			],
+		);
+	});
+	test("a definitions $ref is followed the same way", () => {
+		deepStrictEqual(
+			crawl({
+				$schema: "http://json-schema.org/draft-07/schema#",
+				propertyNames: { $ref: "#/definitions/key" },
+				definitions: { key: keyRule() },
+			}).map((e) => [e.instancePath, e.params.matches]),
+			[["/definitions/key/pattern", ["__proto__", "constructor", "prototype"]]],
+		);
+	});
+
+	const DENY_JS = ["__proto__", "constructor", "prototype"];
+	const NOT_IGNORED_NOTE =
+		"; propertyNames.not ignored: only a string type, an enum array, const, $comment, title and description are understood";
+
+	test("the definition's not excludes the names it rejects", () => {
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: {
+					key: keyRule({ not: { type: "string", enum: DENY_JS } }),
+				},
+			}),
+			[],
+		);
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: {
+					key: keyRule({ not: { type: "string", enum: ["__proto__"] } }),
+				},
+			}).map((e) => [e.instancePath, e.params.matches]),
+			[["/$defs/key/pattern", ["constructor", "prototype"]]],
+		);
+	});
+	test("an unreadable not in the definition is noted as ignored", () => {
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: {
+					key: keyRule({
+						not: { type: "string", enum: DENY_JS, maxLength: 3 },
+					}),
+				},
+			}),
+			[
+				{
+					instancePath: "/$defs/key/pattern",
+					schemaPath: "#/dangerous-name",
+					keyword: "propertyNames",
+					params: {
+						pattern: KEY_PATTERN,
+						matches: DENY_JS,
+						notIgnored: true,
+						lang: "js",
+					},
+					message: `propertyNames pattern "${KEY_PATTERN}" matches deserialization vector(s) for lang="js": __proto__, constructor, prototype${NOT_IGNORED_NOTE}`,
+				},
+			],
+		);
+	});
+
+	test("a not beside the $ref excludes nothing; only the definition's own not counts", () => {
+		deepStrictEqual(
+			crawl({
+				$schema: "https://json-schema.org/draft/2020-12/schema",
+				propertyNames: {
+					$ref: "#/$defs/key",
+					not: { type: "string", enum: DENY_JS },
+				},
+				$defs: { key: keyRule() },
+			}).map((e) => [e.instancePath, e.params.matches]),
+			[["/$defs/key/pattern", DENY_JS]],
+		);
+	});
+	test("the definition's enum entries on the denylist are reported at the definition", () => {
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: { key: { enum: ["a", "constructor", "b", "__proto__"] } },
+			}),
+			[
+				{
+					instancePath: "/$defs/key/enum/1",
+					schemaPath: "#/dangerous-name",
+					keyword: "propertyNames",
+					params: { name: "constructor", lang: "js" },
+					message:
+						'propertyNames entry "constructor" is a deserialization vector for lang="js"',
+				},
+				{
+					instancePath: "/$defs/key/enum/3",
+					schemaPath: "#/dangerous-name",
+					keyword: "propertyNames",
+					params: { name: "__proto__", lang: "js" },
+					message:
+						'propertyNames entry "__proto__" is a deserialization vector for lang="js"',
+				},
+			],
+		);
+	});
+
+	test("the definition's const on the denylist is reported at the definition", () => {
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: { key: { const: "prototype" } },
+			}),
+			[
+				{
+					instancePath: "/$defs/key/const",
+					schemaPath: "#/dangerous-name",
+					keyword: "propertyNames",
+					params: { name: "prototype", lang: "js" },
+					message:
+						'propertyNames const "prototype" is a deserialization vector for lang="js"',
+				},
+			],
+		);
+	});
+	test("a referenced rule reports what the same rule inline reports, at the definition", () => {
+		const rule = keyRule({
+			enum: ["a", "constructor"],
+			const: "prototype",
+			not: { type: "string", enum: ["__proto__"] },
+		});
+		const inline = crawl({ propertyNames: rule });
+		strictEqual(inline.length, 3);
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: { key: structuredClone(rule) },
+			}),
+			inline.map((e) => ({
+				...e,
+				instancePath: e.instancePath.replace("/propertyNames", "/$defs/key"),
+			})),
+		);
+	});
+	const FAIL_CLOSED = {
+		instancePath: "/propertyNames",
+		schemaPath: "#/dangerous-name",
+		keyword: "propertyNames",
+		params: { lang: "js" },
+		message:
+			'propertyNames has no enum, const or pattern to rule out deserialization vectors for lang="js"',
+	};
+
+	for (const [why, $ref, $defs] of [
+		["remote", "https://example.com/key.json", { key: keyRule() }],
+		[
+			"remote with a local-looking fragment",
+			"https://example.com/s#/$defs/key",
+			{ key: keyRule() },
+		],
+		["not of the local form", "#/$defs/key/not", { key: keyRule() }],
+		["an anchor, not a pointer", "#key", { key: keyRule() }],
+		["into another keyword", "#/properties/key", { key: keyRule() }],
+		["the root", "#", { key: keyRule() }],
+		["missing from the root schema", "#/$defs/other", { key: keyRule() }],
+		["to true", "#/$defs/key", { key: true }],
+		["to null", "#/$defs/key", { key: null }],
+		["to an array", "#/$defs/key", { key: [keyRule()] }],
+		["to a string", "#/$defs/key", { key: KEY_PATTERN }],
+		[
+			"to a rule with no enum, const or pattern",
+			"#/$defs/key",
+			{ key: { type: "string", maxLength: 64 } },
+		],
+		[
+			"to a rule that is only a $ref (one hop only)",
+			"#/$defs/key",
+			{ key: { $ref: "#/$defs/real" }, real: keyRule() },
+		],
+		["to itself", "#/$defs/key", { key: { $ref: "#/$defs/key" } }],
+	]) {
+		test(`a $ref ${why} stays fail-closed at the use site`, () => {
+			const errors = crawl({ propertyNames: { $ref }, $defs });
+			deepStrictEqual(
+				errors.filter((e) => e.instancePath === "/propertyNames"),
+				[FAIL_CLOSED],
+			);
+			deepStrictEqual(
+				errors.filter((e) => e.keyword === "propertyNames"),
+				[FAIL_CLOSED],
+			);
+		});
+	}
+	for (const own of [
+		{ pattern: "^[0-9]+$" },
+		{ enum: ["a", "__proto__"] },
+		{ const: "constructor" },
+	]) {
+		test(`a propertyNames with its own ${Object.keys(own)[0]} is checked as before and its $ref is not followed`, () => {
+			const inline = crawl({ propertyNames: own });
+			deepStrictEqual(
+				crawl({
+					propertyNames: { $ref: "#/$defs/key", ...own },
+					$defs: { key: keyRule({ enum: ["prototype"] }) },
+				}),
+				inline,
+			);
+		});
+	}
+	const RULE_FINDINGS = [
+		{
+			instancePath: "/$defs/key/pattern",
+			schemaPath: "#/dangerous-name",
+			keyword: "propertyNames",
+			params: {
+				pattern: KEY_PATTERN,
+				matches: ["constructor", "prototype"],
+				lang: "js",
+			},
+			message: `propertyNames pattern "${KEY_PATTERN}" matches deserialization vector(s) for lang="js": constructor, prototype`,
+		},
+		{
+			instancePath: "/$defs/key/enum/0",
+			schemaPath: "#/dangerous-name",
+			keyword: "propertyNames",
+			params: { name: "constructor", lang: "js" },
+			message:
+				'propertyNames entry "constructor" is a deserialization vector for lang="js"',
+		},
+	];
+	const sharedRule = () =>
+		keyRule({
+			enum: ["constructor", "a"],
+			not: { type: "string", enum: ["__proto__"] },
+		});
+	const nestedAt = (depth, schema) =>
+		depth === 0
+			? schema
+			: { type: "object", properties: { p: nestedAt(depth - 1, schema) } };
+	const keyedMap = { type: "object", propertyNames: { $ref: "#/$defs/key" } };
+
+	for (const depth of [0, 1, 4]) {
+		test(`$defs before or after a referencing schema at depth ${depth} gives the same findings`, () => {
+			const referencing = nestedAt(depth, keyedMap);
+			deepStrictEqual(
+				crawl({ $defs: { key: sharedRule() }, ...referencing }),
+				RULE_FINDINGS,
+			);
+			deepStrictEqual(
+				crawl({ ...referencing, $defs: { key: sharedRule() } }),
+				RULE_FINDINGS,
+			);
+		});
+	}
+
+	test("a definition referenced by several propertyNames is reported once", () => {
+		for (const schema of [
+			{
+				type: "object",
+				properties: {
+					a: structuredClone(keyedMap),
+					b: structuredClone(keyedMap),
+				},
+				$defs: { key: sharedRule() },
+			},
+			{
+				$defs: { key: sharedRule() },
+				type: "object",
+				properties: {
+					a: structuredClone(keyedMap),
+					b: nestedAt(3, structuredClone(keyedMap)),
+				},
+				propertyNames: { $ref: "#/$defs/key" },
+			},
+		]) {
+			deepStrictEqual(crawl(structuredClone(schema)), RULE_FINDINGS);
+		}
+	});
+
+	test("a definition also used as an ordinary schema gets the same key findings", () => {
+		for (const schema of [
+			{
+				type: "object",
+				properties: { name: { $ref: "#/$defs/key" }, map: keyedMap },
+				$defs: { key: sharedRule() },
+			},
+			{
+				$defs: { key: sharedRule() },
+				type: "object",
+				properties: { map: keyedMap, name: { $ref: "#/$defs/key" } },
+			},
+		]) {
+			deepStrictEqual(crawl(structuredClone(schema)), RULE_FINDINGS);
+		}
+	});
+	test("an unsafe definition pattern gives exactly one ReDoS finding and no key finding", () => {
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: { key: keyRule({ pattern: "^(a+)+$" }) },
+			}),
+			[
+				{
+					instancePath: "/$defs/key/pattern",
+					schemaPath: "#/redos",
+					keyword: "pattern",
+					params: { pattern: "^(a+)+$", reason: "hitMaxScore" },
+					message: "pattern is vulnerable to ReDoS",
+				},
+			],
+		);
+	});
+
+	const budgetSchema = () => ({
+		type: "object",
+		properties: { x: { type: "string", pattern: "^[0-9]+$" } },
+		propertyNames: { $ref: "#/$defs/key" },
+		$defs: { key: keyRule() },
+	});
+	const where = (errors) => errors.map((e) => [e.instancePath, e.schemaPath]);
+
+	test("a referenced definition's pattern counts once against maxRedosPatterns", () => {
+		deepStrictEqual(where(crawl(budgetSchema(), { maxRedosPatterns: 2 })), [
+			["/$defs/key/pattern", "#/dangerous-name"],
+		]);
+		deepStrictEqual(where(crawl(budgetSchema(), { maxRedosPatterns: 1 })), [
+			["/properties/x/pattern", "#/redos-budget"],
+			["/$defs/key/pattern", "#/dangerous-name"],
+		]);
+	});
+
+	test("a definition pattern skipped by the pattern budget yields only the budget finding", () => {
+		const { $defs, ...rest } = budgetSchema();
+		deepStrictEqual(where(crawl({ $defs, ...rest }, { maxRedosPatterns: 1 })), [
+			["/$defs/key/pattern", "#/redos-budget"],
+		]);
+	});
+
+	test("a definition pattern skipped by the heap budget yields the heap finding and its enum findings", () => {
+		const reads = [0, Number.MAX_SAFE_INTEGER];
+		let call = 0;
+		const { $defs, ...rest } = budgetSchema();
+		$defs.key.enum = ["prototype"];
+		deepStrictEqual(
+			where(
+				crawl(
+					{ $defs, ...rest },
+					{
+						memoryUsage: () => reads[Math.min(call++, reads.length - 1)],
+						forceGc: () => false,
+					},
+				),
+			),
+			[
+				["/$defs/key/pattern", "#/redos-budget"],
+				["/$defs/key/enum/0", "#/dangerous-name"],
+			],
+		);
+	});
+
+	test("a crawl that times out before the definition is visited reports only the timeout", () => {
+		const reads = [0, 0, 2_000];
+		let call = 0;
+		const r = crawlSchema(
+			{
+				$defs: { key: keyRule({ enum: ["prototype"] }) },
+				propertyNames: { $ref: "#/$defs/key" },
+			},
+			undefined,
+			{
+				lang: "js",
+				deadline: 1_000,
+				now: () => reads[Math.min(call++, reads.length - 1)],
+			},
+		);
+		strictEqual(r.timedOut, true);
+		deepStrictEqual(where(r.errors), [["", "#/timeout"]]);
+	});
+	const patternPropertiesFindings = (not, $schema) =>
+		crawl({
+			...($schema && { $schema }),
+			type: "object",
+			propertyNames: { $ref: "#/$defs/key" },
+			patternProperties: { [KEY_PATTERN]: {} },
+			$defs: { key: keyRule({ not }) },
+		}).filter((e) => e.keyword === "patternProperties");
+
+	for (const $schema of [
+		undefined,
+		"https://json-schema.org/draft/2020-12/schema",
+		"https://json-schema.org/draft/2019-09/schema",
+		"http://json-schema.org/draft-07/schema#",
+		"http://json-schema.org/draft-06/schema#",
+	]) {
+		test(`${$schema ?? "no $schema"}: the referenced definition's not excludes names from a patternProperties key`, () => {
+			deepStrictEqual(
+				patternPropertiesFindings({ type: "string", enum: DENY_JS }, $schema),
+				[],
+			);
+			deepStrictEqual(
+				patternPropertiesFindings(
+					{ type: "string", enum: ["__proto__", "prototype"] },
+					$schema,
+				).map((e) => [e.instancePath, e.params.matches]),
+				[[`/patternProperties/${KEY_PATTERN}`, ["constructor"]]],
+			);
+		});
+	}
+
+	test("an unreadable not in the referenced definition is noted on the patternProperties finding", () => {
+		deepStrictEqual(
+			patternPropertiesFindings({
+				type: "string",
+				enum: DENY_JS,
+				maxLength: 3,
+			}),
+			[
+				{
+					instancePath: `/patternProperties/${KEY_PATTERN}`,
+					schemaPath: "#/dangerous-name",
+					keyword: "patternProperties",
+					params: {
+						pattern: KEY_PATTERN,
+						matches: DENY_JS,
+						notIgnored: true,
+						lang: "js",
+					},
+					message: `patternProperties key "${KEY_PATTERN}" matches deserialization vector(s) for lang="js": __proto__, constructor, prototype${NOT_IGNORED_NOTE}`,
+				},
+			],
+		);
+	});
+
+	test("draft-04 has no propertyNames, so the referenced definition's not excludes nothing from patternProperties", () => {
+		deepStrictEqual(
+			patternPropertiesFindings(
+				{ type: "string", enum: DENY_JS, maxLength: 3 },
+				"http://json-schema.org/draft-04/schema#",
+			).map((e) => [e.params.matches, e.message.endsWith(NOT_IGNORED_NOTE)]),
+			[[DENY_JS, false]],
+		);
+	});
+
+	test("a not beside a followed $ref excludes nothing from patternProperties", () => {
+		deepStrictEqual(
+			crawl({
+				type: "object",
+				propertyNames: {
+					$ref: "#/$defs/key",
+					not: { type: "string", enum: DENY_JS },
+				},
+				patternProperties: { [KEY_PATTERN]: {} },
+				$defs: { key: keyRule() },
+			})
+				.filter((e) => e.keyword === "patternProperties")
+				.map((e) => e.params.matches),
+			[DENY_JS],
+		);
+	});
+	test("a propertyNames with its own pattern keeps its own not for patternProperties; its $ref is not followed", () => {
+		const errors = crawl({
+			$schema: "https://json-schema.org/draft/2020-12/schema",
+			type: "object",
+			propertyNames: {
+				$ref: "#/$defs/key",
+				...keyRule({ not: { type: "string", enum: DENY_JS } }),
+			},
+			patternProperties: { [KEY_PATTERN]: {} },
+			$defs: { key: keyRule({ not: { type: "string", enum: ["a"] } }) },
+		});
+		deepStrictEqual(errors, []);
+	});
+	for (const name of [
+		"__proto__",
+		"constructor",
+		"toString",
+		"hasOwnProperty",
+	]) {
+		test(`#/$defs/${name} does not resolve to an inherited member`, () => {
+			deepStrictEqual(
+				crawl({ propertyNames: { $ref: `#/$defs/${name}` }, $defs: {} }),
+				[FAIL_CLOSED],
+			);
+		});
+	}
+
+	test("a definition inherited by the $defs object is not resolved", () => {
+		deepStrictEqual(
+			crawl({
+				propertyNames: { $ref: "#/$defs/key" },
+				$defs: Object.create({ key: keyRule({ enum: ["prototype"] }) }),
+			}),
+			[FAIL_CLOSED],
+		);
+	});
+
+	test("a $defs inherited by the root schema is not resolved", () => {
+		const root = Object.create({
+			$defs: { key: keyRule({ enum: ["prototype"] }) },
+		});
+		root.propertyNames = { $ref: "#/$defs/key" };
+		deepStrictEqual(crawl(root), [FAIL_CLOSED]);
+	});
+
+	test("an own definition named __proto__ (as JSON.parse creates it) resolves", () => {
+		deepStrictEqual(
+			where(
+				crawl(
+					JSON.parse(
+						'{"propertyNames":{"$ref":"#/$defs/__proto__"},"$defs":{"__proto__":{"enum":["prototype"]}}}',
+					),
+				),
+			),
+			[
+				["/$defs/__proto__", "#/dangerous-name"],
+				["/$defs/__proto__/enum/0", "#/dangerous-name"],
+			],
+		);
+	});
+
+	test("every character the meta-schema allows in a definition name resolves", () => {
+		const name = "Az-09_.z";
+		deepStrictEqual(
+			where(
+				crawl({
+					propertyNames: { $ref: `#/$defs/${name}` },
+					$defs: { [name]: { enum: ["prototype"] } },
+				}),
+			),
+			[[`/$defs/${name}/enum/0`, "#/dangerous-name"]],
+		);
+	});
+
+	// A name that needs JSON-pointer or percent decoding is outside what the
+	// meta-schema allows, so it is never decoded: it stays fail-closed even when a
+	// definition under the decoded name exists.
+	for (const [$ref, decoded] of [
+		["#/$defs/a~1b", "a/b"],
+		["#/$defs/a~0b", "a~b"],
+		["#/$defs/a%2Fb", "a/b"],
+		["#/$defs/a%20b", "a b"],
+		["#/$defs/%6Bey", "key"],
+		["#/%24defs/key", "key"],
+		["#/$defs/a~1b", "a~1b"],
+		["#/$defs/a%20b", "a%20b"],
+	]) {
+		test(`${$ref} is not decoded and stays fail-closed with a definition named ${JSON.stringify(decoded)}`, () => {
+			deepStrictEqual(
+				crawl({
+					propertyNames: { $ref },
+					$defs: { [decoded]: { enum: ["a"] } },
+				}),
+				[FAIL_CLOSED],
+			);
+		});
+	}
+	for (const [why, $ref, $defs] of [
+		["null", "#/$defs/key", null],
+		["an array", "#/$defs/0", [{ enum: ["prototype"] }]],
+		["a string", "#/$defs/length", "key"],
+		["true", "#/$defs/key", true],
+	]) {
+		test(`a $defs that is ${why} resolves nothing`, () => {
+			deepStrictEqual(
+				crawl({ propertyNames: { $ref }, $defs }).filter(
+					(e) => e.keyword === "propertyNames",
+				),
+				[FAIL_CLOSED],
+			);
+		});
+	}
 });

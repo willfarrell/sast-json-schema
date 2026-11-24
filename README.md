@@ -48,32 +48,32 @@ npm install sast-json-schema
 ### Manually
 
 ```javascript
-import Ajv from "ajv/dist/2020.js"
-import sastSchema from "sast-json-schema" with { type: "json" }
-import schema from "path/to/schema.json" with { type: "json" }
+import Ajv from "ajv/dist/2020.js";
+import sastSchema from "sast-json-schema" with { type: "json" };
+import schema from "path/to/schema.json" with { type: "json" };
 
 // Your schema should compile under strictTypes:true. validateSchema() does
 // not apply strictTypes; only compile() does.
-const userAjv = new Ajv({ strictTypes: true })
+const userAjv = new Ajv({ strictTypes: true });
 try {
-  userAjv.compile(schema)
+	userAjv.compile(schema);
 } catch (err) {
-  console.error(err.message)
+	console.error(err.message);
 }
 
 // The meta-schema itself uses strictTypes:false because it validates
 // subschemas that may legally be `false` (boolean-schema form).
-const sastAjv = new Ajv({ strictTypes: false })
-const isSchemaSecure = sastAjv.compile(sastSchema)
+const sastAjv = new Ajv({ strictTypes: false });
+const isSchemaSecure = sastAjv.compile(sastSchema);
 if (!isSchemaSecure(schema)) {
-  console.error(isSchemaSecure.errors)
+	console.error(isSchemaSecure.errors);
 }
 ```
 
 Per-draft entry points are also exported: `sast-json-schema/2020-12`, `/2019-09`, `/draft-07`, `/draft-06`, `/draft-04`. These are JSON exports, so they require an import attribute:
 
 ```javascript
-import schema2020 from "sast-json-schema/2020-12" with { type: "json" }
+import schema2020 from "sast-json-schema/2020-12" with { type: "json" };
 ```
 
 Each meta-schema is identified by a `urn:willfarrell:sast-json-schema:<spec>` URN. Shared primitives (`safePattern`, `safeUrl`, etc.) are available via `sast-json-schema/$defs`.
@@ -85,9 +85,9 @@ Every meta-schema requires a root `$schema` and a root `$id` (`id` in draft-04).
 The CLI's analysis (meta-schema plus the checks a meta-schema cannot express: ReDoS, SSRF DNS, dangerous property names, unsatisfiable ranges, regex anchoring and control characters) is available as a function:
 
 ```javascript
-import { analyze, formatSarif } from "sast-json-schema/cli"
+import { analyze, formatSarif } from "sast-json-schema/cli";
 
-const errors = await analyze(schema, { offline: true, lang: "js" })
+const errors = await analyze(schema, { offline: true, lang: "js" });
 // errors: AJV-style { instancePath, schemaPath, keyword, params, message }[]
 ```
 
@@ -98,14 +98,34 @@ const errors = await analyze(schema, { offline: true, lang: "js" })
 Every meta-schema requires `$schema` to be the `https://json-schema.org/...` URI without a trailing `#`, for example `https://json-schema.org/draft-07/schema`. The CLI maps the `http://` and `#` spellings to the right draft and then reports the value as a finding. AJV registers the draft-04/06/07 meta-schemas under their original `http://...#` identifiers, so register the https identifier as an alias before compiling a classic-draft schema:
 
 ```javascript
-import Ajv from "ajv"
+import Ajv from "ajv";
 
-const ajv = new Ajv()
+const ajv = new Ajv();
 ajv.addMetaSchema({
-  $id: "https://json-schema.org/draft-07/schema",
-  $ref: "http://json-schema.org/draft-07/schema#",
-})
+	$id: "https://json-schema.org/draft-07/schema",
+	$ref: "http://json-schema.org/draft-07/schema#",
+});
 ```
+
+### `$ref` siblings in draft-04, draft-06 and draft-07
+
+These drafts tell a validator to ignore every keyword next to `$ref` (draft-07 core, section 8.3). AJV applies them anyway. So a bound such as `maxLength` beside a `$ref` works in AJV and does nothing in a validator that follows the spec. The draft-04, draft-06 and draft-07 meta-schemas reject any keyword next to `$ref` except these:
+
+| Keyword next to `$ref`                                                     | draft-04 | draft-06 | draft-07 |
+| -------------------------------------------------------------------------- | :------: | :------: | :------: |
+| `$schema`, `$id` (`id` in draft-04), `title`, `description`, `definitions` |    ✓     |    ✓     |    ✓     |
+| `examples`                                                                 |   n/a    |    ✓     |    ✓     |
+| `$comment`, `readOnly`, `writeOnly`                                        |   n/a    |   n/a    |    ✓     |
+
+`n/a` means that draft's meta-schema rejects the keyword next to `$ref`. `default` is rejected on purpose, because AJV with `useDefaults` fills in a `default` next to `$ref` and a validator that follows the spec does not. Schemas that passed before this rule may now fail.
+
+To keep the bound, move the `$ref` into `allOf`:
+
+```json
+{ "allOf": [{ "$ref": "#/definitions/name" }], "maxLength": 8 }
+```
+
+2019-09 and 2020-12 apply keywords next to `$ref`, so this rule does not cover them.
 
 ### CLI
 
@@ -122,6 +142,7 @@ npx sast-json-schema 'schemas/**/*.json'
 ```
 
 Options:
+
 - `--override-max-depth <n>`: Override max depth limit (default: 32)
 - `--override-max-items <n>`: Raise the `maxItems` limit (default: 1024). It only drops `maxItems` findings that are within the new limit; it cannot lower the limit
 - `--override-max-properties <n>`: Raise the `maxProperties` limit (default: 1024), the same way
@@ -142,10 +163,10 @@ Options:
 
 #### Exit codes
 
-| Code | Meaning |
-|------|---------|
-| `0`  | No issues found |
-| `1`  | Any input schema has security findings, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget conditions (a schema too expensive or unsafe to fully analyze is itself a finding) |
+| Code | Meaning                                                                                                                                                                                                                                                                                          |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0`  | No issues found                                                                                                                                                                                                                                                                                  |
+| `1`  | Any input schema has security findings, including depth-exceeded, analysis timeout, and SSRF hostname-cap / DNS-budget conditions (a schema too expensive or unsafe to fully analyze is itself a finding)                                                                                        |
 | `2`  | Usage/tool error: bad args, unreadable file, invalid JSON, unsupported `$schema`, an oversized schema (over `--max-schema-size`), or a non-JSON-serializable (circular or too deeply nested) schema. With several files, the others are still analyzed and reported, and exit 2 wins over exit 1 |
 
 Exit 1 means a problem was found in the schema, including the resource-limit conditions above; exit 2 means the tool could not analyze the input at all.
@@ -167,10 +188,27 @@ ajv sast --fail path/to/schema.json
 
 ### Meta-schema only
 
-- **Prototype-pollution denylist does not cover `patternProperties` keys or `propertyNames`.** The meta-schema rejects `__proto__`, `constructor`, and `prototype` as literal keys in `properties`, `$defs`, `definitions`, `dependentSchemas`, `dependentRequired`, `dependencies`, and `required`. It does NOT reject these names when introduced via a `patternProperties` regex key, because any literal denylist (`^__proto__$`) is trivially bypassed by equivalent regexes (`^_{2}proto_{2}$`, `^[_][_]proto__$`, `^.{9}$`). The same holds for a `propertyNames` `enum`, `const` or `pattern` that admits one of these names. Enforced by the CLI: `crawlSchema` tests each `patternProperties` key and `propertyNames` pattern (after ReDoS analysis) and each `propertyNames` `enum`/`const` entry against the denylisted names. A `propertyNames` with none of `enum`, `const` or `pattern` (for example only `format`, a `$ref` or a combinator) cannot be checked, so the CLI reports it (fail-closed; suppress with `--ignore` once reviewed). Consumers using the meta-schema standalone (without `cli.js` / `analyze()`) get property-key protection but not this.
+- **Prototype-pollution denylist does not cover `patternProperties` keys or `propertyNames`.** The meta-schema rejects `__proto__`, `constructor`, and `prototype` as literal keys in `properties`, `$defs`, `definitions`, `dependentSchemas`, `dependentRequired`, `dependencies`, and `required`. It does NOT reject these names when a `patternProperties` regex key introduces them. Any literal denylist (`^__proto__$`) is trivially bypassed by equivalent regexes (`^_{2}proto_{2}$`, `^[_][_]proto__$`, `^.{9}$`). The same holds for a `propertyNames` `enum`, `const` or `pattern` that admits one of these names. Enforced by the CLI. For the chosen `--lang`, `crawlSchema` tests each `patternProperties` key and `propertyNames` pattern (after ReDoS analysis) against the denylisted names. It also tests each `propertyNames` `enum` and `const` entry. Consumers using the meta-schema standalone (without `cli.js` / `analyze()`) get property-key protection but not this.
+  - **Each finding lists the names it matched.** With `--format json` they are in `params.matches`.
+  - **Exclude names with a `not` next to the pattern.** Negative lookahead is banned, so to keep a broad `propertyNames` pattern, add a `not` that lists every name the finding reports. With `--lang js` that is three names:
+
+    ```json
+    {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z_]+$",
+      "not": { "type": "string", "enum": ["__proto__", "constructor", "prototype"] }
+    }
+    ```
+
+    Use `not.const` for a single name. The list depends on `--lang`. The default is the union of every language. There a broad pattern such as `^[\x21-\x7E]+$` matches 75 names, and the CLI still reports the 72 that the example leaves out.
+  - **The same `not` clears the `patternProperties` key finding.** `propertyNames` applies to every key of the object, so its `not` also removes names from the finding for each `patternProperties` key in that object. draft-04 has no `propertyNames`, so there the key finding lists every match.
+  - **The `not` counts only in this shape.** Besides `$comment`, `title` and `description`, it may hold only `type` (`"string"`, or an array that includes `"string"`), `enum` (an array) and `const`. Any other keyword, such as `maxLength` or a nested `not`, makes the CLI ignore the whole `not`. The finding then lists every match, its message ends with `propertyNames.not ignored: ...`, and `params.notIgnored` is `true`.
+  - **A `propertyNames` can share a definition's key rule through `$ref`.** This applies when it has no `enum`, `const` or `pattern` of its own. The CLI then follows a `$ref` of the form `#/$defs/<name>` or `#/definitions/<name>` to a root definition. `<name>` may hold only letters, digits, `-`, `_` and `.`. draft-06 and draft-07 accept only `#/definitions/<name>`. The CLI checks the definition's `enum`, `const` or `pattern` and reports a match at the definition's path, for example `/$defs/key/pattern`. Only the definition's `not` excludes names, so put the `not` there. The CLI ignores a `not` next to the `$ref`, and draft-06 and draft-07 reject it. The definition's `not` also clears the `patternProperties` key finding in that object.
+  - **Any other `propertyNames` with none of `enum`, `const` or `pattern` cannot be checked.** This covers, for example, one with only `format`, a combinator or a remote `$ref`. It also covers a local `$ref` whose definition is missing, is itself a `$ref`, or has no `enum`, `const` or `pattern`. The CLI reports it at the `propertyNames` path (fail-closed). Suppress it with `--ignore` once reviewed.
 - **Language-specific deserialization-vector names are not in the meta-schema.** Only `__proto__`, `constructor`, `prototype` are rejected at the meta-schema layer (the universal baseline). Names like `@type` (Java), `$type` (.NET), `__class__` (Python), `isa` (Objective-C), `__struct__` (Elixir), or PHP magic methods are enforced only at the CLI / `analyze()` layer via `--lang`. See [Language coverage](#language-coverage).
 - **Depth limits are a runtime concern.** Deeply nested schemas could cause stack overflow during recursive validation. Configure your validator's depth limits (e.g. AJV does not limit recursion depth by default). Enforced by the CLI, see `--override-max-depth`.
-- **`const` / `default` / `enum` / `examples` value sizes are bounded recursively, but value nesting depth is a runtime concern.** The meta-schema bounds nested string length (`maxLength`), array length (`maxItems`), and object property counts (`maxProperties`) at every level of a literal value, so an oversized nested string, array, or object is rejected (ASVS 1.3.3). It does NOT cap the nesting *depth* of a literal value: a value nested thousands of levels deep is not given a clean rejection by the meta-schema rule itself (it fails closed via the validator's own recursion limit). Schema-nesting depth is enforced by the CLI, see `--override-max-depth`.
+- **`const` / `default` / `enum` / `examples` value sizes are bounded recursively, but value nesting depth is a runtime concern.** The meta-schema bounds nested string length (`maxLength`), array length (`maxItems`), and object property counts (`maxProperties`) at every level of a literal value, so an oversized nested string, array, or object is rejected (ASVS 1.3.3). It does NOT cap the nesting _depth_ of a literal value: a value nested thousands of levels deep is not given a clean rejection by the meta-schema rule itself (it fails closed via the validator's own recursion limit). Schema-nesting depth is enforced by the CLI, see `--override-max-depth`.
 - **Min/max logical consistency not enforced.** A schema with `minimum: 100, maximum: 1` (impossible range) will pass validation. This cannot be reliably enforced in JSON Schema alone and would require a wrapper function. Having unit tests for your schema is recommended, this would catch this type of error. Enforced by the CLI.
 - **`pattern` regex validation has known gaps.** The check rejects negated character classes `[^...]` as broad denylist matchers (use allowlist patterns like `[\p{L}\p{N}]` instead), blocks nested quantifiers like `(a+)+`, a bounded quantifier wrapped around a group with an unbounded inner quantifier like `(a+){1,5}`, absurd quantifier upper bounds (5+ digits, e.g. `a{1,1000000}` or `[a-z]{10000}`), backreferences, identical overlapping quantifiers like `[a-z]+[a-z]+`, semantically identical overlapping quantifiers like `\d+[0-9]+`, and superset overlaps like `\w+\d+` (where `\w` ⊃ `\d`). Top-level alternation (`^a|b$`, which means `(^a)|(b$)`) is rejected when the groups around the `|` are nested up to 3 deep; deeper nesting is only detected by the CLI, which checks any depth. Control characters are rejected by escape (`\x00`, `\u0085`, `\cA`), by property (`\p{Cc}`, `\p{gc=Control}`, `\p{Any}`, `\p{ASCII}`) and as raw characters, but a range that spans them (e.g. `[ -\uffff]`) is only detected by the CLI, which asks the regex engine whether any character class or escape can match one. The check cannot detect non-identical overlapping quantifiers (e.g. `[a-z]+\\w+` where `\\w` ⊃ `[a-z]`). It also does NOT reject a bounded quantifier wrapped around a group whose inner quantifier is itself bounded with a large product (e.g. `(a{1,1000}){1,1000}`); this nested-bounded-quantifier shape is caught by the CLI runtime (`redos-detector`) but not by the standalone meta-schema. Use runtime ReDoS checking for full protection.
 - **Remote `$ref` URLs can be SSRF vectors.** The meta-schema restricts `$ref`, `$dynamicRef`, and `$recursiveRef` to `#` (local) or `https://` URLs and blocks private IP ranges (dotted-decimal, hex `0x`, and decimal representations), and rejects special-use local names (`.localhost`, `.local`, `.internal`, `.home.arpa`, `.onion`, in any case), but DNS-based bypasses (domains resolving to internal IPs) cannot be detected at the schema level. Ensure your validator is configured to disallow or restrict remote schema loading (e.g., use `ajv.addSchema()` instead of allowing external fetches). Dereferencing before running SAST is recommended. Enforced by the CLI, which DNS-checks remote refs, including relative refs resolved against an absolute `$id` base.
@@ -183,38 +221,38 @@ The meta-schema itself enforces a universal baseline of `__proto__`, `constructo
 
 For a list of JSON-Schema validators per language, see [json-schema.org/tools#validator](https://json-schema.org/tools#validator).
 
-| Language | `--lang` | Extras over JS baseline |
-|---|---|---|
-| JavaScript / TypeScript / Node.js | `js` | (none, the universal baseline) |
-| Python | `py` | `__class__`, `__init__`, `__globals__`, `__builtins__`, `__import__`, `__reduce__`, `__subclasses__`, `__dict__`, `__mro__` |
-| Ruby | `rb` | `__send__`, `json_class`, `instance_eval`, `instance_variable_set`, `singleton_class` |
-| Rust | `rs` | (none. `serde` is type-safe; baseline applies because specs often pass through JS tooling) |
-| Java | `java` | `@type`, `@class` (Jackson / Fastjson polymorphic markers) |
-| Kotlin | `kotlin` | alias of `java` (JVM/Jackson) |
-| Clojure | `clojure` | alias of `java` (JVM/Cheshire) |
-| C# | `cs` | `$type`, `__type`, `@odata.type` (Json.NET, DataContractJsonSerializer, OData) |
-| VB.NET | `vb` | alias of `cs` |
-| F# | `fsharp` | alias of `cs` |
-| ASP.NET / ASPX | `cs` | shares the .NET serializer stack |
-| PHP | `php` | `__construct`, `__destruct`, `__wakeup`, `__sleep`, `__serialize`, `__unserialize`, `__call`, `__callStatic`, `__get`, `__set`, `__isset`, `__unset`, `__toString`, `__invoke`, `__set_state`, `__clone`, `__debugInfo` |
-| Objective-C | `objc` | `isa`, `class`, `superclass`, `description`, `init`, `_cmd` (Obj-C runtime + KVC + `performSelector:`) |
-| Swift | `swift` | alias of `objc` (mixed Obj-C interop; pure `Codable` is type-safe) |
-| Elixir | `ex` | `__struct__`, `__exception__`, `__protocol__` (BEAM struct-identifier keys when JSON is decoded with `:keys => :atoms`) |
-| Lua | `lua` | metamethod names: `__index`, `__newindex`, `__call`, `__metatable`, `__tostring`, `__name`, `__pairs`, `__eq`, `__lt`, `__le`, `__add`, `__sub`, `__mul`, `__div`, `__mod`, `__pow`, `__concat`, `__len`, `__unm`, `__band`, `__bor`, `__bxor`, `__bnot`, `__shl`, `__shr`, `__idiv`, `__close`, `__gc` |
-| _Union of every named language above_ | `default` | every extra above (the implicit default) |
+| Language                              | `--lang`  | Extras over JS baseline                                                                                                                                                                                                                                                                                 |
+| ------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| JavaScript / TypeScript / Node.js     | `js`      | (none, the universal baseline)                                                                                                                                                                                                                                                                          |
+| Python                                | `py`      | `__class__`, `__init__`, `__globals__`, `__builtins__`, `__import__`, `__reduce__`, `__subclasses__`, `__dict__`, `__mro__`                                                                                                                                                                             |
+| Ruby                                  | `rb`      | `__send__`, `json_class`, `instance_eval`, `instance_variable_set`, `singleton_class`                                                                                                                                                                                                                   |
+| Rust                                  | `rs`      | (none. `serde` is type-safe; baseline applies because specs often pass through JS tooling)                                                                                                                                                                                                              |
+| Java                                  | `java`    | `@type`, `@class` (Jackson / Fastjson polymorphic markers)                                                                                                                                                                                                                                              |
+| Kotlin                                | `kotlin`  | alias of `java` (JVM/Jackson)                                                                                                                                                                                                                                                                           |
+| Clojure                               | `clojure` | alias of `java` (JVM/Cheshire)                                                                                                                                                                                                                                                                          |
+| C#                                    | `cs`      | `$type`, `__type`, `@odata.type` (Json.NET, DataContractJsonSerializer, OData)                                                                                                                                                                                                                          |
+| VB.NET                                | `vb`      | alias of `cs`                                                                                                                                                                                                                                                                                           |
+| F#                                    | `fsharp`  | alias of `cs`                                                                                                                                                                                                                                                                                           |
+| ASP.NET / ASPX                        | `cs`      | shares the .NET serializer stack                                                                                                                                                                                                                                                                        |
+| PHP                                   | `php`     | `__construct`, `__destruct`, `__wakeup`, `__sleep`, `__serialize`, `__unserialize`, `__call`, `__callStatic`, `__get`, `__set`, `__isset`, `__unset`, `__toString`, `__invoke`, `__set_state`, `__clone`, `__debugInfo`                                                                                 |
+| Objective-C                           | `objc`    | `isa`, `class`, `superclass`, `description`, `init`, `_cmd` (Obj-C runtime + KVC + `performSelector:`)                                                                                                                                                                                                  |
+| Swift                                 | `swift`   | alias of `objc` (mixed Obj-C interop; pure `Codable` is type-safe)                                                                                                                                                                                                                                      |
+| Elixir                                | `ex`      | `__struct__`, `__exception__`, `__protocol__` (BEAM struct-identifier keys when JSON is decoded with `:keys => :atoms`)                                                                                                                                                                                 |
+| Lua                                   | `lua`     | metamethod names: `__index`, `__newindex`, `__call`, `__metatable`, `__tostring`, `__name`, `__pairs`, `__eq`, `__lt`, `__le`, `__add`, `__sub`, `__mul`, `__div`, `__mod`, `__pow`, `__concat`, `__len`, `__unm`, `__band`, `__bor`, `__bxor`, `__bnot`, `__shl`, `__shr`, `__idiv`, `__close`, `__gc` |
+| _Union of every named language above_ | `default` | every extra above (the implicit default)                                                                                                                                                                                                                                                                |
 
 ### Languages without a dedicated entry
 
 These ecosystems have JSON-Schema validators but either deserialize type-safely (no magic-name attack class) or their deserialization risks aren't expressible as a property-name denylist. The universal `__proto__` / `constructor` / `prototype` baseline still applies via the meta-schema.
 
-| Language | Reason |
-|---|---|
-| Go | `encoding/json` is reflection-by-struct-tag; no magic keys |
-| C / C++ | `nlohmann/json` + `valijson` are type-safe; no runtime polymorphism via key names |
+| Language                                  | Reason                                                                                                                                                                                                                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Go                                        | `encoding/json` is reflection-by-struct-tag; no magic keys                                                                                                                                                                                                                 |
+| C / C++                                   | `nlohmann/json` + `valijson` are type-safe; no runtime polymorphism via key names                                                                                                                                                                                          |
 | Erlang / Elixir (BEAM, raw `:atoms` mode) | Attack class is **atom-table exhaustion DoS** when user keys are interned via `binary_to_atom/1`. Use `binary_to_existing_atom/1`, or `Jason.decode/2` without `:keys => :atoms`. See [SECURITY.md](./SECURITY.md#atom-table--symbol-package-exhaustion-beam-common-lisp). |
-| Common Lisp | `cl-json` symbol-interning has the same exhaustion shape. Set `cl-json:*json-symbols-package*` to `:keyword` or `nil`. See [SECURITY.md](./SECURITY.md#atom-table--symbol-package-exhaustion-beam-common-lisp). |
-| Perl | `JSON::PP` does not auto-`bless`; magic only kicks in if `convert_blessed` is set, and the marker key is library-defined |
-| Julia | `JSONSchema.jl` + `JSON3.jl` are type-safe |
+| Common Lisp                               | `cl-json` symbol-interning has the same exhaustion shape. Set `cl-json:*json-symbols-package*` to `:keyword` or `nil`. See [SECURITY.md](./SECURITY.md#atom-table--symbol-package-exhaustion-beam-common-lisp).                                                            |
+| Perl                                      | `JSON::PP` does not auto-`bless`; magic only kicks in if `convert_blessed` is set, and the marker key is library-defined                                                                                                                                                   |
+| Julia                                     | `JSONSchema.jl` + `JSON3.jl` are type-safe                                                                                                                                                                                                                                 |
 
 If you have a language-specific deserialization vector that fits the magic-name pattern and isn't covered, please open an issue.
 
@@ -222,29 +260,29 @@ If you have a language-specific deserialization vector that fits the magic-name 
 
 All meta-schemas reject keywords not listed in their respective JSON Schema spec (e.g. draft-04 rejects `const` because it was introduced in draft-06). Keywords that ARE in a given spec but are rejected here on security grounds are flagged below.
 
-| Keyword                | draft-04 | draft-06 | draft-07 | 2019-09 | 2020-12 | Notes |
-|------------------------|:-:|:-:|:-:|:-:|:-:|---|
-| `type`, `enum`, `not`  | ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `allOf`/`anyOf`/`oneOf`| ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `$ref`                 | ✓ | ✓ | ✓ | ✓ | ✓ | Local refs must be `#/$defs/<name>` or `#/definitions/<name>`; remote refs must be HTTPS; SSRF-checked |
-| `$id` / `id`           | ✓ | ✓ | ✓ | ✓ | ✓ | HTTPS URL, URN, or plain name |
-| `definitions`          | ✓ | ✓ | ✓ | ✓ | ✓ | Root only |
-| `$defs`                | n/a | n/a | n/a | ✓ | ✓ | Root only |
-| `items` (array form)   | ✓ | ✓ | ✓ | ✓ | n/a | draft-04/06/07 require `additionalItems` so items past the tuple are constrained; 2019-09 requires `unevaluatedItems` |
-| `title`, `description`, `default` | ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `const`                | n/a | ✓ | ✓ | ✓ | ✓ | Type-locked to declared `type` |
-| `contains`             | n/a | ✓ | ✓ | ✓ | ✓ | draft-06/07 require `items` + `maxItems` + `uniqueItems`; 2019-09/2020-12 additionally require `maxContains` + `unevaluatedItems` |
-| `propertyNames`        | n/a | ✓ | ✓ | ✓ | ✓ | |
-| `if`/`then`/`else`     | n/a | n/a | ✓ | ✓ | ✓ | |
-| `contentMediaType`, `contentEncoding` | n/a | n/a | ✓ | ✓ | ✓ | Allow-listed per RFC 6838 / RFC-standard |
-| `contentSchema`        | n/a | n/a | n/a | ✓ | ✓ | |
-| `readOnly` / `writeOnly` | n/a | n/a | ✓ | ✓ | ✓ | Annotation-only (added in draft-07); accepted but ignored |
-| `deprecated`           | n/a | n/a | n/a | ✓ | ✓ | Annotation-only; type-checked as boolean. Rejected in older drafts where it isn't in spec |
-| `dependencies`         | ✓ | ✓ | ✓ | n/a | n/a | Array or subschema form; removed in 2019-09+, prefer `dependentRequired` / `dependentSchemas` |
-| `dependentRequired`    | n/a | n/a | n/a | ✓ | ✓ | |
-| `dependentSchemas`     | n/a | n/a | n/a | ✓ | ✓ | |
-| `prefixItems`          | n/a | n/a | n/a | n/a | ✓ | |
-| `unevaluatedProperties`/`unevaluatedItems` | n/a | n/a | n/a | ✓ | ✓ | Required for object/array strictness. draft-04/06/07 have no such keyword, so every `type: "object"` there requires `additionalProperties` instead |
+| Keyword                                    | draft-04 | draft-06 | draft-07 | 2019-09 | 2020-12 | Notes                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | :------: | :------: | :------: | :-----: | :-----: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`, `enum`, `not`                      |    ✓     |    ✓     |    ✓     |    ✓    |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `allOf`/`anyOf`/`oneOf`                    |    ✓     |    ✓     |    ✓     |    ✓    |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `$ref`                                     |    ✓     |    ✓     |    ✓     |    ✓    |    ✓    | Local refs must be `#/$defs/<name>` or `#/definitions/<name>`; remote refs must be HTTPS; SSRF-checked. draft-04/06/07 reject keywords next to it other than ids, `$schema`, annotations other than `default`, and `definitions`, see [`$ref` siblings](#ref-siblings-in-draft-04-draft-06-and-draft-07) |
+| `$id` / `id`                               |    ✓     |    ✓     |    ✓     |    ✓    |    ✓    | HTTPS URL, URN, or plain name                                                                                                                                                                                                                                                                            |
+| `definitions`                              |    ✓     |    ✓     |    ✓     |    ✓    |    ✓    | Root only                                                                                                                                                                                                                                                                                                |
+| `$defs`                                    |   n/a    |   n/a    |   n/a    |    ✓    |    ✓    | Root only                                                                                                                                                                                                                                                                                                |
+| `items` (array form)                       |    ✓     |    ✓     |    ✓     |    ✓    |   n/a   | draft-04/06/07 require `additionalItems` so items past the tuple are constrained; 2019-09 requires `unevaluatedItems`                                                                                                                                                                                    |
+| `title`, `description`, `default`          |    ✓     |    ✓     |    ✓     |    ✓    |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `const`                                    |   n/a    |    ✓     |    ✓     |    ✓    |    ✓    | Type-locked to declared `type`                                                                                                                                                                                                                                                                           |
+| `contains`                                 |   n/a    |    ✓     |    ✓     |    ✓    |    ✓    | draft-06/07 require `items` + `maxItems` + `uniqueItems`; 2019-09/2020-12 additionally require `maxContains` + `unevaluatedItems`                                                                                                                                                                        |
+| `propertyNames`                            |   n/a    |    ✓     |    ✓     |    ✓    |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `if`/`then`/`else`                         |   n/a    |   n/a    |    ✓     |    ✓    |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `contentMediaType`, `contentEncoding`      |   n/a    |   n/a    |    ✓     |    ✓    |    ✓    | Allow-listed per RFC 6838 / RFC-standard                                                                                                                                                                                                                                                                 |
+| `contentSchema`                            |   n/a    |   n/a    |   n/a    |    ✓    |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `readOnly` / `writeOnly`                   |   n/a    |   n/a    |    ✓     |    ✓    |    ✓    | Annotation-only (added in draft-07); accepted but ignored                                                                                                                                                                                                                                                |
+| `deprecated`                               |   n/a    |   n/a    |   n/a    |    ✓    |    ✓    | Annotation-only; type-checked as boolean. Rejected in older drafts where it isn't in spec                                                                                                                                                                                                                |
+| `dependencies`                             |    ✓     |    ✓     |    ✓     |   n/a   |   n/a   | Array or subschema form; removed in 2019-09+, prefer `dependentRequired` / `dependentSchemas`                                                                                                                                                                                                            |
+| `dependentRequired`                        |   n/a    |   n/a    |   n/a    |    ✓    |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `dependentSchemas`                         |   n/a    |   n/a    |   n/a    |    ✓    |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `prefixItems`                              |   n/a    |   n/a    |   n/a    |   n/a   |    ✓    |                                                                                                                                                                                                                                                                                                          |
+| `unevaluatedProperties`/`unevaluatedItems` |   n/a    |   n/a    |   n/a    |    ✓    |    ✓    | Required for object/array strictness. draft-04/06/07 have no such keyword, so every `type: "object"` there requires `additionalProperties` instead                                                                                                                                                       |
 
 Legend: ✓ supported · **✗** rejected on security grounds · `n/a` not in spec for that draft.
 
@@ -288,4 +326,5 @@ The following requirements should be considered when writing JSON Schemas used f
 - [Input Validation With JSON Schemas: Best Practices](https://ventral.digital/posts/2021/2/20/input-validation-json-schemas-best-practices/)
 
 ## Contributions
+
 Contributions are most welcome. Something missed, please reach out. I'd also love for security experts to give it an audit.

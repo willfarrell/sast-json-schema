@@ -324,6 +324,413 @@
           "maxLength": 10
         },
         "valid": true
+      },
+      {
+        "description": "accept: | inside a character class is a literal",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a|b]+$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: | inside a character class inside a group is a literal",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:x[a|b])$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: ) inside a character class does not close a group",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:[)]|a)$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: escaped \\$ inside a group does not end a top-level |",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:a|b\\$)$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "reject: top-level | after a character class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a]|[b]$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: top-level | after a class holding a literal |",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[|]a|b$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: overlapping quantifiers on a unicode property \\p{L}+\\p{L}+",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\p{L}+\\p{L}+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: overlapping quantifiers on a unicode property \\p{L}*\\p{L}+",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\p{L}*\\p{L}+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: overlapping quantifiers on a code point escape \\u{41}+\\u{41}+",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\u{41}+\\u{41}+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "accept: adjacent quantifiers on different unicode properties",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\p{L}+\\p{N}+$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: literal * and + in a class inside a bounded group",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:[a*+]){1,4}$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: literal * and + in a class next to other atoms in a bounded group",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:x[*+]-){1,4}$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: ( and * in a class do not open a quantified group",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:[(*]){1,2}$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: literal * and + in a class with a bounded quantifier inside a group",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:[a*+]{1,4})$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: repeated literal + in a class is not an overlapping quantifier",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a+a+]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "reject: bounded group with an inner unbounded quantifier after a class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:[*]a+){1,4}$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: bounded group with an unbounded quantifier on a class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:[a*]+){1,4}$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "accept: ( followed by a literal + in a class does not open a quantified group",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?:[(a+]){1,2}$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: ) and + inside a class are not an unbounded group repeat",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[)+]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: ) and * inside a class are not an unbounded group repeat",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a)*]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: ){n,} inside a class is not an unbounded group repeat",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a){2,}]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: (?= inside a class is not a lookahead",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[(?=]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: (?<= inside a class is not a lookbehind",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[(?<=]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: (?! inside a class is not a negative lookahead",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[(?!]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: (?<! inside a class is not a negative lookbehind",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[(?<!]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: [^ inside a class is not a negated class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a[^]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: a 5-digit code point escape is not a quantifier bound",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\u{10000}$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "accept: 5-digit code point escapes in a class range are not quantifier bounds",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[\\u{20000}-\\u{2A6DF}]$",
+          "maxLength": 10
+        },
+        "valid": true
+      },
+      {
+        "description": "reject: unbounded group repeat )+ after a class holding (",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[(]?(?:a)+$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: unbounded group repeat {n,} after a class holding )",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[)]?(?:a){2,}$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: positive lookahead after a class",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[a](?=b)b$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: positive lookbehind holding a class with (",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^(?<=[(])a$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: negative lookahead after an escaped [",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\[(?!a)b$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: negative lookbehind after a class holding [",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[[](?<!a)b$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: negated class after a class holding [",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[[][^a]$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: 5-digit {n} bound after a class holding {",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^[{]a{10000}$",
+          "maxLength": 10
+        },
+        "valid": false
+      },
+      {
+        "description": "reject: 5-digit {n,m} bound on a unicode property",
+        "data": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "test",
+          "type": "string",
+          "pattern": "^\\p{L}{0,10000}$",
+          "maxLength": 10
+        },
+        "valid": false
       }
     ]
   }

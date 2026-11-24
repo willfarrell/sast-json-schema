@@ -233,45 +233,45 @@
 				}
 			},
 			{
-				"$comment": "Reject unbounded group repetition: )+ )*. Allows )? (optional), ){n} (exact), ){n,m} (bounded).",
+				"$comment": "Reject unbounded group repetition: )+ )*. Allows )? (optional), ){n} (exact), ){n,m} (bounded). Scanned from the start over whole escapes and character classes, so the same characters inside [...] or after a backslash are literals. [)+] is allowed.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\)[+*]"
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\)[+*]"
 				}
 			},
 			{
-				"$comment": "Reject unbounded group repeat {n,} (no upper bound, equivalent to )+)",
+				"$comment": "Reject unbounded group repeat {n,} (no upper bound, equivalent to )+). Scanned from the start over whole escapes and character classes, so the same characters inside [...] or after a backslash are literals.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\)\\{[0-9]+,\\}"
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\)\\{[0-9]+,\\}"
 				}
 			},
 			{
-				"$comment": "Reject positive lookahead: (?=...)",
+				"$comment": "Reject positive lookahead: (?=...). Scanned from the start over whole escapes and character classes, so the same characters inside [...] or after a backslash are literals.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?="
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\(\\?="
 				}
 			},
 			{
-				"$comment": "Reject positive lookbehind: (?<=...)",
+				"$comment": "Reject positive lookbehind: (?<=...). Scanned from the start over whole escapes and character classes, so the same characters inside [...] or after a backslash are literals.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?<="
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\(\\?<="
 				}
 			},
 			{
-				"$comment": "Reject negative lookahead: (?!...)",
+				"$comment": "Reject negative lookahead: (?!...). Scanned from the start over whole escapes and character classes, so the same characters inside [...] or after a backslash are literals.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?!"
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\(\\?!"
 				}
 			},
 			{
-				"$comment": "Reject negative lookbehind: (?<!...)",
+				"$comment": "Reject negative lookbehind: (?<!...). Scanned from the start over whole escapes and character classes, so the same characters inside [...] or after a backslash are literals.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\(\\?<!"
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\(\\?<!"
 				}
 			},
 			{
-				"$comment": "Reject overlapping quantifiers: identical adjacent atoms with unbounded quantifiers cause O(n²) backtracking (e.g. [a-z]+[a-z]+, \\d+\\d+, a+a+)",
+				"$comment": "Reject overlapping quantifiers: identical adjacent atoms with unbounded quantifiers cause O(n²) backtracking (e.g. [a-z]+[a-z]+, \\d+\\d+, a+a+, \\p{L}+\\p{L}+). The scan is anchored at the start and walks whole atoms: a brace escape (\\p{...}, \\P{...}, \\u{...}), a \\uHHHH or \\xHH escape, any other escape pair, a whole character class, or one other character. So \\p{L} is one atom, and a + or * inside [...] is a literal, not a quantifier.",
 				"not": {
-					"pattern": "(\\[[^\\]]+\\]|\\\\.|.)[+*]\\1[+*]"
+					"pattern": "^(?:\\\\(?:[pPu]\\{[^}]*\\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[^pPux])|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\\\\\[])*(\\\\(?:[pPu]\\{[^}]*\\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[^pPux])|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\\\\\[])[+*]\\1[+*]"
 				}
 			},
 			{
@@ -287,33 +287,33 @@
 				}
 			},
 			{
-				"$comment": "Reject negated character classes [^...] (broad denylist matchers)",
+				"$comment": "Reject negated character classes [^...] (broad denylist matchers). Scanned from the start over whole escapes and character classes, so the same characters inside [...] or after a backslash are literals. [a[^] is a class holding a literal [ and ^, so it is allowed.",
 				"not": {
-					"pattern": "(^|[^\\\\])(\\\\\\\\)*\\[\\^"
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\[\\^"
 				}
 			},
 			{
-				"$comment": "Reject top-level | after ^ anchor (breaks anchoring). Sees through balanced groups nested up to 3 deep between ^ and |; the CLI crawler checks any depth. Use (?:...) to wrap alternation.",
+				"$comment": "Reject top-level | after ^ anchor (breaks anchoring). Sees through balanced groups nested up to 3 deep between ^ and |; the CLI crawler checks any depth. Use (?:...) to wrap alternation. Tokenized like the CLI: an escape (\\\\.) and a whole character class ([...], with escapes inside) are single tokens, so a | or ( ) inside [a|b] or after a backslash is a literal.",
 				"not": {
-					"pattern": "^\\^(?:[^()]|\\((?:[^()]|\\((?:[^()]|\\([^()]*\\))*\\))*\\))*\\|"
+					"pattern": "^\\^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\]|\\((?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\]|\\((?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\]|\\((?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\])*\\))*\\))*\\))*\\|"
 				}
 			},
 			{
-				"$comment": "Reject top-level | before $ anchor (breaks anchoring). Sees through balanced groups nested up to 3 deep between | and $; the CLI crawler checks any depth.",
+				"$comment": "Reject top-level | before $ anchor (breaks anchoring). Sees through balanced groups nested up to 3 deep between | and $; the CLI crawler checks any depth. The scan up to the | is anchored at the start and walks whole escapes and character classes, so it never starts on a literal | inside [...] or after a backslash; the same tokens are used between | and $.",
 				"not": {
-					"pattern": "\\|(?:[^()]|\\((?:[^()]|\\((?:[^()]|\\([^()]*\\))*\\))*\\))*\\$"
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\|(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\]|\\((?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\]|\\((?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\]|\\((?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\])*\\))*\\))*\\))*\\$"
 				}
 			},
 			{
-				"$comment": "Reject absurd quantifier upper bounds: a {n,m} (or {n}) whose count has 5+ digits (>= 10000). Catches huge single repetitions like a{1,1000000} and a{100000} that the runtime redos-detector would otherwise have to catch. Four-digit bounds (<= 9999) remain allowed.",
+				"$comment": "Reject absurd quantifier upper bounds: a {n,m} (or {n}) whose count has 5+ digits (>= 10000). Catches huge single repetitions like a{1,1000000} and a{100000} that the runtime redos-detector would otherwise have to catch. Four-digit bounds (<= 9999) remain allowed. Scanned from the start over whole escapes and character classes, with \\u{...}, \\p{...} and \\P{...} as one escape each, so a code point escape such as \\u{20000} and braces inside [...] are not quantifier bounds.",
 				"not": {
-					"pattern": "\\{[0-9]*,?[0-9]{5,}\\}"
+					"pattern": "^(?:\\\\(?:[pPu]\\{[^}]*\\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[^pPux])|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\{[0-9]*,?[0-9]{5,}\\}"
 				}
 			},
 			{
-				"$comment": "Reject a bounded quantifier {n,m} applied to a group (...) that itself contains an unbounded quantifier (+ or *), e.g. (a+){1,5}, (a*){1,5}, or (?:a+){1,5}. This nested-quantifier-around-a-repeating-group shape is a classic exponential-backtracking ReDoS. Groups whose only inner quantifiers are fixed/bounded {n}, e.g. (?:[0-9a-f]{4}-){3}, and bounded groups with no inner quantifier, e.g. (abc){1,5}, remain allowed. An ESCAPED + or * is a literal, not a quantifier, so (\\+b){0,1} is allowed; an escaped BACKSLASH is itself a literal atom, so (\\\\+){1,5} is still rejected. Known limitation: a group whose inner quantifier is itself bounded but with a large product, e.g. (a{1,1000}){1,1000}, is NOT rejected here; the CLI runtime (redos-detector) still catches it. See README Known Limitations.",
+				"$comment": "Reject a bounded quantifier {n,m} applied to a group (...) that itself contains an unbounded quantifier (+ or *), e.g. (a+){1,5}, (a*){1,5}, or (?:a+){1,5}. This nested-quantifier-around-a-repeating-group shape is a classic exponential-backtracking ReDoS. Groups whose only inner quantifiers are fixed/bounded {n}, e.g. (?:[0-9a-f]{4}-){3}, and bounded groups with no inner quantifier, e.g. (abc){1,5}, remain allowed. An ESCAPED + or * is a literal, not a quantifier, so (\\+b){0,1} is allowed; an escaped BACKSLASH is itself a literal atom, so (\\\\+){1,5} is still rejected. A + or * inside a character class is a literal too, so (?:[a*+]){1,4} is allowed: the scan is anchored at the start and walks whole escapes and character classes, so neither the group's ( nor its quantifier can be read from inside [...]. Known limitation: a group whose inner quantifier is itself bounded but with a large product, e.g. (a{1,1000}){1,1000}, is NOT rejected here; the CLI runtime (redos-detector) still catches it. See README Known Limitations.",
 				"not": {
-					"pattern": "\\([^()]*(?:[^()\\\\]|\\\\\\\\)[+*][^()]*\\)\\{[0-9]"
+					"pattern": "^(?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^\\[\\\\])*\\((?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\])*[+*](?:\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\]|[^()\\[\\\\])*\\)\\{[0-9]"
 				}
 			}
 		]
@@ -1230,9 +1230,43 @@
 		}
 	},
 	"dependentSchemas.propertyNames": {
+		"$comment": "propertyNames declares a type, or shares a key rule through a local $ref (#/$defs/<name> or #/definitions/<name>) so the rule need not be repeated inline in every map. The referenced definition is validated as an ordinary subschema where it lives, and the CLI crawler follows the local $ref for its key checks. A remote $ref alone is rejected: the crawler cannot follow it, so the key rule would go unchecked.",
 		"properties": {
 			"propertyNames": {
-				"required": ["type"]
+				"anyOf": [
+					{
+						"required": ["type"]
+					},
+					{
+						"required": ["$ref"],
+						"properties": {
+							"$ref": {
+								"$ref": "#/$defs/safeLocalDefsRef"
+							}
+						}
+					}
+				]
+			}
+		},
+		"required": ["maxProperties"]
+	},
+	"dependentSchemas.propertyNames.draft-06-07": {
+		"$comment": "draft-06/07 variant of dependentSchemas.propertyNames: the local $ref must be #/definitions/<name>, since $defs is not a classic-draft keyword. Classic drafts also ignore $ref siblings, so dependentSchemas.$ref.draft keeps such a propertyNames a bare $ref apart from annotations.",
+		"properties": {
+			"propertyNames": {
+				"anyOf": [
+					{
+						"required": ["type"]
+					},
+					{
+						"required": ["$ref"],
+						"properties": {
+							"$ref": {
+								"$ref": "#/$defs/safeLocalDefinitionsRef"
+							}
+						}
+					}
+				]
 			}
 		},
 		"required": ["maxProperties"]
@@ -1264,7 +1298,7 @@
 		}
 	},
 	"dependentSchemas.$ref.draft": {
-		"$comment": "Like dependentSchemas.$ref but only #/definitions/<name> for classic drafts (draft-04/06/07) that do not support $defs.",
+		"$comment": "Like dependentSchemas.$ref but only #/definitions/<name> for classic drafts (draft-04/06/07) that do not support $defs. Those drafts require every other keyword in a $ref object to be ignored (draft-07 core 8.3), so a spec-strict validator never applies bounds placed beside a $ref even though AJV does. Siblings are therefore an allow-list of keywords with no validation meaning ($schema, $id, id, $comment, title, description, examples, readOnly, writeOnly, definitions); anything else fails closed via refSiblingIgnored. A draft that lacks one of these keywords still rejects it through its own schemaBase (draft-04 bans examples, readOnly and writeOnly; draft-06 bans readOnly and writeOnly). default is deliberately not allowed: AJV applies a sibling default under useDefaults while spec-strict validators ignore it, so it changes behaviour. Wrap the $ref in allOf to combine it with other keywords: { \"allOf\": [{ \"$ref\": \"...\" }], \"maxLength\": 8 }.",
 		"properties": {
 			"$ref": {
 				"anyOf": [
@@ -1275,9 +1309,23 @@
 						"$ref": "#/$defs/safeLocalDefinitionsRef"
 					}
 				]
-			}
+			},
+			"$schema": true,
+			"$id": true,
+			"id": true,
+			"$comment": true,
+			"title": true,
+			"description": true,
+			"examples": true,
+			"readOnly": true,
+			"writeOnly": true,
+			"definitions": true
+		},
+		"additionalProperties": {
+			"$ref": "#/$defs/refSiblingIgnored"
 		}
 	},
+	"refSiblingIgnored": false,
 	"dependentSchemas.$anchor": {
 		"properties": {
 			"$anchor": {

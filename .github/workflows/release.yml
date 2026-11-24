@@ -5,7 +5,7 @@ on:
     types: [closed]
     branches: [main]
     paths:
-      - 'package.json'
+      - "package.json"
 
 concurrency:
   # github.ref is the per-PR merge ref, so keying on it would let two releases
@@ -147,7 +147,6 @@ jobs:
         with:
           subject-path: |
             *.tgz
-      # upload-artifact is independently versioned from download-artifact; v7.0.1 is the latest major (no v8.x exists)
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -180,7 +179,7 @@ jobs:
         with:
           name: ${{ needs.build.outputs.tag }}
       - name: Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.2 # zizmor: ignore[superfluous-actions] prefer maintained action over inline `gh release` script
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3 # zizmor: ignore[superfluous-actions] prefer maintained action over inline `gh release` script
         with:
           draft: true
           prerelease: ${{ needs.build.outputs.prerelease }}

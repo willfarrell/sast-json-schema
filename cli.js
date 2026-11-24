@@ -309,6 +309,25 @@ const resolveDangerousNames = (lang) => {
 const SCHEMA_PATH_MAX_ITEMS = "#/$defs/safeArrayItemsLimits/maxItems";
 const SCHEMA_PATH_MAX_PROPERTIES =
 	"#/$defs/safeObjectPropertiesLimits/maxProperties";
+const SCHEMA_PATH_REF_SIBLING = "#/$defs/refSiblingIgnored/false schema";
+
+// RFC 6901 JSON Pointer token unescaping: ~1 → /, then ~0 → ~.
+const unescapeJsonPointer = (token) =>
+	token.replace(/~1/g, "/").replace(/~0/g, "~");
+
+// AJV reports a false schema as "boolean schema is false", which gives no
+// reason, and SARIF and JSON carry the message without the path, so the
+// message names the keyword (the last segment of the path) itself.
+const refSiblingMessage = (instancePath) => {
+	const keyword = unescapeJsonPointer(
+		instancePath.slice(instancePath.lastIndexOf("/") + 1),
+	);
+	return `${JSON.stringify(keyword)} is ignored next to $ref in draft-04, draft-06 and draft-07; move the $ref into allOf to keep it`;
+};
+const explainMetaSchemaError = (err) =>
+	err.schemaPath === SCHEMA_PATH_REF_SIBLING
+		? { ...err, message: refSiblingMessage(err.instancePath) }
+		: err;
 
 // Returns the SAST validator for the draft declared by `schema.$schema`,
 // compiling it on first use (memoized in compiledSchemas). Defaults to
@@ -430,16 +449,17 @@ const INSTANCE_DATA_KEYS = new Set([
 	"errorMessage",
 ]);
 
-// Keywords whose value maps NAMES to subschemas. Inside one of these, a key
-// such as "default" or "enum" is a property/definition name, not instance
-// data, so INSTANCE_DATA_KEYS must not skip it (otherwise naming a property
-// "default" hides its whole subtree from every crawl check).
-const SCHEMA_MAP_KEYS = new Set([
+// Keywords whose value maps NAMES to subschemas or to lists of names. Inside
+// one of these, a key such as "default" or "enum" is a property/definition
+// name, not instance data, so INSTANCE_DATA_KEYS must not skip it (otherwise
+// naming a property "default" hides its whole subtree from every crawl check).
+const NAME_MAP_KEYS = new Set([
 	"properties",
 	"patternProperties",
 	"$defs",
 	"definitions",
 	"dependentSchemas",
+	"dependentRequired",
 	"dependencies",
 ]);
 
@@ -542,6 +562,33 @@ function* regexAtoms(pattern) {
 	}
 }
 
+const ANNOTATION_KEYWORDS = new Set(["$comment", "title", "description"]);
+
+const admitsString = (type) =>
+	type === "string" || (Array.isArray(type) && type.includes("string"));
+
+// Returns a test for the names a propertyNames `not` rejects, or null when the
+// `not` holds anything that test cannot account for, so it excludes nothing.
+const nameRejectionOf = (not) => {
+	if (typeof not !== "object" || not === null) return null;
+	const keys = Object.keys(not).filter((k) => !ANNOTATION_KEYWORDS.has(k));
+	const readable =
+		keys.length > 0 &&
+		keys.every(
+			(k) =>
+				(k === "type" && admitsString(not.type)) ||
+				(k === "enum" && Array.isArray(not.enum)) ||
+				k === "const",
+		);
+	if (!readable) return null;
+	return (name) =>
+		(!keys.includes("enum") || not.enum.includes(name)) &&
+		(!keys.includes("const") || not.const === name);
+};
+
+const NOT_IGNORED_NOTE =
+	"; propertyNames.not ignored: only a string type, an enum array, const, $comment, title and description are understood";
+
 // True when any atom of `pattern` can match a control character, whatever the
 // spelling: a range spanning one ([ -￿]), a property (\p{Any}), an escape
 // or a raw character. The regex engine decides, so no spelling is missed.
@@ -558,6 +605,30 @@ const matchesControlChar = (pattern) => {
 	}
 	return false;
 };
+
+// True when a propertyNames subschema has something the denylist can be
+// checked against.
+const hasKeyRule = (schema) =>
+	typeof schema === "object" &&
+	schema !== null &&
+	(Array.isArray(schema.enum) ||
+		Object.hasOwn(schema, "const") ||
+		typeof schema.pattern === "string");
+
+// The local $ref form the meta-schemas accept for a propertyNames. The name
+// admits nothing that JSON-pointer or percent decoding would change, so a $ref
+// that needs decoding is not followed and fails closed.
+const LOCAL_DEFINITION_REF = /^#\/(\$defs|definitions)\/([-a-zA-Z0-9_.]+)$/;
+
+// The value of an own property of a plain object, so a name such as
+// "toString" never reaches the prototype chain and "0" never indexes an array.
+const ownValue = (object, key) =>
+	typeof object === "object" &&
+	object !== null &&
+	!Array.isArray(object) &&
+	Object.hasOwn(object, key)
+		? object[key]
+		: undefined;
 
 // RFC 6901 JSON Pointer token escaping: ~ → ~0, / → ~1.
 // https://datatracker.ietf.org/doc/html/rfc6901#section-3
@@ -589,6 +660,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 	const denylist = resolveDangerousNames(options.lang);
 	const denySet = new Set(denylist);
 	const lang = options.lang ?? DEFAULT_LANG;
+	const hasPropertyNamesKeyword = schemaVersion(obj.$schema) !== "draft-04";
 	// Records one dangerous-name finding; every site shares this shape.
 	const flagDangerous = (instancePath, keyword, params, what, suffix = "") => {
 		result.errors.push({
@@ -600,12 +672,32 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		});
 	};
 
+	// A propertyNames with no enum, const or pattern of its own that $refs a
+	// definition shares that definition's key rule, and only its `not`: a sibling
+	// of $ref is ignored in draft-06 and draft-07. Returns [definition, path], or
+	// null when the $ref is not followed.
+	const referencedKeyRule = (propertyNames) => {
+		if (hasKeyRule(propertyNames)) return null;
+		const match = LOCAL_DEFINITION_REF.exec(propertyNames?.$ref);
+		if (match === null) return null;
+		const [, container, name] = match;
+		const definition = ownValue(ownValue(obj, container), name);
+		if (!hasKeyRule(definition)) return null;
+		return [definition, `/${container}/${name}`];
+	};
+	// The definition may be visited before or after the propertyNames that
+	// references it, and `visited` stops a second visit, so its key checks run
+	// once after the crawl, using the pattern compiled by its ordinary visit.
+	const referencedKeyRules = new Map();
+	const compiledPatterns = new WeakMap();
+
 	const visited = new WeakSet();
 	visited.add(obj);
 	result.depth = 1;
-	// Entries: [node, path, depth, role, base]. role is "map" for a keyword
-	// value that maps names to subschemas, "names" for a propertyNames
-	// subschema, undefined otherwise.
+	// Entries: [node, path, depth, role, base]. role is "map" for the value of a
+	// NAME_MAP_KEYS keyword, "names" for a propertyNames subschema, undefined
+	// otherwise. The entries of a name map are always ordinary schemas, even
+	// when an entry's name is a keyword.
 	const stack = [[obj, "", 1, undefined, undefined]];
 
 	// Defense in depth: total number of regex patterns ReDoS-analyzed so far.
@@ -715,25 +807,50 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 		return true;
 	};
 
-	// Flags a regex (already vetted by analyzePattern) that matches any
-	// denylisted name; `label` names the site in the message.
-	const flagPatternMatches = (pattern, instancePath, keyword, label) => {
-		try {
-			// "u" like AJV, so \p{...} and friends mean what the validator reads.
-			// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
-			const re = new RegExp(pattern, "u");
-			const matches = denylist.filter((n) => re.test(n));
-			if (matches.length > 0) {
-				flagDangerous(
-					instancePath,
-					keyword,
-					{ pattern, matches },
-					`${label} "${pattern}" matches deserialization vector(s)`,
-					`: ${matches.join(", ")}`,
-				);
+	const flagPatternMatches = ({
+		pattern,
+		re,
+		propertyNamesNot,
+		instancePath,
+		keyword,
+		label,
+	}) => {
+		const isRejected = nameRejectionOf(propertyNamesNot);
+		const notIgnored = propertyNamesNot !== undefined && isRejected === null;
+		const matches = denylist.filter((n) => !isRejected?.(n) && re.test(n));
+		if (matches.length > 0) {
+			flagDangerous(
+				instancePath,
+				keyword,
+				{ pattern, matches, ...(notIgnored && { notIgnored }) },
+				`${label} "${pattern}" matches deserialization vector(s)`,
+				`: ${matches.join(", ")}${notIgnored ? NOT_IGNORED_NOTE : ""}`,
+			);
+		}
+	};
+
+	// propertyNames is an allowlist of instance keys: an enum entry or const
+	// naming a deserialization vector admits it like declaring the property.
+	const flagKeyRuleNames = (keyRule, path) => {
+		if (Array.isArray(keyRule.enum)) {
+			for (const [i, name] of keyRule.enum.entries()) {
+				if (denySet.has(name)) {
+					flagDangerous(
+						`${path}/enum/${i}`,
+						"propertyNames",
+						{ name },
+						`propertyNames entry "${name}" is a deserialization vector`,
+					);
+				}
 			}
-		} catch {
-			// unparseable regex; meta-schema safePattern rejects it
+		}
+		if (denySet.has(keyRule.const)) {
+			flagDangerous(
+				`${path}/const`,
+				"propertyNames",
+				{ name: keyRule.const },
+				`propertyNames const "${keyRule.const}" is a deserialization vector`,
+			);
 		}
 	};
 
@@ -762,7 +879,8 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 
 	// ReDoS-analyzes one regex (a `pattern` value or a patternProperties key) and
 	// records any unsafe verdict. `label` prefixes the message so both sites read
-	// the same way. Returns false when the pattern is unsafe or unparseable.
+	// the same way. Returns the compiled RegExp, or null when the pattern is
+	// unsafe or unparseable.
 	const analyzePattern = (pattern, instancePath, keyword, label) => {
 		let reason;
 		try {
@@ -778,7 +896,16 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 				timeout: redosTimeoutMs,
 				unicode: true,
 			});
-			if (patternResult.safe) return true;
+			if (patternResult.safe) {
+				try {
+					// "u" like AJV, so \p{...} and friends mean what the validator reads.
+					// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+					return new RegExp(pattern, "u");
+				} catch {
+					// unparseable regex; meta-schema safePattern rejects it
+					return null;
+				}
+			}
 			// redos-detector always sets error (hitMaxScore) on unsafe verdicts.
 			reason = patternResult.error;
 		} catch {
@@ -803,7 +930,7 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 			params: { pattern, reason },
 			message: `${label} ${tail}`,
 		});
-		return false;
+		return null;
 	};
 
 	while (stack.length > 0) {
@@ -814,278 +941,267 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 
 		const [current, path, currentDepth, role, parentBase] = stack.pop();
 		const isMap = role === "map";
-		// Base URI for resolving relative refs: an absolute $id (resolved against
-		// the enclosing base) replaces it. Inside a name map, "$id" is a property
-		// name, not a keyword.
 		let base = parentBase;
-		if (!isMap && typeof current.$id === "string") {
-			try {
-				base = new URL(current.$id, base).href;
-			} catch {
-				// relative $id with no absolute base, or not a URL: keep the parent's
+		// A name map has no keywords: its keys are names (one may be "$id" or
+		// "required"), so only its entries are crawled.
+		if (!isMap) {
+			// Base URI for resolving relative refs: an absolute $id (resolved against
+			// the enclosing base) replaces it.
+			if (typeof current.$id === "string") {
+				try {
+					base = new URL(current.$id, base).href;
+				} catch {
+					// relative $id with no absolute base, or not a URL: keep the parent's
+				}
 			}
-		}
 
-		const currentType = current.type;
-		const isType = (t) =>
-			currentType === t ||
-			(Array.isArray(currentType) && currentType.includes(t));
+			const currentType = current.type;
+			const isType = (t) =>
+				currentType === t ||
+				(Array.isArray(currentType) && currentType.includes(t));
 
-		// Unsatisfiable min/max pairs. Every pair reports identically (keyword and
-		// schemaPath are the min side), so they are driven from one table; the
-		// numeric range check below is separate because exclusive bounds make it
-		// a four-keyword comparison rather than a straight min > max.
-		for (const [type, minKey, maxKey] of MIN_MAX_PAIRS) {
+			// Unsatisfiable min/max pairs. Every pair reports identically (keyword and
+			// schemaPath are the min side), so they are driven from one table; the
+			// numeric range check below is separate because exclusive bounds make it
+			// a four-keyword comparison rather than a straight min > max.
+			for (const [type, minKey, maxKey] of MIN_MAX_PAIRS) {
+				if (
+					isType(type) &&
+					Object.hasOwn(current, minKey) &&
+					Object.hasOwn(current, maxKey) &&
+					current[minKey] > current[maxKey]
+				) {
+					result.errors.push({
+						instancePath: path,
+						schemaPath: `#/${minKey}`,
+						keyword: minKey,
+						params: {
+							[minKey]: current[minKey],
+							[maxKey]: current[maxKey],
+						},
+						message: `${minKey} must be less than or equal to ${maxKey}`,
+					});
+				}
+			}
+
+			if (isType("integer") || isType("number")) {
+				const rangeError = checkNumericRange(current, path);
+				if (rangeError) result.errors.push(rangeError);
+			}
+
 			if (
-				isType(type) &&
-				Object.hasOwn(current, minKey) &&
-				Object.hasOwn(current, maxKey) &&
-				current[minKey] > current[maxKey]
+				Object.hasOwn(current, "pattern") &&
+				typeof current.pattern === "string"
 			) {
-				result.errors.push({
-					instancePath: path,
-					schemaPath: `#/${minKey}`,
-					keyword: minKey,
-					params: {
-						[minKey]: current[minKey],
-						[maxKey]: current[maxKey],
-					},
-					message: `${minKey} must be less than or equal to ${maxKey}`,
-				});
-			}
-		}
-
-		if (isType("integer") || isType("number")) {
-			const rangeError = checkNumericRange(current, path);
-			if (rangeError) result.errors.push(rangeError);
-		}
-
-		if (
-			Object.hasOwn(current, "pattern") &&
-			typeof current.pattern === "string"
-		) {
-			// Check the deadline BEFORE the (potentially expensive) analysis: the
-			// once-per-pop check above is not enough when one stack frame holds many
-			// patterns. Bail to the timeout path on an expired deadline. Exercised
-			// deterministically by an injected clock that is under-deadline at the
-			// once-per-pop check and over it here (see cli.crawl.test.js).
-			if (deadlinePassed()) {
-				timeoutBail();
-				return result;
-			}
-			checkPatternShape(current.pattern, `${path}/pattern`, "pattern");
-			redosPatternCount++;
-			// Skip analysis (of this and every later pattern) once a backstop trips:
-			// the total-pattern cap or the heap circuit breaker (primary memory bound).
-			if (
-				!redosBudgetExceeded(`${path}/pattern`) &&
-				!redosHeapExceeded(`${path}/pattern`)
-			) {
-				const safe = analyzePattern(
-					current.pattern,
-					`${path}/pattern`,
-					"pattern",
-					"pattern",
-				);
-				// A propertyNames pattern admits every key it matches. Only a pattern
-				// that just passed ReDoS analysis is executed against the denylist.
-				if (safe && role === "names") {
-					flagPatternMatches(
-						current.pattern,
-						`${path}/pattern`,
-						"propertyNames",
-						"propertyNames pattern",
-					);
-				}
-			}
-		}
-		for (const siteKey of [
-			"properties",
-			"$defs",
-			"definitions",
-			"dependentSchemas",
-			"dependentRequired",
-			"dependencies",
-		]) {
-			const site = current[siteKey];
-			if (typeof site === "object" && site !== null && !Array.isArray(site)) {
-				for (const name of Object.keys(site)) {
-					if (denySet.has(name)) {
-						flagDangerous(
-							`${path}/${siteKey}/${escapeJsonPointer(name)}`,
-							siteKey,
-							{ name },
-							`${siteKey} key "${name}" is a deserialization vector`,
-						);
-					}
-				}
-			}
-		}
-
-		// propertyNames is an allowlist of instance keys: an enum entry or const
-		// naming a deserialization vector admits it like declaring the property.
-		// Anything else (format, $ref, a combinator, a bare maxLength) cannot be
-		// checked against the denylist, so it fails closed.
-		if (role === "names") {
-			if (
-				!Array.isArray(current.enum) &&
-				!Object.hasOwn(current, "const") &&
-				typeof current.pattern !== "string"
-			) {
-				flagDangerous(
-					path,
-					"propertyNames",
-					{},
-					"propertyNames has no enum, const or pattern to rule out deserialization vectors",
-				);
-			}
-			if (Array.isArray(current.enum)) {
-				for (const [i, name] of current.enum.entries()) {
-					if (denySet.has(name)) {
-						flagDangerous(
-							`${path}/enum/${i}`,
-							"propertyNames",
-							{ name },
-							`propertyNames entry "${name}" is a deserialization vector`,
-						);
-					}
-				}
-			}
-			if (denySet.has(current.const)) {
-				flagDangerous(
-					`${path}/const`,
-					"propertyNames",
-					{ name: current.const },
-					`propertyNames const "${current.const}" is a deserialization vector`,
-				);
-			}
-		}
-
-		if (Array.isArray(current.required)) {
-			for (const [i, name] of current.required.entries()) {
-				// denySet only holds strings, so has(non-string) is already false.
-				if (denySet.has(name)) {
-					flagDangerous(
-						`${path}/required/${i}`,
-						"required",
-						{ name },
-						`required entry "${name}" is a deserialization vector`,
-					);
-				}
-			}
-		}
-
-		// `dependencies` is the pre-2019-09 spelling of dependentRequired (array of
-		// property names) fused with dependentSchemas (subschema). Only the array
-		// shape names properties, and the Array.isArray guard below skips the rest.
-		for (const depKey of ["dependentRequired", "dependencies"]) {
-			const site = current[depKey];
-			if (typeof site === "object" && site !== null && !Array.isArray(site)) {
-				for (const [trigger, deps] of Object.entries(site)) {
-					// A non-array deps value (malformed, or a `dependencies` subschema)
-					// has no .entries(); skipping it keeps adversarial input from
-					// throwing (pinned by a crawl test).
-					if (Array.isArray(deps)) {
-						for (const [i, name] of deps.entries()) {
-							// denySet only holds strings, so has(non-string) is already false.
-							if (denySet.has(name)) {
-								flagDangerous(
-									`${path}/${depKey}/${escapeJsonPointer(trigger)}/${i}`,
-									depKey,
-									{ name },
-									`${depKey} entry "${name}" is a deserialization vector`,
-								);
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// ReDoS scanning of patternProperties keys is independent of the
-		// dangerous-name denylist, so it runs unconditionally; the dangerous-name
-		// match below self-gates (filtering an empty denylist yields no matches).
-		if (
-			typeof current.patternProperties === "object" &&
-			current.patternProperties !== null &&
-			!Array.isArray(current.patternProperties)
-		) {
-			for (const patternKey of Object.keys(current.patternProperties)) {
-				const keyPath = `${path}/patternProperties/${escapeJsonPointer(patternKey)}`;
-				// Check the deadline before each key: a single object can carry many
-				// patternProperties keys, all analyzed in ONE stack frame, so the
-				// once-per-pop check above never fires between them. Exercised with an
-				// injected clock that crosses the deadline before a later key (see
-				// cli.crawl.test.js).
+				// Check the deadline BEFORE the (potentially expensive) analysis: the
+				// once-per-pop check above is not enough when one stack frame holds many
+				// patterns. Bail to the timeout path on an expired deadline. Exercised
+				// deterministically by an injected clock that is under-deadline at the
+				// once-per-pop check and over it here (see cli.crawl.test.js).
 				if (deadlinePassed()) {
 					timeoutBail();
 					return result;
 				}
-				checkPatternShape(patternKey, keyPath, "patternProperties");
+				checkPatternShape(current.pattern, `${path}/pattern`, "pattern");
 				redosPatternCount++;
-				// Stop analyzing further patterns once a backstop trips: the
-				// total-pattern cap or the heap circuit breaker (primary memory bound).
-				if (redosBudgetExceeded(keyPath) || redosHeapExceeded(keyPath)) break;
+				// Skip analysis (of this and every later pattern) once a backstop trips:
+				// the total-pattern cap or the heap circuit breaker (primary memory bound).
 				if (
-					!analyzePattern(
+					!redosBudgetExceeded(`${path}/pattern`) &&
+					!redosHeapExceeded(`${path}/pattern`)
+				) {
+					const re = analyzePattern(
+						current.pattern,
+						`${path}/pattern`,
+						"pattern",
+						"pattern",
+					);
+					compiledPatterns.set(current, re);
+					if (re && role === "names") {
+						flagPatternMatches({
+							pattern: current.pattern,
+							re,
+							propertyNamesNot: current.not,
+							instancePath: `${path}/pattern`,
+							keyword: "propertyNames",
+							label: "propertyNames pattern",
+						});
+					}
+				}
+			}
+			for (const siteKey of [
+				"properties",
+				"$defs",
+				"definitions",
+				"dependentSchemas",
+				"dependentRequired",
+				"dependencies",
+			]) {
+				const site = current[siteKey];
+				if (typeof site === "object" && site !== null && !Array.isArray(site)) {
+					for (const name of Object.keys(site)) {
+						if (denySet.has(name)) {
+							flagDangerous(
+								`${path}/${siteKey}/${escapeJsonPointer(name)}`,
+								siteKey,
+								{ name },
+								`${siteKey} key "${name}" is a deserialization vector`,
+							);
+						}
+					}
+				}
+			}
+
+			// A propertyNames without an enum, const or pattern, of its own or in the
+			// local definition its $ref names, cannot be checked against the
+			// denylist (format, a combinator, a bare maxLength), so it fails closed.
+			if (role === "names") {
+				if (!hasKeyRule(current)) {
+					const keyRule = referencedKeyRule(current);
+					if (keyRule === null) {
+						flagDangerous(
+							path,
+							"propertyNames",
+							{},
+							"propertyNames has no enum, const or pattern to rule out deserialization vectors",
+						);
+					} else {
+						referencedKeyRules.set(...keyRule);
+					}
+				}
+				flagKeyRuleNames(current, path);
+			}
+
+			if (Array.isArray(current.required)) {
+				for (const [i, name] of current.required.entries()) {
+					// denySet only holds strings, so has(non-string) is already false.
+					if (denySet.has(name)) {
+						flagDangerous(
+							`${path}/required/${i}`,
+							"required",
+							{ name },
+							`required entry "${name}" is a deserialization vector`,
+						);
+					}
+				}
+			}
+
+			// `dependencies` is the pre-2019-09 spelling of dependentRequired (array of
+			// property names) fused with dependentSchemas (subschema). Only the array
+			// shape names properties, and the Array.isArray guard below skips the rest.
+			for (const depKey of ["dependentRequired", "dependencies"]) {
+				const site = current[depKey];
+				if (typeof site === "object" && site !== null && !Array.isArray(site)) {
+					for (const [trigger, deps] of Object.entries(site)) {
+						// A non-array deps value (malformed, or a `dependencies` subschema)
+						// has no .entries(); skipping it keeps adversarial input from
+						// throwing (pinned by a crawl test).
+						if (Array.isArray(deps)) {
+							for (const [i, name] of deps.entries()) {
+								// denySet only holds strings, so has(non-string) is already false.
+								if (denySet.has(name)) {
+									flagDangerous(
+										`${path}/${depKey}/${escapeJsonPointer(trigger)}/${i}`,
+										depKey,
+										{ name },
+										`${depKey} entry "${name}" is a deserialization vector`,
+									);
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// ReDoS scanning of patternProperties keys is independent of the
+			// dangerous-name denylist, so it runs unconditionally; the dangerous-name
+			// match below self-gates (filtering an empty denylist yields no matches).
+			if (
+				typeof current.patternProperties === "object" &&
+				current.patternProperties !== null &&
+				!Array.isArray(current.patternProperties)
+			) {
+				for (const patternKey of Object.keys(current.patternProperties)) {
+					const keyPath = `${path}/patternProperties/${escapeJsonPointer(patternKey)}`;
+					// Check the deadline before each key: a single object can carry many
+					// patternProperties keys, all analyzed in ONE stack frame, so the
+					// once-per-pop check above never fires between them. Exercised with an
+					// injected clock that crosses the deadline before a later key (see
+					// cli.crawl.test.js).
+					if (deadlinePassed()) {
+						timeoutBail();
+						return result;
+					}
+					checkPatternShape(patternKey, keyPath, "patternProperties");
+					redosPatternCount++;
+					// Stop analyzing further patterns once a backstop trips: the
+					// total-pattern cap or the heap circuit breaker (primary memory bound).
+					if (redosBudgetExceeded(keyPath) || redosHeapExceeded(keyPath)) break;
+					const re = analyzePattern(
 						patternKey,
 						keyPath,
 						"patternProperties",
 						`patternProperties key "${patternKey}"`,
-					)
-				) {
-					continue;
+					);
+					if (!re) continue;
+					flagPatternMatches({
+						pattern: patternKey,
+						re,
+						propertyNamesNot: hasPropertyNamesKeyword
+							? (
+									referencedKeyRule(current.propertyNames)?.[0] ??
+									current.propertyNames
+								)?.not
+							: undefined,
+						instancePath: keyPath,
+						keyword: "patternProperties",
+						label: "patternProperties key",
+					});
 				}
-				flagPatternMatches(
-					patternKey,
-					keyPath,
-					"patternProperties",
-					"patternProperties key",
-				);
 			}
-		}
 
-		// Collect remote $ref, $dynamicRef (2020-12), and $recursiveRef (2019-09)
-		// URLs as SSRF fetch targets. A relative ref is resolved against the $id
-		// base, because that is where a loader fetches it from. A bare $id is NOT
-		// collected: it declares an identifier, not a fetch target, and the
-		// -r/--ref-schema-files flag uses $id hostnames as the SAFE list.
-		for (const refKey of ["$ref", "$dynamicRef", "$recursiveRef"]) {
-			const refValue = current[refKey];
-			if (
-				Object.hasOwn(current, refKey) &&
-				typeof refValue === "string" &&
-				!refValue.startsWith("#")
-			) {
-				try {
-					const url = new URL(refValue, base);
-					if (url.hostname) {
-						// Backstop: stop buffering once the collected-refs cap is reached,
-						// recording one truncation finding. Without this, a schema with a
-						// huge number of refs could accumulate an unbounded array before
-						// the later distinct-hostname cap ever applies.
-						if (result.refs.length >= MAX_COLLECTED_REFS) {
-							if (!refsTruncated) {
-								refsTruncated = true;
-								result.errors.push({
-									instancePath: `${path}/${refKey}`,
-									schemaPath: "#/refs-truncated",
-									keyword: "$ref",
-									params: { limit: MAX_COLLECTED_REFS, incomplete: true },
-									message: `more than ${MAX_COLLECTED_REFS} remote $ref(s); remaining refs not collected for SSRF analysis`,
+			// Collect remote $ref, $dynamicRef (2020-12), and $recursiveRef (2019-09)
+			// URLs as SSRF fetch targets. A relative ref is resolved against the $id
+			// base, because that is where a loader fetches it from. A bare $id is NOT
+			// collected: it declares an identifier, not a fetch target, and the
+			// -r/--ref-schema-files flag uses $id hostnames as the SAFE list.
+			for (const refKey of ["$ref", "$dynamicRef", "$recursiveRef"]) {
+				const refValue = current[refKey];
+				if (
+					Object.hasOwn(current, refKey) &&
+					typeof refValue === "string" &&
+					!refValue.startsWith("#")
+				) {
+					try {
+						const url = new URL(refValue, base);
+						if (url.hostname) {
+							// Backstop: stop buffering once the collected-refs cap is reached,
+							// recording one truncation finding. Without this, a schema with a
+							// huge number of refs could accumulate an unbounded array before
+							// the later distinct-hostname cap ever applies.
+							if (result.refs.length >= MAX_COLLECTED_REFS) {
+								if (!refsTruncated) {
+									refsTruncated = true;
+									result.errors.push({
+										instancePath: `${path}/${refKey}`,
+										schemaPath: "#/refs-truncated",
+										keyword: "$ref",
+										params: { limit: MAX_COLLECTED_REFS, incomplete: true },
+										message: `more than ${MAX_COLLECTED_REFS} remote $ref(s); remaining refs not collected for SSRF analysis`,
+									});
+								}
+							} else {
+								result.refs.push({
+									hostname: url.hostname,
+									// Report a relative ref by its resolved URL.
+									ref: URL.canParse(refValue) ? refValue : url.href,
+									path: `${path}/${refKey}`,
 								});
 							}
-						} else {
-							result.refs.push({
-								hostname: url.hostname,
-								// Report a relative ref by its resolved URL.
-								ref: URL.canParse(refValue) ? refValue : url.href,
-								path: `${path}/${refKey}`,
-							});
 						}
+					} catch {
+						// not a valid URL, skip
 					}
-				} catch {
-					// not a valid URL, skip
 				}
 			}
 		}
@@ -1112,16 +1228,33 @@ export const crawlSchema = (obj, maxDepth = MAX_DEPTH, options = {}) => {
 						value,
 						`${path}/${escapeJsonPointer(key)}`,
 						newDepth,
-						SCHEMA_MAP_KEYS.has(key)
-							? "map"
-							: !isMap && key === "propertyNames"
-								? "names"
-								: undefined,
+						isMap
+							? undefined
+							: NAME_MAP_KEYS.has(key)
+								? "map"
+								: key === "propertyNames"
+									? "names"
+									: undefined,
 						base,
 					]);
 				}
 			}
 		}
+	}
+
+	for (const [keyRule, keyRulePath] of referencedKeyRules) {
+		const re = compiledPatterns.get(keyRule);
+		if (re) {
+			flagPatternMatches({
+				pattern: keyRule.pattern,
+				re,
+				propertyNamesNot: keyRule.not,
+				instancePath: `${keyRulePath}/pattern`,
+				keyword: "propertyNames",
+				label: "propertyNames pattern",
+			});
+		}
+		flagKeyRuleNames(keyRule, keyRulePath);
 	}
 
 	return result;
@@ -1346,10 +1479,7 @@ export const resolveSSRFRefs = async (refs, options = {}) => {
 export const resolveInstancePath = (obj, pointer) => {
 	if (typeof obj !== "object" || obj === null) return undefined;
 	// An empty pointer splits to zero parts, so the loop below returns obj as-is.
-	const parts = pointer
-		.split("/")
-		.slice(1)
-		.map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
+	const parts = pointer.split("/").slice(1).map(unescapeJsonPointer);
 	let current = obj;
 	for (const part of parts) {
 		if (typeof current !== "object" || current === null) return undefined;
@@ -1472,7 +1602,8 @@ export const analyze = async (schema, options = {}) => {
 	let errors = [];
 	const validate = sast(schema);
 	validate(schema);
-	if (validate.errors) errors.push(...validate.errors);
+	if (validate.errors)
+		errors.push(...validate.errors.map(explainMetaSchemaError));
 	errors.push(...crawl.errors);
 
 	if (!options.offline) {

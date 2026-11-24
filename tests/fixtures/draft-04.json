@@ -157,6 +157,32 @@
         "valid": false
       },
       {
+        "description": "Should fail when propertyNames is a bare $ref to #/definitions/<name> (still draft-06+)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8,
+            "enum": ["a"]
+          },
+          "propertyNames": {
+            "$ref": "#/definitions/key"
+          },
+          "definitions": {
+            "key": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z_]+$"
+            }
+          },
+          "maxProperties": 10,
+          "required": []
+        },
+        "valid": false
+      },
+      {
         "description": "Should fail when schema uses examples (draft-06+)",
         "data": {
           "$schema": "https://json-schema.org/draft-04/schema",
@@ -460,6 +486,105 @@
           "$schema": "https://json-schema.org/draft-04/schema",
           "id": "test",
           "type": "object"
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "draft-04 $ref siblings are ignored by spec-strict validators",
+    "schema": {
+      "$ref": "urn:willfarrell:sast-json-schema:draft-04"
+    },
+    "tests": [
+      {
+        "description": "Should fail when $ref has a maxLength sibling",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/name",
+              "maxLength": 3
+            }
+          },
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should pass a root $ref with legacy id and definitions beside it",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "$ref": "#/definitions/Root",
+          "definitions": {
+            "Root": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": true
+      },
+      {
+        "description": "Should fail when $ref has an examples sibling (examples is not a draft-04 keyword)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/name",
+              "examples": ["alice"]
+            }
+          },
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
+        },
+        "valid": false
+      },
+      {
+        "description": "Should fail when $ref has a default sibling (AJV useDefaults applies it, spec-strict validators ignore it)",
+        "data": {
+          "$schema": "https://json-schema.org/draft-04/schema",
+          "id": "test",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 10,
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/name",
+              "default": "alice"
+            }
+          },
+          "definitions": {
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z]+$"
+            }
+          }
         },
         "valid": false
       }
